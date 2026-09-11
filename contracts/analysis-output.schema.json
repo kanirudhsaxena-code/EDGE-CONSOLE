@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "edge-console.analysis-output.v1",
+  "title": "EDGE Console Analysis Output Contract V1",
+  "type": "object",
+  "required": ["contract_version", "run_id", "engine", "framework_version", "status", "provenance", "generated_at", "result"],
+  "properties": {
+    "contract_version": {"const": "1.0"},
+    "run_id": {"type": "string", "minLength": 1},
+    "engine": {"enum": ["5DR", "EDGE_STOCKS", "EDGE_IPO"]},
+    "framework_version": {"type": "string"},
+    "status": {"enum": ["SUCCESS", "PARTIAL", "FAILED", "SHADOW"]},
+    "provenance": {
+      "type": "object",
+      "required": ["mode", "sources"],
+      "properties": {
+        "mode": {"enum": ["MANUAL", "HYBRID", "AUTOMATED"]},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "freshness_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "generated_at": {"type": "string", "format": "date-time"},
+    "result": {"type": "object"},
+    "warnings": {"type": "array", "items": {"type": "string"}},
+    "learning_eligible": {"type": "boolean", "default": true}
+  },
+  "additionalProperties": true
+}
