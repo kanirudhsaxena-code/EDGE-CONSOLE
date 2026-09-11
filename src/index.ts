@@ -2,12 +2,22 @@ import { neon } from '@neondatabase/serverless';
 
 type Env = {
   ASSETS: Fetcher;
+  EVIDENCE_BUCKET: R2Bucket;
   DATABASE_URL?: string;
   APP_ENV: string;
   OUTPUT_CONTRACT_VERSION: string;
 };
 
 type JsonRecord = Record<string, unknown>;
+
+const MAX_EVIDENCE_FILES = 10;
+const MAX_EVIDENCE_FILE_BYTES = 10 * 1024 * 1024;
+const ALLOWED_EVIDENCE_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/pdf'
+]);
 
 const json = (data: unknown, status = 200) =>
   new Response(JSON.stringify(data, null, 2), {
@@ -20,6 +30,18 @@ const isObject = (value: unknown): value is JsonRecord =>
 
 const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
+
+const sanitizeFilename = (name: string) => {
+  const cleaned = name.replace(/[^a-zA-Z0-9._-]+/g, '-').replace(/-+/g, '-');
+  return cleaned.slice(0, 120) || 'evidence';
+};
+
+const evidencePrefix = (engine: string, now: Date) => {
+  const yyyy = now.getUTCFullYear();
+  const mm = String(now.getUTCMonth() + 1).padStart(2, '0');
+  const dd = String(now.getUTCDate()).padStart(2, '0');
+  return `${engine.toLowerCase()}/${yyyy}/${mm}/${dd}`;
+};
 
 function validate5drResult(result: unknown): string[] {
   const errors: string[] = [];
@@ -86,6 +108,108 @@ function validate5drEnvelope(body: unknown): string[] {
   return errors;
 }
 
+async function uploadEvidence(request: Request, env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
+  if (!env.EVIDENCE_BUCKET) return json({ error: 'Evidence storage is not configured' }, 503);
+
+  let form: FormData;
+  try {
+    form = await request.formData();
+  } catch {
+    return json({ error: 'Invalid multipart form data' }, 400);
+  }
+
+  const engine = String(form.get('engine') || '').trim();
+  const provenanceMode = String(form.get('provenance_mode') || '').trim().toUpperCase();
+  const capturedAtRaw = String(form.get('captured_at') || '').trim();
+  const files = form.getAll('files').filter((entry): entry is File => entry instanceof File);
+
+  if (engine !== '5DR') return json({ error: 'Evidence upload currently supports 5DR only' }, 422);
+  if (!['MANUAL', 'HYBRID', 'AUTOMATED'].includes(provenanceMode)) {
+    return json({ error: 'provenance_mode must be MANUAL, HYBRID or AUTOMATED' }, 422);
+  }
+  if (!files.length) return json({ error: 'At least one evidence file is required' }, 422);
+  if (files.length > MAX_EVIDENCE_FILES) {
+    return json({ error: `Maximum ${MAX_EVIDENCE_FILES} evidence files per upload` }, 413);
+  }
+
+  for (const file of files) {
+    if (!ALLOWED_EVIDENCE_TYPES.has(file.type)) {
+      return json({ error: `Unsupported evidence type: ${file.type || 'unknown'}`, file: file.name }, 415);
+    }
+    if (file.size <= 0 || file.size > MAX_EVIDENCE_FILE_BYTES) {
+      return json({ error: 'Each evidence file must be between 1 byte and 10 MB', file: file.name }, 413);
+    }
+  }
+
+  const capturedAt = capturedAtRaw && !Number.isNaN(Date.parse(capturedAtRaw))
+    ? new Date(capturedAtRaw).toISOString()
+    : new Date().toISOString();
+  const now = new Date();
+  const uploadBatchId = crypto.randomUUID();
+  const sql = neon(env.DATABASE_URL);
+  const uploaded: Array<Record<string, unknown>> = [];
+  const storedKeys: string[] = [];
+
+  try {
+    for (const file of files) {
+      const uploadId = crypto.randomUUID();
+      const filename = sanitizeFilename(file.name);
+      const objectKey = `${evidencePrefix(engine, now)}/${uploadBatchId}/${uploadId}-${filename}`;
+
+      await env.EVIDENCE_BUCKET.put(objectKey, file.stream(), {
+        httpMetadata: { contentType: file.type },
+        customMetadata: {
+          engine,
+          provenance_mode: provenanceMode,
+          upload_id: uploadId,
+          batch_id: uploadBatchId,
+          original_filename: filename,
+          captured_at: capturedAt
+        }
+      });
+      storedKeys.push(objectKey);
+
+      await sql`
+        insert into evidence_uploads (
+          upload_id, batch_id, engine, provenance_mode, object_key, file_name,
+          mime_type, size_bytes, captured_at, status, metadata
+        ) values (
+          ${uploadId}, ${uploadBatchId}, ${engine}, ${provenanceMode}, ${objectKey}, ${filename},
+          ${file.type}, ${file.size}, ${capturedAt}, 'STAGED',
+          ${JSON.stringify({ storage: 'R2', bucket_binding: 'EVIDENCE_BUCKET' })}::jsonb
+        )
+      `;
+
+      uploaded.push({
+        upload_id: uploadId,
+        file_name: filename,
+        mime_type: file.type,
+        size_bytes: file.size,
+        captured_at: capturedAt,
+        status: 'STAGED'
+      });
+    }
+  } catch (error) {
+    console.error('Evidence upload failed', error);
+    await Promise.allSettled(storedKeys.map((key) => env.EVIDENCE_BUCKET.delete(key)));
+    if (uploaded.length) {
+      await sql`delete from evidence_uploads where batch_id = ${uploadBatchId}`;
+    }
+    return json({ error: 'Evidence upload failed; staged files were rolled back' }, 500);
+  }
+
+  return json({
+    ok: true,
+    batch_id: uploadBatchId,
+    engine,
+    provenance_mode: provenanceMode,
+    file_count: uploaded.length,
+    evidence: uploaded,
+    next_step: '5DR engine execution adapter'
+  }, 201);
+}
+
 async function api(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
 
@@ -96,8 +220,13 @@ async function api(request: Request, env: Env): Promise<Response> {
       environment: env.APP_ENV,
       contract_version: env.OUTPUT_CONTRACT_VERSION,
       database_configured: Boolean(env.DATABASE_URL),
+      evidence_storage_configured: Boolean(env.EVIDENCE_BUCKET),
       integrations: { '5DR': 'V2.1.2' }
     });
+  }
+
+  if (url.pathname === '/api/evidence/upload' && request.method === 'POST') {
+    return uploadEvidence(request, env);
   }
 
   if (url.pathname === '/api/engines') {
