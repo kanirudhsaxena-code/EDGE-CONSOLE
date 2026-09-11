@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#0b1020" />
+  <title>EDGE Console</title>
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <main class="shell">
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">DECISION INTELLIGENCE</div>
+        <h1>EDGE Console</h1>
+      </div>
+      <div id="health" class="pill">Checking…</div>
+    </header>
+
+    <section class="hero card">
+      <div>
+        <div class="eyebrow">CONTROL PANEL</div>
+        <h2>One console. Three engines.</h2>
+        <p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p>
+      </div>
+      <button id="runButton" class="primary">Run analysis</button>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h3>Engines</h3>
+        <span>Live foundation status</span>
+      </div>
+      <div id="engines" class="grid"></div>
+    </section>
+
+    <section>
+      <div class="section-head">
+        <h3>Latest published runs</h3>
+        <span id="runsNote">Loading</span>
+      </div>
+      <div id="runs" class="stack"></div>
+    </section>
+  </main>
+
+  <nav class="bottom-nav" aria-label="Primary">
+    <button class="active">Home</button>
+    <button>Run</button>
+    <button>5DR</button>
+    <button>EDGE</button>
+    <button>IPO</button>
+  </nav>
+
+  <dialog id="runDialog">
+    <form method="dialog" class="dialog-card">
+      <div class="section-head"><h3>Run Analysis</h3><button value="cancel" class="ghost">Close</button></div>
+      <label>Engine
+        <select>
+          <option>5DR</option>
+          <option>EDGE Stocks</option>
+          <option>EDGE IPO</option>
+        </select>
+      </label>
+      <label>Evidence mode
+        <select>
+          <option>Hybrid</option>
+          <option>Manual</option>
+          <option>Automated</option>
+        </select>
+      </label>
+      <label class="upload">Upload screenshots or evidence
+        <input type="file" accept="image/*,.pdf" multiple />
+      </label>
+      <p class="muted">Execution is intentionally disabled until engine adapters and persistence are connected.</p>
+      <button class="primary" value="cancel">Foundation ready</button>
+    </form>
+  </dialog>
+
+  <script type="module" src="/app.js"></script>
+</body>
+</html>
