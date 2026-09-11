@@ -7,6 +7,12 @@
     "directory": "./public",
     "binding": "ASSETS"
   },
+  "r2_buckets": [
+    {
+      "binding": "EVIDENCE_BUCKET",
+      "bucket_name": "edge-console-evidence"
+    }
+  ],
   "vars": {
     "APP_ENV": "development",
     "OUTPUT_CONTRACT_VERSION": "1.0"
