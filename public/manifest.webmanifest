@@ -1,0 +1,9 @@
+{
+  "name": "EDGE Console",
+  "short_name": "EDGE",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#07111f",
+  "theme_color": "#0b1020",
+  "description": "Mobile-first decision intelligence console for 5DR, EDGE Stocks and EDGE IPO."
+}
