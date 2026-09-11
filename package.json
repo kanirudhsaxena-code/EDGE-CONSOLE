@@ -1,6 +1,6 @@
 {
   "name": "edge-console",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -12,7 +12,7 @@
     "@neondatabase/serverless": "^1.0.1"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^4.20260910.0",
+    "@cloudflare/workers-types": "latest",
     "typescript": "^5.9.2",
     "wrangler": "^4.34.0"
   }
