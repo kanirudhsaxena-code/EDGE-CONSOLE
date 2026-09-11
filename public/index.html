@@ -66,27 +66,29 @@
   </nav>
 
   <dialog id="runDialog">
-    <form method="dialog" class="dialog-card">
-      <div class="section-head"><h3>Run Analysis</h3><button value="cancel" class="ghost">Close</button></div>
+    <form id="runForm" class="dialog-card">
+      <div class="section-head"><h3>Run Analysis</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
       <label>Engine
         <select id="runEngine">
-          <option>5DR</option>
-          <option>EDGE Stocks</option>
-          <option>EDGE IPO</option>
+          <option value="5DR">5DR</option>
+          <option value="EDGE_STOCKS" disabled>EDGE Stocks — coming next</option>
+          <option value="EDGE_IPO" disabled>EDGE IPO — automated</option>
         </select>
       </label>
       <label>Evidence mode
-        <select>
-          <option>Hybrid</option>
-          <option>Manual</option>
-          <option>Automated</option>
+        <select id="evidenceMode">
+          <option value="HYBRID">Hybrid</option>
+          <option value="MANUAL">Manual</option>
         </select>
       </label>
       <label class="upload">Upload screenshots or evidence
-        <input type="file" accept="image/*,.pdf" multiple />
+        <input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple />
+        <span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span>
       </label>
-      <p class="muted"><strong>5DR:</strong> persistence and release-contract validation are connected. Screenshot ingestion and engine execution are the next adapter step.</p>
-      <button class="primary" value="cancel">5DR integration ready</button>
+      <div id="fileSelection" class="file-selection muted">No files selected.</div>
+      <div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+      <p class="muted"><strong>Current step:</strong> files are staged privately in Cloudflare R2 and recorded in Neon. 5DR engine execution remains the next adapter step.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Stage evidence</button>
     </form>
   </dialog>
 
