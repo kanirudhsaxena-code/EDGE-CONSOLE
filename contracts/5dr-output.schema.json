@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "edge-console.5dr-output.v1",
+  "title": "EDGE Console 5DR Output Envelope",
+  "type": "object",
+  "required": ["contract_version", "run_id", "engine", "framework_version", "status", "provenance", "generated_at", "result"],
+  "properties": {
+    "contract_version": {"const": "1.0"},
+    "run_id": {"type": "string", "minLength": 1},
+    "engine": {"const": "5DR"},
+    "framework_version": {"type": "string", "minLength": 1},
+    "status": {"enum": ["SUCCESS", "PARTIAL", "FAILED", "SHADOW"]},
+    "published": {"type": "boolean"},
+    "provenance": {
+      "type": "object",
+      "required": ["mode", "sources"],
+      "properties": {
+        "mode": {"enum": ["MANUAL", "HYBRID", "AUTOMATED"]},
+        "sources": {"type": "array", "items": {"type": "string"}},
+        "freshness_at": {"type": ["string", "null"], "format": "date-time"}
+      },
+      "additionalProperties": true
+    },
+    "generated_at": {"type": "string", "format": "date-time"},
+    "result": {
+      "type": "object",
+      "required": [
+        "model_version",
+        "output_contract_version",
+        "forecast_assessment",
+        "recommendation_assessment",
+        "assessment_snapshot_complete",
+        "horizon_slots",
+        "recommendation_ledger_complete"
+      ],
+      "properties": {
+        "model_version": {"const": "5DR_V2_1"},
+        "output_contract_version": {"const": "5DR_V2_1_2"},
+        "forecast_assessment": {"type": "string", "minLength": 1},
+        "recommendation_assessment": {"type": "string", "minLength": 1},
+        "assessment_snapshot_complete": {"const": true},
+        "horizon_slots": {
+          "type": "object",
+          "required": ["D+1", "D+2", "D+3", "D+4", "D+5"],
+          "properties": {
+            "D+1": {},
+            "D+2": {},
+            "D+3": {},
+            "D+4": {},
+            "D+5": {}
+          },
+          "additionalProperties": true
+        },
+        "recommendation_ledger_complete": {"const": true}
+      },
+      "additionalProperties": true
+    },
+    "warnings": {"type": "array"},
+    "learning_eligible": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}
