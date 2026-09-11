@@ -30,9 +30,22 @@
     <section>
       <div class="section-head">
         <h3>Engines</h3>
-        <span>Live foundation status</span>
+        <span>Live integration status</span>
       </div>
       <div id="engines" class="grid"></div>
+    </section>
+
+    <section id="fiveDrPanel" class="integration card">
+      <div class="section-head compact">
+        <div>
+          <div class="eyebrow">5DR INTEGRATION</div>
+          <h3>Production contract V2.1.2</h3>
+        </div>
+        <span id="fiveDrState" class="badge">Checking</span>
+      </div>
+      <div id="fiveDrSummary" class="stack">
+        <div class="run muted">Checking latest 5DR publication…</div>
+      </div>
     </section>
 
     <section>
@@ -45,18 +58,18 @@
   </main>
 
   <nav class="bottom-nav" aria-label="Primary">
-    <button class="active">Home</button>
-    <button>Run</button>
-    <button>5DR</button>
-    <button>EDGE</button>
-    <button>IPO</button>
+    <button class="active" data-view="home">Home</button>
+    <button id="navRun" data-view="run">Run</button>
+    <button id="nav5dr" data-view="5dr">5DR</button>
+    <button data-view="edge">EDGE</button>
+    <button data-view="ipo">IPO</button>
   </nav>
 
   <dialog id="runDialog">
     <form method="dialog" class="dialog-card">
       <div class="section-head"><h3>Run Analysis</h3><button value="cancel" class="ghost">Close</button></div>
       <label>Engine
-        <select>
+        <select id="runEngine">
           <option>5DR</option>
           <option>EDGE Stocks</option>
           <option>EDGE IPO</option>
@@ -72,8 +85,8 @@
       <label class="upload">Upload screenshots or evidence
         <input type="file" accept="image/*,.pdf" multiple />
       </label>
-      <p class="muted">Execution is intentionally disabled until engine adapters and persistence are connected.</p>
-      <button class="primary" value="cancel">Foundation ready</button>
+      <p class="muted"><strong>5DR:</strong> persistence and release-contract validation are connected. Screenshot ingestion and engine execution are the next adapter step.</p>
+      <button class="primary" value="cancel">5DR integration ready</button>
     </form>
   </dialog>
 
