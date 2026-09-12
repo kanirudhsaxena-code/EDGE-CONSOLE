@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edge-console",
-  "main": "src/index.ts",
+  "main": "src/router.ts",
   "compatibility_date": "2026-09-11",
   "assets": {
     "directory": "./public",
