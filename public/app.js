@@ -88,6 +88,17 @@ function renderFileSelection() {
 
 evidenceFiles.addEventListener('change', renderFileSelection);
 
+async function createRunRequest(batchId) {
+  const response = await fetch('/api/5dr/run-requests', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ batch_id: batchId })
+  });
+  const data = await response.json().catch(function () { return {}; });
+  if (!response.ok) throw new Error(data.error || 'Could not create 5DR run request.');
+  return data.request;
+}
+
 runForm.addEventListener('submit', async function (event) {
   event.preventDefault();
   const files = Array.from(evidenceFiles.files || []);
@@ -108,7 +119,7 @@ runForm.addEventListener('submit', async function (event) {
   files.forEach(function (file) { form.append('files', file, file.name); });
 
   uploadButton.disabled = true;
-  uploadButton.textContent = 'Staging…';
+  uploadButton.textContent = 'Preparing…';
   setUploadStatus('Uploading securely to private evidence storage…', 'working');
 
   try {
@@ -119,28 +130,41 @@ runForm.addEventListener('submit', async function (event) {
       throw new Error(data.error || detail || 'Evidence upload failed.');
     }
 
-    setUploadStatus('Staged ' + data.file_count + ' file' + (data.file_count === 1 ? '' : 's') + ' successfully. Batch ' + data.batch_id + '.', 'success');
-    fileSelection.innerHTML = '<strong>Evidence staged</strong><span>Private R2 storage + Neon metadata</span>';
+    setUploadStatus('Evidence staged. Creating 5DR engine request…', 'working');
+    const request = await createRunRequest(data.batch_id);
+    setUploadStatus('5DR request ready for engine processing · ' + request.request_id + '.', 'success');
+    fileSelection.innerHTML = [
+      '<strong>Evidence + run request ready</strong>',
+      '<span>' + data.file_count + ' file' + (data.file_count === 1 ? '' : 's') + ' secured in private R2</span>',
+      '<span>Request status: ' + escapeHtml(request.status) + '</span>'
+    ].join('');
     evidenceFiles.value = '';
+    loadDashboard();
   } catch (error) {
     console.error(error);
-    setUploadStatus(error.message || 'Evidence upload failed.', 'error');
+    setUploadStatus(error.message || 'Evidence preparation failed.', 'error');
   } finally {
     uploadButton.disabled = false;
     uploadButton.textContent = 'Stage evidence';
   }
 });
 
-function render5dr(run) {
+function render5dr(run, request) {
   if (!run) {
-    fiveDrState.textContent = 'READY';
+    fiveDrState.textContent = request ? request.status : 'READY';
+    const requestBlock = request ? [
+      '<div class="metric"><span>Latest engine request</span><strong>' + escapeHtml(request.request_id) + '</strong></div>',
+      '<div class="metric"><span>Request status</span><strong>' + escapeHtml(request.status) + '</strong></div>',
+      '<p class="muted">Evidence batch ' + escapeHtml(request.batch_id) + ' · ' + escapeHtml(request.metadata && request.metadata.evidence_file_count ? request.metadata.evidence_file_count : '—') + ' file(s)</p>'
+    ].join('') : '<p class="muted">No engine request has been created yet.</p>';
     fiveDrSummary.innerHTML = [
       '<article class="run">',
-      '<strong>Adapter ready for first 5DR publication</strong>',
-      '<p class="muted">The console validates the current 5DR V2.1.2 release contract before a run can be persisted.</p>',
+      '<strong>5DR V2.1.2 integration</strong>',
+      requestBlock,
+      '<p class="muted">The next adapter stage is evidence classification/normalization followed by 5DR engine execution. Production publication remains blocked until the complete V2.1.2 release contract validates.</p>',
       '<div class="check-grid">',
-      '<span>✓ Forecast Assessment</span><span>✓ Recommendation Assessment</span>',
-      '<span>✓ D+1 → D+5 slots</span><span>✓ Recommendation ledger</span>',
+      '<span>✓ Private evidence intake</span><span>✓ Run request queue</span>',
+      '<span>✓ Output contract validation</span><span>✓ Immutable publication path</span>',
       '</div>',
       '</article>'
     ].join('');
@@ -170,7 +194,8 @@ async function loadDashboard() {
     }).join('');
 
     const fiveDr = await fetch('/api/5dr/latest').then(function (r) { return r.json(); });
-    render5dr(fiveDr.run || null);
+    const requestData = await fetch('/api/5dr/run-requests/latest').then(function (r) { return r.json(); });
+    render5dr(fiveDr.run || null, requestData.request || null);
 
     const latest = await fetch('/api/runs/latest').then(function (r) { return r.json(); });
     if (!latest.runs || latest.runs.length === 0) {

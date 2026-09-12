@@ -117,18 +117,73 @@ async function uploadEvidence(request: Request, env: Env): Promise<Response> {
     if (uploaded.length) await sql`delete from evidence_uploads where batch_id = ${uploadBatchId}`;
     return json({ error: 'Evidence upload failed; staged files were rolled back' }, 500);
   }
-  return json({ ok: true, batch_id: uploadBatchId, engine, provenance_mode: provenanceMode, file_count: uploaded.length, evidence: uploaded, next_step: '5DR engine execution adapter' }, 201);
+  return json({ ok: true, batch_id: uploadBatchId, engine, provenance_mode: provenanceMode, file_count: uploaded.length, evidence: uploaded, next_step: 'Create 5DR run request' }, 201);
+}
+
+async function create5drRunRequest(request: Request, env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
+  let body: unknown;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (!isObject(body) || !isNonEmptyString(body.batch_id)) return json({ error: 'batch_id is mandatory' }, 422);
+
+  const batchId = String(body.batch_id);
+  const sql = neon(env.DATABASE_URL);
+  const existing = await sql`select request_id, engine, batch_id, provenance_mode, framework_version, output_contract_version, status, run_id, created_at, updated_at from analysis_requests where batch_id = ${batchId} limit 1`;
+  if (existing.length) return json({ ok: true, request: existing[0], idempotent: true });
+
+  const evidence = await sql`select upload_id, batch_id, engine, provenance_mode, mime_type, captured_at, status from evidence_uploads where batch_id = ${batchId} order by id`;
+  if (!evidence.length) return json({ error: 'Evidence batch not found' }, 404);
+  if (evidence.some((row) => row.engine !== '5DR')) return json({ error: 'Evidence batch is not a 5DR batch' }, 422);
+  if (evidence.some((row) => row.status !== 'STAGED')) return json({ error: 'Evidence batch is not fully staged' }, 409);
+
+  const provenanceMode = String(evidence[0].provenance_mode);
+  if (evidence.some((row) => row.provenance_mode !== provenanceMode)) return json({ error: 'Evidence batch has mixed provenance modes' }, 422);
+
+  const requestId = `5drreq_${crypto.randomUUID()}`;
+  const capturedTimes = evidence.map((row) => row.captured_at).filter(Boolean).map((value) => new Date(String(value)).getTime()).filter((value) => !Number.isNaN(value));
+  const freshnessAt = capturedTimes.length ? new Date(Math.max(...capturedTimes)).toISOString() : null;
+  const metadata = {
+    evidence_file_count: evidence.length,
+    evidence_mime_types: [...new Set(evidence.map((row) => String(row.mime_type)))],
+    freshness_at: freshnessAt,
+    adapter_stage: 'READY_FOR_ENGINE'
+  };
+
+  await sql`insert into analysis_requests (request_id, engine, batch_id, provenance_mode, framework_version, output_contract_version, status, metadata) values (${requestId}, '5DR', ${batchId}, ${provenanceMode}, '5DR_V2_1', '5DR_V2_1_2', 'READY_FOR_ENGINE', ${JSON.stringify(metadata)}::jsonb)`;
+  await sql`update evidence_uploads set request_id = ${requestId}, status = 'READY_FOR_ENGINE' where batch_id = ${batchId}`;
+
+  return json({
+    ok: true,
+    request: {
+      request_id: requestId,
+      engine: '5DR',
+      batch_id: batchId,
+      provenance_mode: provenanceMode,
+      framework_version: '5DR_V2_1',
+      output_contract_version: '5DR_V2_1_2',
+      status: 'READY_FOR_ENGINE',
+      metadata
+    },
+    next_step: '5DR evidence classification and engine execution'
+  }, 201);
 }
 
 async function api(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === '/api/health') return json({ ok: true, service: 'EDGE Console', environment: env.APP_ENV, contract_version: env.OUTPUT_CONTRACT_VERSION, database_configured: Boolean(env.DATABASE_URL), evidence_storage_configured: Boolean(env.EVIDENCE_BUCKET), integrations: { '5DR': 'V2.1.2' } });
+  if (url.pathname === '/api/health') return json({ ok: true, service: 'EDGE Console', environment: env.APP_ENV, contract_version: env.OUTPUT_CONTRACT_VERSION, database_configured: Boolean(env.DATABASE_URL), evidence_storage_configured: Boolean(env.EVIDENCE_BUCKET), integrations: { '5DR': 'V2.1.2', '5DR_RUN_REQUEST_ADAPTER': 'READY' } });
   if (url.pathname === '/api/evidence/upload' && request.method === 'POST') return uploadEvidence(request, env);
+  if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return create5drRunRequest(request, env);
+  if (url.pathname === '/api/5dr/run-requests/latest' && request.method === 'GET') {
+    if (!env.DATABASE_URL) return json({ request: null, note: 'DATABASE_URL not configured yet' }, 503);
+    const sql = neon(env.DATABASE_URL);
+    const rows = await sql`select request_id, engine, batch_id, provenance_mode, framework_version, output_contract_version, status, run_id, metadata, error, created_at, updated_at from analysis_requests where engine = '5DR' order by created_at desc limit 1`;
+    return json({ request: rows[0] ?? null, note: rows.length ? undefined : 'No 5DR run request yet' });
+  }
   if (url.pathname === '/api/engines') {
-    if (!env.DATABASE_URL) return json({ engines: [{ id: '5DR', name: '5DR', mode: 'HYBRID', status: 'INTEGRATION_READY', version: '2.1.2' }, { id: 'EDGE_STOCKS', name: 'EDGE Stocks', mode: 'HYBRID', status: 'FOUNDATION', version: '1.0' }, { id: 'EDGE_IPO', name: 'EDGE IPO', mode: 'AUTOMATED', status: 'INTEGRATION_PENDING', version: '1.0' }] });
+    if (!env.DATABASE_URL) return json({ engines: [{ id: '5DR', name: '5DR', mode: 'HYBRID', status: 'RUN_REQUEST_READY', version: '2.1.2' }, { id: 'EDGE_STOCKS', name: 'EDGE Stocks', mode: 'HYBRID', status: 'FOUNDATION', version: '1.0' }, { id: 'EDGE_IPO', name: 'EDGE IPO', mode: 'AUTOMATED', status: 'INTEGRATION_PENDING', version: '1.0' }] });
     const sql = neon(env.DATABASE_URL);
     const rows = await sql`select engine as id, display_name as name, production_version as version, status from engine_registry order by case engine when '5DR' then 1 when 'EDGE_STOCKS' then 2 else 3 end`;
-    return json({ engines: rows.map((row) => ({ ...row, mode: row.id === 'EDGE_IPO' ? 'AUTOMATED' : 'HYBRID', status: row.id === '5DR' ? 'INTEGRATION_READY' : row.status })) });
+    return json({ engines: rows.map((row) => ({ ...row, mode: row.id === 'EDGE_IPO' ? 'AUTOMATED' : 'HYBRID', status: row.id === '5DR' ? 'RUN_REQUEST_READY' : row.status })) });
   }
   if (url.pathname === '/api/runs/latest' && request.method === 'GET') {
     if (!env.DATABASE_URL) return json({ runs: [], note: 'DATABASE_URL not configured yet' });
@@ -147,10 +202,20 @@ async function api(request: Request, env: Env): Promise<Response> {
     const errors = validate5drEnvelope(body); if (errors.length) return json({ error: '5DR contract validation failed', details: errors }, 422);
     const payload = body as JsonRecord; const provenance = payload.provenance as JsonRecord; const sql = neon(env.DATABASE_URL);
     const existing = await sql`select run_id from analysis_runs where run_id = ${String(payload.run_id)} limit 1`; if (existing.length) return json({ error: 'run_id already exists; runs are immutable' }, 409);
+    const requestId = isNonEmptyString(payload.request_id) ? String(payload.request_id) : null;
+    if (requestId) {
+      const requests = await sql`select request_id, status from analysis_requests where request_id = ${requestId} and engine = '5DR' limit 1`;
+      if (!requests.length) return json({ error: 'request_id not found' }, 422);
+      if (!['READY_FOR_ENGINE', 'PROCESSING'].includes(String(requests[0].status))) return json({ error: 'request_id is not eligible for completion' }, 409);
+    }
     const status = String(payload.status); const requestedPublish = payload.published === true; if (requestedPublish && status !== 'SUCCESS') return json({ error: 'Only SUCCESS runs may be published' }, 422);
     const sources = Array.isArray(provenance.sources) ? provenance.sources : []; const freshnessAt = isNonEmptyString(provenance.freshness_at) ? provenance.freshness_at : null; const warnings = Array.isArray(payload.warnings) ? payload.warnings : []; const learningEligible = payload.learning_eligible !== false;
     await sql`insert into analysis_runs (run_id, engine, contract_version, framework_version, status, provenance_mode, sources, freshness_at, generated_at, result, warnings, learning_eligible, published) values (${String(payload.run_id)}, '5DR', ${String(payload.contract_version)}, ${String(payload.framework_version)}, ${status}, ${String(provenance.mode)}, ${JSON.stringify(sources)}::jsonb, ${freshnessAt}, ${String(payload.generated_at)}, ${JSON.stringify(payload.result)}::jsonb, ${JSON.stringify(warnings)}::jsonb, ${learningEligible}, ${requestedPublish})`;
-    return json({ ok: true, run_id: payload.run_id, engine: '5DR', published: requestedPublish, contract: '5DR_V2_1_2' }, 201);
+    if (requestId) {
+      await sql`update analysis_requests set status = 'COMPLETED', run_id = ${String(payload.run_id)}, updated_at = now() where request_id = ${requestId}`;
+      await sql`update evidence_uploads set status = 'ATTACHED', run_id = ${String(payload.run_id)} where request_id = ${requestId}`;
+    }
+    return json({ ok: true, run_id: payload.run_id, engine: '5DR', published: requestedPublish, contract: '5DR_V2_1_2', request_id: requestId }, 201);
   }
   return json({ error: 'Not found' }, 404);
 }
