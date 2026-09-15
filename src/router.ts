@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
 import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
+import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 
 type Env = {
   ASSETS: Fetcher;
@@ -13,6 +14,16 @@ type Env = {
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data, null, 2), {
   status, headers: { 'content-type': 'application/json; charset=utf-8' }
 });
+
+async function readinessGate(request: Request, env: Env): Promise<Response> {
+  let body: unknown;
+  try { body = await request.clone().json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (!isObject(body)) return json({ error: 'request body must be a JSON object' }, 422);
+  const assessment = assessEvidenceReadiness(body.evidence_categories);
+  if (assessment.invalid.length) return json({ error: 'Unknown 5DR evidence categories', invalid_categories: assessment.invalid, required_categories: REQUIRED_5DR_EVIDENCE_CATEGORIES }, 422);
+  if (!assessment.ready) return json({ error: '5DR evidence readiness gate blocked', missing_categories: assessment.missing, required_categories: REQUIRED_5DR_EVIDENCE_CATEGORIES }, 409);
+  return app.fetch(request, env);
+}
 
 async function saveNormalizedEvidence(request: Request, env: Env, requestId: string): Promise<Response> {
   if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
@@ -60,6 +71,7 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
 
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
+  if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return readinessGate(request, env);
   const normalized = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
   if (normalized && request.method === 'POST') return saveNormalizedEvidence(request, env, decodeURIComponent(normalized[1]));
   const packet = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/execution-packet$/);
