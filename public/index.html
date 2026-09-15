@@ -10,88 +10,34 @@
 </head>
 <body>
   <main class="shell">
-    <header class="topbar">
-      <div>
-        <div class="eyebrow">DECISION INTELLIGENCE</div>
-        <h1>EDGE Console</h1>
-      </div>
-      <div id="health" class="pill">Checking…</div>
-    </header>
-
-    <section class="hero card">
-      <div>
-        <div class="eyebrow">CONTROL PANEL</div>
-        <h2>One console. Three engines.</h2>
-        <p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p>
-      </div>
-      <button id="runButton" class="primary">Run analysis</button>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <h3>Engines</h3>
-        <span>Live integration status</span>
-      </div>
-      <div id="engines" class="grid"></div>
-    </section>
-
-    <section id="fiveDrPanel" class="integration card">
-      <div class="section-head compact">
-        <div>
-          <div class="eyebrow">5DR INTEGRATION</div>
-          <h3>Production contract V2.1.2</h3>
-        </div>
-        <span id="fiveDrState" class="badge">Checking</span>
-      </div>
-      <div id="fiveDrSummary" class="stack">
-        <div class="run muted">Checking latest 5DR publication…</div>
-      </div>
-    </section>
-
-    <section>
-      <div class="section-head">
-        <h3>Latest published runs</h3>
-        <span id="runsNote">Loading</span>
-      </div>
-      <div id="runs" class="stack"></div>
-    </section>
+    <header class="topbar"><div><div class="eyebrow">DECISION INTELLIGENCE</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
+    <section class="hero card"><div><div class="eyebrow">CONTROL PANEL</div><h2>One console. Three engines.</h2><p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p></div><button id="runButton" class="primary">Run analysis</button></section>
+    <section><div class="section-head"><h3>Engines</h3><span>Live integration status</span></div><div id="engines" class="grid"></div></section>
+    <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR INTEGRATION</div><h3>Production contract V2.1.2</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
+    <section><div class="section-head"><h3>Latest published runs</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
   </main>
-
-  <nav class="bottom-nav" aria-label="Primary">
-    <button class="active" data-view="home">Home</button>
-    <button id="navRun" data-view="run">Run</button>
-    <button id="nav5dr" data-view="5dr">5DR</button>
-    <button data-view="edge">EDGE</button>
-    <button data-view="ipo">IPO</button>
-  </nav>
-
+  <nav class="bottom-nav" aria-label="Primary"><button class="active" data-view="home">Home</button><button id="navRun" data-view="run">Run</button><button id="nav5dr" data-view="5dr">5DR</button><button data-view="edge">EDGE</button><button data-view="ipo">IPO</button></nav>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
       <div class="section-head"><h3>Run Analysis</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
-      <label>Engine
-        <select id="runEngine">
-          <option value="5DR">5DR</option>
-          <option value="EDGE_STOCKS" disabled>EDGE Stocks — coming next</option>
-          <option value="EDGE_IPO" disabled>EDGE IPO — automated</option>
-        </select>
-      </label>
-      <label>Evidence mode
-        <select id="evidenceMode">
-          <option value="HYBRID">Hybrid</option>
-          <option value="MANUAL">Manual</option>
-        </select>
-      </label>
-      <label class="upload">Upload screenshots or evidence
-        <input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple />
-        <span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span>
-      </label>
-      <div id="fileSelection" class="file-selection muted">No files selected.</div>
-      <div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2, recorded in Neon, and converted into a governed 5DR engine request. Automatic evidence classification and engine execution are the next adapter stage.</p>
+      <label>Engine<select id="runEngine"><option value="5DR">5DR</option><option value="EDGE_STOCKS" disabled>EDGE Stocks — coming next</option><option value="EDGE_IPO" disabled>EDGE IPO — automated</option></select></label>
+      <label>Evidence mode<select id="evidenceMode"><option value="HYBRID">Hybrid</option><option value="MANUAL">Manual</option></select></label>
+      <label class="upload">Upload screenshots or evidence<input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /><span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span></label>
+      <div id="fileSelection" class="file-selection muted">No files selected.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2 and recorded in Neon. A governed request is created without inventing information from screenshots.</p>
       <button id="uploadEvidenceButton" type="submit" class="primary">Prepare 5DR run</button>
     </form>
   </dialog>
-
+  <dialog id="normalizeDialog">
+    <form id="normalizeForm" class="dialog-card">
+      <div class="section-head"><h3>Supply governed 5DR inputs</h3><button id="closeNormalizeDialog" type="button" class="ghost">Close</button></div>
+      <p class="muted">Manual/hybrid bridge. Paste only normalized evidence supported by the uploaded sources. The Console validates structure, completeness and conflicts; it does not infer missing values.</p>
+      <label>Request ID<input id="normalizeRequestId" type="text" readonly /></label>
+      <label>Normalized evidence JSON<textarea id="normalizedEvidenceJson" rows="12" spellcheck="false" placeholder='{"evidence":[{"evidence_type":"...","source_ref":"...","captured_at":"...","normalized":{...}}]}'></textarea></label>
+      <div id="normalizeStatus" class="upload-status" aria-live="polite"></div>
+      <button id="submitNormalizedEvidence" type="submit" class="primary">Validate &amp; prepare execution</button>
+    </form>
+  </dialog>
   <script type="module" src="/app.js"></script>
 </body>
 </html>
