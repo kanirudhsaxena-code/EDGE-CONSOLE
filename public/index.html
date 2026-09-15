@@ -19,24 +19,14 @@
   <nav class="bottom-nav" aria-label="Primary"><button class="active" data-view="home">Home</button><button id="navRun" data-view="run">Run</button><button id="nav5dr" data-view="5dr">5DR</button><button data-view="edge">EDGE</button><button data-view="ipo">IPO</button></nav>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
-      <div class="section-head"><h3>Run Analysis</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
-      <label>Engine<select id="runEngine"><option value="5DR">5DR</option><option value="EDGE_STOCKS" disabled>EDGE Stocks — coming next</option><option value="EDGE_IPO" disabled>EDGE IPO — automated</option></select></label>
-      <label>Evidence mode<select id="evidenceMode"><option value="HYBRID">Hybrid</option><option value="MANUAL">Manual</option></select></label>
-      <div class="run"><strong>5DR evidence readiness</strong><p class="muted">Before staging, select the evidence categories represented in this batch. This is a readiness declaration only; it does not extract or invent market values.</p><label><input class="readiness-check" type="checkbox" value="PRICE_TECHNICALS" /> Price / technical chart evidence</label><label><input class="readiness-check" type="checkbox" value="DERIVATIVES_OI" /> Options / OI / derivatives evidence</label><label><input class="readiness-check" type="checkbox" value="MARKET_TRUST" /> Market Trust / breadth / cross-market evidence</label><label><input class="readiness-check" type="checkbox" value="EVENT_SHOCK" /> Event / news / shock evidence</label><label><input class="readiness-check" type="checkbox" value="EXECUTION_RISK" /> Execution / entry / stop / risk-reward evidence</label><div id="readinessStatus" class="upload-status">No evidence categories declared yet.</div></div>
-      <label class="upload">Upload screenshots or evidence<input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /><span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span></label>
-      <div id="fileSelection" class="file-selection muted">No files selected.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2 and recorded in Neon. Incomplete category coverage remains explicitly blocked before normalization.</p>
-      <button id="uploadEvidenceButton" type="submit" class="primary">Check readiness &amp; prepare</button>
-    </form>
-  </dialog>
-  <dialog id="normalizeDialog">
-    <form id="normalizeForm" class="dialog-card">
-      <div class="section-head"><h3>Supply governed 5DR inputs</h3><button id="closeNormalizeDialog" type="button" class="ghost">Close</button></div>
-      <p class="muted">Manual/hybrid bridge. Paste only normalized evidence supported by the uploaded sources. The Console validates structure, completeness and conflicts; it does not infer missing values.</p>
-      <label>Request ID<input id="normalizeRequestId" type="text" readonly /></label>
-      <label>Normalized evidence JSON<textarea id="normalizedEvidenceJson" rows="12" spellcheck="false" placeholder='{"evidence":[{"evidence_type":"...","source_ref":"...","captured_at":"...","normalized":{...}}]}'></textarea></label>
-      <div id="normalizeStatus" class="upload-status" aria-live="polite"></div>
-      <button id="submitNormalizedEvidence" type="submit" class="primary">Validate &amp; prepare execution</button>
+      <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
+      <input id="runEngine" type="hidden" value="5DR" />
+      <input id="evidenceMode" type="hidden" value="HYBRID" />
+      <div class="run"><strong>1. NIFTY chart</strong><p class="muted">Upload one or more current NIFTY price / technical chart screenshots.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div class="run"><strong>2. Options / OI</strong><p class="muted">Upload one or more current option-chain, OI or derivatives screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div id="fileSelection" class="file-selection muted">Select both screenshot groups to continue.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+      <p class="muted">EDGE Console will secure the screenshots and create a governed request. Market Trust, event/shock and execution-risk evidence are system-owned. If the intelligence layer cannot verify required evidence, the run remains blocked rather than inventing values.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Prepare 5DR run</button>
     </form>
   </dialog>
   <script type="module" src="/app.js"></script>
