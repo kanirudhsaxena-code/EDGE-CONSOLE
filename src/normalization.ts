@@ -1,10 +1,12 @@
 export type JsonRecord = Record<string, unknown>;
 
+// Only evidence required to calculate a new 5DR forecast belongs upstream.
+// Forecast/recommendation assessments and ledger completion are downstream lifecycle
+// outputs and must never be fabricated to make a run executable.
 export const REQUIRED_5DR_INPUTS = [
   'regime', 'component_scores', 'market_trust_inputs', 'event_shock',
   'execution_inputs', 'data_adequate', 'event_kill_switch', 'expected_rr',
-  'forecast_assessment', 'recommendation_assessment', 'horizon_slots',
-  'recommendation_ledger_complete', 'assessment_snapshot_complete'
+  'horizon_slots'
 ] as const;
 
 export const isObject = (value: unknown): value is JsonRecord =>
