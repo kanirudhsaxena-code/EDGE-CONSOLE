@@ -2,13 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { canAdvanceIntelligenceHandoff, validateIntelligenceHandoff } from '../src/intelligence-contract';
 
-const normalized = {
+const makeNormalized = () => ({
   regime: 'TREND', component_scores: {}, market_trust_inputs: {}, event_shock: 0,
   execution_inputs: {}, data_adequate: true, event_kill_switch: false,
   expected_rr: 2, horizon_slots: { 'D+1': {}, 'D+2': {}, 'D+3': {}, 'D+4': {}, 'D+5': {} },
-};
+});
 
-const observations = [
+const makeObservations = () => [
   ['PRICE_TECHNICALS', 'SCREENSHOT'], ['DERIVATIVES_OI', 'SCREENSHOT'],
   ['MARKET_TRUST', 'WEB_RESEARCH'], ['EVENT_SHOCK', 'WEB_RESEARCH'], ['EXECUTION_RISK', 'WEB_RESEARCH'],
 ].map(([category, source_kind]) => ({
@@ -16,7 +16,7 @@ const observations = [
   retrieved_at: '2026-09-15T10:01:00Z', verification: 'VERIFIED',
 }));
 
-const packet = () => ({ producer: 'test-intelligence', producer_version: '1', request_id: '5drreq_test', observations, normalized });
+const packet = () => ({ producer: 'test-intelligence', producer_version: '1', request_id: '5drreq_test', observations: makeObservations(), normalized: makeNormalized() });
 
 test('complete provenance-bearing nine-input packet is ready', () => {
   assert.deepEqual(validateIntelligenceHandoff(packet()), []);
