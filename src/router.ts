@@ -15,7 +15,6 @@ async function createScreenshotReadyRequest(request: Request, env: Env): Promise
   const readiness = assessUserEvidenceReadiness(body.evidence_categories);
   if (readiness.invalid.length) return json({ error: 'Unknown user-owned 5DR evidence categories', invalid_categories: readiness.invalid, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES }, 422);
   if (!readiness.ready) return json({ error: '5DR screenshot readiness gate blocked', missing_categories: readiness.missing, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES }, 409);
-
   const batchId = String(body.batch_id), sql = neon(env.DATABASE_URL);
   const existing = await sql`select request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,run_id,metadata,created_at,updated_at from analysis_requests where batch_id=${batchId} limit 1`;
   if (existing.length) return json({ ok: true, request: existing[0], idempotent: true });
@@ -25,35 +24,65 @@ async function createScreenshotReadyRequest(request: Request, env: Env): Promise
   if (evidence.some(row => row.status !== 'STAGED')) return json({ error: 'Evidence batch is not fully staged' }, 409);
   const provenanceMode = String(evidence[0].provenance_mode);
   if (evidence.some(row => row.provenance_mode !== provenanceMode)) return json({ error: 'Evidence batch has mixed provenance modes' }, 422);
-
   const requestId = `5drreq_${crypto.randomUUID()}`;
-  const metadata = {
-    evidence_file_count: evidence.length,
-    user_evidence_readiness: { status: 'SCREENSHOTS_READY', declared_categories: readiness.declared, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES, assessed_at: new Date().toISOString() },
-    autonomous_evidence: { status: 'PENDING', required_categories: SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES, items: initialAutonomousEvidenceState() },
-    adapter_stage: 'SCREENSHOTS_READY'
-  };
+  const metadata = { evidence_file_count: evidence.length, user_evidence_readiness: { status: 'SCREENSHOTS_READY', declared_categories: readiness.declared, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES, assessed_at: new Date().toISOString() }, autonomous_evidence: { status: 'PENDING', required_categories: SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES, items: initialAutonomousEvidenceState() }, adapter_stage: 'SCREENSHOTS_READY' };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata) values (${requestId},'5DR',${batchId},${provenanceMode},'5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
   await sql`update evidence_uploads set request_id=${requestId},status='READY_FOR_ENGINE' where batch_id=${batchId}`;
   return json({ ok: true, request: { request_id: requestId, batch_id: batchId, status: 'READY_FOR_ENGINE', metadata }, next_step: 'SYSTEM_EVIDENCE_ACQUISITION' }, 201);
+}
+
+async function intelligenceWorkPacket(env: Env, requestId: string): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
+  const sql = neon(env.DATABASE_URL);
+  const rows = await sql`select request_id,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  if (!rows.length) return json({ error: 'request_id not found' }, 404);
+  const row = rows[0], metadata = isObject(row.metadata) ? row.metadata as JsonRecord : {};
+  if (!['SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED'].includes(String(metadata.adapter_stage ?? ''))) return json({ error: 'request is not eligible for intelligence work', adapter_stage: metadata.adapter_stage ?? null }, 409);
+  const evidence = await sql`select upload_id,file_name,mime_type,size_bytes,captured_at,status from evidence_uploads where request_id=${requestId} order by id`;
+  if (!evidence.length) return json({ error: 'request has no attached screenshot evidence' }, 409);
+  return json({
+    request_id: String(row.request_id),
+    engine: '5DR',
+    provenance_mode: String(row.provenance_mode),
+    framework_version: String(row.framework_version),
+    output_contract_version: String(row.output_contract_version),
+    adapter_stage: metadata.adapter_stage,
+    screenshot_requirements: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES,
+    system_research_requirements: SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES,
+    screenshots: evidence.map(item => ({ upload_id: String(item.upload_id), file_name: String(item.file_name), mime_type: String(item.mime_type), size_bytes: Number(item.size_bytes), captured_at: item.captured_at, status: String(item.status), content_endpoint: `/api/5dr/run-requests/${encodeURIComponent(requestId)}/evidence/${encodeURIComponent(String(item.upload_id))}` })),
+    next_step: 'INTELLIGENCE_PRODUCER_MUST_INSPECT_SCREENSHOTS_AND_RESEARCH_SYSTEM_EVIDENCE'
+  });
+}
+
+async function evidenceContent(env: Env, requestId: string, uploadId: string): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
+  const sql = neon(env.DATABASE_URL);
+  const rows = await sql`select upload_id,object_key,mime_type,file_name from evidence_uploads where request_id=${requestId} and upload_id=${uploadId} limit 1`;
+  if (!rows.length) return json({ error: 'evidence not found for request' }, 404);
+  const object = await env.EVIDENCE_BUCKET.get(String(rows[0].object_key));
+  if (!object) return json({ error: 'evidence object missing from private storage' }, 404);
+  const headers = new Headers();
+  headers.set('content-type', String(rows[0].mime_type));
+  headers.set('content-disposition', `inline; filename="${String(rows[0].file_name).replace(/["\\]/g,'-')}"`);
+  headers.set('cache-control', 'private, no-store');
+  headers.set('x-content-type-options', 'nosniff');
+  return new Response(object.body, { headers });
 }
 
 async function saveAutonomousEvidence(request: Request, env: Env, requestId: string): Promise<Response> {
   if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
   let body: unknown; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   if (!isObject(body) || !Array.isArray(body.items)) return json({ error: 'items array is mandatory' }, 422);
-  const items = body.items as AutonomousEvidenceItem[];
-  const allowed = new Set(SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES);
+  const items = body.items as AutonomousEvidenceItem[], allowed = new Set(SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES);
   if (items.some(item => !item || !allowed.has(item.category) || !['PENDING','VERIFIED','DEGRADED','UNAVAILABLE'].includes(item.status) || !Array.isArray(item.source_refs))) return json({ error: 'Invalid autonomous evidence envelope' }, 422);
-  const assessment = assessAutonomousEvidence(items);
-  const sql = neon(env.DATABASE_URL);
+  const assessment = assessAutonomousEvidence(items), sql = neon(env.DATABASE_URL);
   const rows = await sql`select request_id,status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if (!rows.length) return json({ error: 'request_id not found' }, 404);
   if (!['READY_FOR_ENGINE','PROCESSING'].includes(String(rows[0].status))) return json({ error: 'request_id is not eligible for autonomous evidence' }, 409);
   const current = isObject(rows[0].metadata) ? rows[0].metadata as JsonRecord : {};
   if (!['SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED'].includes(String(current.adapter_stage ?? ''))) return json({ error: 'request is not at autonomous evidence stage', adapter_stage: current.adapter_stage ?? null }, 409);
-  const metadata = { ...current, autonomous_evidence: { status: assessment.next_stage, items, assessment, assessed_at: new Date().toISOString() }, adapter_stage: assessment.next_stage };
-  await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
+  const next = { ...current, autonomous_evidence: { status: assessment.next_stage, items, assessment, assessed_at: new Date().toISOString() }, adapter_stage: assessment.next_stage };
+  await sql`update analysis_requests set metadata=${JSON.stringify(next)}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ ok: assessment.complete, request_id: requestId, adapter_stage: assessment.next_stage, assessment, next_step: assessment.complete ? 'INTELLIGENCE_HANDOFF' : 'RETRY_SYSTEM_EVIDENCE' }, assessment.complete ? 200 : 409);
 }
 
@@ -62,15 +91,13 @@ async function saveIntelligenceHandoff(request: Request, env: Env, requestId: st
   let body: unknown; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   const assessment = canAdvanceIntelligenceHandoff(body);
   if (!isObject(body) || body.request_id !== requestId) return json({ error: 'intelligence request_id mismatch' }, 422);
-  const sql = neon(env.DATABASE_URL);
-  const rows = await sql`select request_id,status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  const sql = neon(env.DATABASE_URL), rows = await sql`select request_id,status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if (!rows.length) return json({ error: 'request_id not found' }, 404);
   const current = isObject(rows[0].metadata) ? rows[0].metadata as JsonRecord : {};
   if (!['AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED'].includes(String(current.adapter_stage ?? ''))) return json({ error: 'request is not ready for intelligence handoff', adapter_stage: current.adapter_stage ?? null }, 409);
-  const nextStage = assessment.ready ? 'INTELLIGENCE_READY' : 'INTELLIGENCE_BLOCKED';
-  const handoff = isObject(body) ? body as unknown as IntelligenceHandoff : null;
-  const metadata = { ...current, intelligence_handoff: handoff, intelligence_assessment: assessment, intelligence_received_at: new Date().toISOString(), adapter_stage: nextStage };
-  await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
+  const nextStage = assessment.ready ? 'INTELLIGENCE_READY' : 'INTELLIGENCE_BLOCKED', handoff = isObject(body) ? body as unknown as IntelligenceHandoff : null;
+  const next = { ...current, intelligence_handoff: handoff, intelligence_assessment: assessment, intelligence_received_at: new Date().toISOString(), adapter_stage: nextStage };
+  await sql`update analysis_requests set metadata=${JSON.stringify(next)}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ ok: assessment.ready, request_id: requestId, adapter_stage: nextStage, degraded: assessment.degraded, blockers: assessment.errors, next_step: assessment.ready ? 'NORMALIZE_INTELLIGENCE' : 'RETRY_INTELLIGENCE' }, assessment.ready ? 200 : 409);
 }
 
@@ -85,13 +112,12 @@ async function saveNormalizedEvidence(request: Request, env: Env, requestId: str
   if (current.adapter_stage !== 'INTELLIGENCE_READY' && current.adapter_stage !== 'NORMALIZATION_BLOCKED') return json({ error: 'validated intelligence is not ready for normalization', adapter_stage: current.adapter_stage ?? null }, 409);
   const handoff = isObject(current.intelligence_handoff) ? current.intelligence_handoff as JsonRecord : null;
   if (!handoff || !isObject(handoff.normalized)) return json({ error: 'validated intelligence handoff is missing normalized inputs' }, 409);
-  const supplied = new Map<string, string>();
-  for (const item of evidence) if (isObject(item) && isObject(item.normalized)) for (const [key, value] of Object.entries(item.normalized)) supplied.set(key, JSON.stringify(value));
+  const supplied = new Map<string, string>(); for (const item of evidence) if (isObject(item) && isObject(item.normalized)) for (const [key, value] of Object.entries(item.normalized)) supplied.set(key, JSON.stringify(value));
   const mismatches = Object.entries(handoff.normalized).filter(([key, value]) => supplied.has(key) && supplied.get(key) !== JSON.stringify(value)).map(([key]) => key);
   if (mismatches.length) return json({ error: 'normalized evidence conflicts with validated intelligence handoff', conflicts: mismatches }, 409);
-  const metadata = { ...current, normalized_evidence: evidence, normalized_at: new Date().toISOString(), normalization_assessment: assessment, adapter_stage: executable ? 'NORMALIZED_READY' : 'NORMALIZATION_BLOCKED' };
-  await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ ok: executable, request_id: requestId, adapter_stage: metadata.adapter_stage, blockers: assessment, next_step: executable ? 'EXECUTE_5DR' : 'RETRY_NORMALIZATION' }, executable ? 200 : 409);
+  const next = { ...current, normalized_evidence: evidence, normalized_at: new Date().toISOString(), normalization_assessment: assessment, adapter_stage: executable ? 'NORMALIZED_READY' : 'NORMALIZATION_BLOCKED' };
+  await sql`update analysis_requests set metadata=${JSON.stringify(next)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+  return json({ ok: executable, request_id: requestId, adapter_stage: next.adapter_stage, blockers: assessment, next_step: executable ? 'EXECUTE_5DR' : 'RETRY_NORMALIZATION' }, executable ? 200 : 409);
 }
 
 async function executionPacket(env: Env, requestId: string): Promise<Response> {
@@ -117,6 +143,8 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return createScreenshotReadyRequest(request, env);
+  const work = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/intelligence-work$/); if (work && request.method === 'GET') return intelligenceWorkPacket(env, decodeURIComponent(work[1]));
+  const content = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/evidence\/([^/]+)$/); if (content && request.method === 'GET') return evidenceContent(env, decodeURIComponent(content[1]), decodeURIComponent(content[2]));
   const autonomous = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/autonomous-evidence$/); if (autonomous && request.method === 'POST') return saveAutonomousEvidence(request, env, decodeURIComponent(autonomous[1]));
   const intelligence = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/intelligence$/); if (intelligence && request.method === 'POST') return saveIntelligenceHandoff(request, env, decodeURIComponent(intelligence[1]));
   const normalized = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/); if (normalized && request.method === 'POST') return saveNormalizedEvidence(request, env, decodeURIComponent(normalized[1]));
