@@ -22,10 +22,11 @@
       <div class="section-head"><h3>Run Analysis</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
       <label>Engine<select id="runEngine"><option value="5DR">5DR</option><option value="EDGE_STOCKS" disabled>EDGE Stocks — coming next</option><option value="EDGE_IPO" disabled>EDGE IPO — automated</option></select></label>
       <label>Evidence mode<select id="evidenceMode"><option value="HYBRID">Hybrid</option><option value="MANUAL">Manual</option></select></label>
+      <div class="run"><strong>5DR evidence readiness</strong><p class="muted">Before staging, select the evidence categories represented in this batch. This is a readiness declaration only; it does not extract or invent market values.</p><label><input class="readiness-check" type="checkbox" value="PRICE_TECHNICALS" /> Price / technical chart evidence</label><label><input class="readiness-check" type="checkbox" value="DERIVATIVES_OI" /> Options / OI / derivatives evidence</label><label><input class="readiness-check" type="checkbox" value="MARKET_TRUST" /> Market Trust / breadth / cross-market evidence</label><label><input class="readiness-check" type="checkbox" value="EVENT_SHOCK" /> Event / news / shock evidence</label><label><input class="readiness-check" type="checkbox" value="EXECUTION_RISK" /> Execution / entry / stop / risk-reward evidence</label><div id="readinessStatus" class="upload-status">No evidence categories declared yet.</div></div>
       <label class="upload">Upload screenshots or evidence<input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /><span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span></label>
       <div id="fileSelection" class="file-selection muted">No files selected.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2 and recorded in Neon. A governed request is created without inventing information from screenshots.</p>
-      <button id="uploadEvidenceButton" type="submit" class="primary">Prepare 5DR run</button>
+      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2 and recorded in Neon. Incomplete category coverage remains explicitly blocked before normalization.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Check readiness &amp; prepare</button>
     </form>
   </dialog>
   <dialog id="normalizeDialog">
