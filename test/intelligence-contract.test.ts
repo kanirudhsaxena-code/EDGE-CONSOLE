@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import test from 'node:test';
 import { canAdvanceIntelligenceHandoff, validateIntelligenceHandoff } from '../src/intelligence-contract';
 
 const normalized = {
@@ -17,33 +18,31 @@ const observations = [
 
 const packet = () => ({ producer: 'test-intelligence', producer_version: '1', request_id: '5drreq_test', observations, normalized });
 
-describe('Mobile V1 intelligence handoff', () => {
-  it('accepts a complete provenance-bearing nine-input packet', () => {
-    expect(validateIntelligenceHandoff(packet())).toEqual([]);
-    expect(canAdvanceIntelligenceHandoff(packet()).ready).toBe(true);
-  });
+test('complete provenance-bearing nine-input packet is ready', () => {
+  assert.deepEqual(validateIntelligenceHandoff(packet()), []);
+  assert.equal(canAdvanceIntelligenceHandoff(packet()).ready, true);
+});
 
-  it('blocks if a screenshot family is missing', () => {
-    const body = packet();
-    body.observations = body.observations.filter(item => item.category !== 'DERIVATIVES_OI');
-    expect(validateIntelligenceHandoff(body)).toContain('missing intelligence observation category DERIVATIVES_OI');
-  });
+test('missing screenshot family blocks', () => {
+  const body = packet();
+  body.observations = body.observations.filter(item => item.category !== 'DERIVATIVES_OI');
+  assert.ok(validateIntelligenceHandoff(body).includes('missing intelligence observation category DERIVATIVES_OI'));
+});
 
-  it('blocks if any of the nine normalized inputs is absent', () => {
-    const body: any = packet();
-    delete body.normalized.expected_rr;
-    expect(validateIntelligenceHandoff(body)).toContain('missing normalized input expected_rr');
-  });
+test('missing normalized input blocks', () => {
+  const body: any = packet();
+  delete body.normalized.expected_rr;
+  assert.ok(validateIntelligenceHandoff(body).includes('missing normalized input expected_rr'));
+});
 
-  it('blocks unavailable required intelligence', () => {
-    const body = packet();
-    body.observations[2] = { ...body.observations[2], verification: 'UNAVAILABLE' };
-    expect(canAdvanceIntelligenceHandoff(body).ready).toBe(false);
-  });
+test('unavailable required intelligence blocks', () => {
+  const body = packet();
+  body.observations[2] = { ...body.observations[2], verification: 'UNAVAILABLE' };
+  assert.equal(canAdvanceIntelligenceHandoff(body).ready, false);
+});
 
-  it('allows degraded state to be explicitly surfaced rather than fabricated as verified', () => {
-    const body = packet();
-    body.observations[2] = { ...body.observations[2], verification: 'DEGRADED' };
-    expect(canAdvanceIntelligenceHandoff(body)).toMatchObject({ ready: true, degraded: true });
-  });
+test('degraded evidence is surfaced explicitly', () => {
+  const body = packet();
+  body.observations[2] = { ...body.observations[2], verification: 'DEGRADED' };
+  assert.deepEqual(canAdvanceIntelligenceHandoff(body), { ready: true, errors: [], degraded: true });
 });
