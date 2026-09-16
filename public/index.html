@@ -12,11 +12,11 @@
   <main class="shell">
     <header class="topbar"><div><div class="eyebrow">DECISION INTELLIGENCE</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
     <section class="hero card"><div><div class="eyebrow">CONTROL PANEL</div><h2>One console. Three engines.</h2><p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p></div><button id="runButton" class="primary">Run analysis</button></section>
-    <section><div class="section-head"><h3>Engines</h3><span>Live integration status</span></div><div id="engines" class="grid"></div></section>
+    <section id="enginesPanel"><div class="section-head"><h3>Engines</h3><span>Live integration status</span></div><div id="engines" class="grid"></div></section>
     <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR INTEGRATION</div><h3>Production contract V2.1.2</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
     <section><div class="section-head"><h3>Latest published runs</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
   </main>
-  <nav class="bottom-nav" aria-label="Primary"><button class="active" data-view="home">Home</button><button id="navRun" data-view="run">Run</button><button id="nav5dr" data-view="5dr">5DR</button><button data-view="edge">EDGE</button><button data-view="ipo">IPO</button></nav>
+  <nav class="bottom-nav" aria-label="Primary"><button id="navHome" class="active" data-view="home" type="button">Home</button><button id="navRun" data-view="run" type="button">Run</button><button id="nav5dr" data-view="5dr" type="button">5DR</button><button id="navEdge" data-view="edge" type="button">EDGE</button><button id="navIpo" data-view="ipo" type="button">IPO</button></nav>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
       <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
