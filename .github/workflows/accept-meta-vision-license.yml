@@ -1,0 +1,20 @@
+name: Accept Meta Vision License
+
+on:
+  workflow_dispatch:
+
+jobs:
+  accept-license:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Accept Meta Llama 3.2 Vision license
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CF_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          curl --fail-with-body \
+            -X POST \
+            "https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/ai/run/@cf/meta/llama-3.2-11b-vision-instruct" \
+            -H "Authorization: Bearer ${CF_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            --data '{"prompt":"agree"}'
