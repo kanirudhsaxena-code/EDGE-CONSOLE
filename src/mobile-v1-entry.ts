@@ -32,16 +32,27 @@ async function shadowVision(env:Env,requestId:string):Promise<Response>{
   if(!['SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED'].includes(stage))return json({error:'request is not eligible for shadow vision',adapter_stage:stage},409);
   const rows=await sql`select upload_id,object_key,file_name,mime_type,captured_at,metadata from evidence_uploads where request_id=${requestId} order by id`;
   if(!rows.length)return json({error:'request has no attached screenshot evidence'},409);
-  const observations=[] as Record<string,unknown>[];
+
   for(const row of rows){
     const metadata=isObject(row.metadata)?row.metadata:{};
     const category=metadata.evidence_category;
     if(typeof category!=='string'||!allowed.has(category as ScreenshotCategory))return json({error:'request contains uncategorized or invalid screenshot evidence',upload_id:String(row.upload_id)},409);
-    const object=await env.EVIDENCE_BUCKET.get(String(row.object_key));
-    if(!object){observations.push({upload_id:String(row.upload_id),category,source_kind:'SCREENSHOT',source_ref:`evidence:${String(row.upload_id)}`,observed_at:row.captured_at,retrieved_at:new Date().toISOString(),verification:'UNAVAILABLE',findings:[],limitations:['Evidence object missing from private R2 storage']});continue;}
-    const result=await analyzeScreenshot(env.AI,await object.arrayBuffer(),String(row.mime_type),category as ScreenshotCategory);
-    observations.push({upload_id:String(row.upload_id),file_name:String(row.file_name),category:result.category,source_kind:'SCREENSHOT',source_ref:`evidence:${String(row.upload_id)}`,observed_at:row.captured_at,retrieved_at:new Date().toISOString(),verification:result.verification,findings:result.findings,limitations:result.limitations,model:result.model});
   }
+
+  const observations=await Promise.all(rows.map(async(row):Promise<Record<string,unknown>>=>{
+    const metadata=isObject(row.metadata)?row.metadata:{};
+    const category=metadata.evidence_category as ScreenshotCategory;
+    try{
+      const object=await env.EVIDENCE_BUCKET.get(String(row.object_key));
+      if(!object)return {upload_id:String(row.upload_id),file_name:String(row.file_name),category,source_kind:'SCREENSHOT',source_ref:`evidence:${String(row.upload_id)}`,observed_at:row.captured_at,retrieved_at:new Date().toISOString(),verification:'UNAVAILABLE',findings:[],limitations:['Evidence object missing from private R2 storage']};
+      const result=await analyzeScreenshot(env.AI,await object.arrayBuffer(),String(row.mime_type),category);
+      return {upload_id:String(row.upload_id),file_name:String(row.file_name),category:result.category,source_kind:'SCREENSHOT',source_ref:`evidence:${String(row.upload_id)}`,observed_at:row.captured_at,retrieved_at:new Date().toISOString(),verification:result.verification,findings:result.findings,limitations:result.limitations,model:result.model};
+    }catch(error){
+      const message=error instanceof Error?error.message:'Screenshot interpretation failed';
+      return {upload_id:String(row.upload_id),file_name:String(row.file_name),category,source_kind:'SCREENSHOT',source_ref:`evidence:${String(row.upload_id)}`,observed_at:row.captured_at,retrieved_at:new Date().toISOString(),verification:'UNAVAILABLE',findings:[],limitations:[message]};
+    }
+  }));
+
   const missing=[...allowed].filter(category=>!observations.some(item=>item.category===category));
   const unavailable=observations.filter(item=>item.verification==='UNAVAILABLE');
   const visionStatus=missing.length||unavailable.length?'VISION_BLOCKED':'VISION_READY';
