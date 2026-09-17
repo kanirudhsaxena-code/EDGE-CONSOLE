@@ -1,0 +1,69 @@
+name: EDGE Production Smoke
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '15 * * * 1-5'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-edge-production:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check EDGE health
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/health' \
+            -o /tmp/health.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/health.json'))
+          assert d.get('ok') is True, d
+          assert d.get('edge_database_configured') is True, d
+          PY
+
+      - name: Validate LTF report contract
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=LTF' \
+            -o /tmp/report.json
+          python - <<'PY'
+          import json, math
+          d=json.load(open('/tmp/report.json'))
+          r=d['report']
+          assert r['contract_version']=='EDGE_STOCKS_V1_1', r
+          probs=r['decision']['probabilities']
+          total=sum(float(probs[k]) for k in ('bull','base','bear'))
+          assert math.isclose(total,100.0,abs_tol=0.2), total
+          o=r['official_efficacy']
+          p=r['provisional_checkpoint_diagnostics']
+          assert o['label']=='OFFICIAL', o
+          assert p['label']=='PROVISIONAL', p
+          if int(o['sample_size'])==0:
+              assert o['recommendation_hit_rate_pct'] is None, o
+              assert o['directional_accuracy_pct'] is None, o
+          assert int(p['forecast_hits']) <= int(p['forecast_scorable']), p
+          assert int(p['zone_hits']) <= int(p['zone_scorable']), p
+          PY
+
+      - name: Validate master efficacy separation
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/master' \
+            -o /tmp/master.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/master.json'))
+          assert d['labels']['official']=='OFFICIAL', d
+          assert d['labels']['provisional']=='PROVISIONAL', d
+          m=d['master']
+          assert m is not None, d
+          assert int(m['provisional_forecast_hits']) <= int(m['provisional_forecast_scorable']), m
+          assert int(m['provisional_zone_hits']) <= int(m['provisional_zone_scorable']), m
+          PY
