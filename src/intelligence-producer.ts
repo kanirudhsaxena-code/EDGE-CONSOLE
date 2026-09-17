@@ -103,7 +103,7 @@ const prompt=(packet:unknown)=>`You are the governed intelligence reconciliation
 
 export async function produceIntelligence(ai:AiBinding,packet:unknown,allowedSourceRefs:Set<string>):Promise<{judgment:IntelligenceJudgment|null;normalized:JsonRecord|null;errors:string[];model:string}>{
   try{
-    const raw=await ai.run(INTELLIGENCE_MODEL,{messages:[{role:'system',content:'Reconcile evidence under frozen 5DR rules. Output governed JSON only.'},{role:'user',content:prompt(packet)}],max_tokens:2600,temperature:0});
+    const raw=await ai.run(INTELLIGENCE_MODEL,{messages:[{role:'system',content:'Reconcile evidence under frozen 5DR rules. Output governed JSON only.'},{role:'user',content:prompt(packet)}],max_tokens:2600,temperature:0,chat_template_kwargs:{enable_thinking:false}});
     const parsed=parseJson(raw);const validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
     if(!validation.judgment)return {judgment:null,normalized:null,errors:validation.errors.length?validation.errors:['intelligence model returned invalid JSON'],model:INTELLIGENCE_MODEL};
     return {judgment:validation.judgment,normalized:normalizeIntelligenceJudgment(validation.judgment),errors:[],model:INTELLIGENCE_MODEL};
