@@ -1,0 +1,97 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "edge-console.edge-stocks-output.v1",
+  "title": "EDGE Stocks Output Contract V1",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "engine",
+    "framework_version",
+    "ticker",
+    "run_id",
+    "generated_at",
+    "decision",
+    "official_efficacy",
+    "provisional_checkpoint_diagnostics",
+    "institutional_drilldown"
+  ],
+  "properties": {
+    "contract_version": {"const": "EDGE_STOCKS_V1_1"},
+    "engine": {"const": "EDGE_STOCKS"},
+    "framework_version": {"const": "EDGE_V1"},
+    "ticker": {"type": "string", "minLength": 1},
+    "run_id": {"type": "string", "minLength": 1},
+    "generated_at": {"type": "string", "format": "date-time"},
+    "decision": {
+      "type": "object",
+      "required": ["forecast", "probabilities", "expected_zone", "market_trust", "bot", "recommendation", "execution"],
+      "properties": {
+        "forecast": {"type": "string"},
+        "probabilities": {
+          "type": "object",
+          "required": ["bull", "base", "bear"],
+          "properties": {
+            "bull": {"type": "number", "minimum": 0, "maximum": 100},
+            "base": {"type": "number", "minimum": 0, "maximum": 100},
+            "bear": {"type": "number", "minimum": 0, "maximum": 100}
+          }
+        },
+        "expected_zone": {
+          "type": "object",
+          "required": ["low", "high"],
+          "properties": {
+            "low": {"type": ["number", "null"]},
+            "high": {"type": ["number", "null"]}
+          }
+        },
+        "market_trust": {"type": "object"},
+        "bot": {"type": "object"},
+        "recommendation": {"type": "string"},
+        "execution": {"type": "object"}
+      }
+    },
+    "official_efficacy": {
+      "type": "object",
+      "description": "Final efficacy only. Must be derived exclusively from CLOSED, scorable recommendations.",
+      "required": ["sample_size", "recommendation_hit_rate_pct", "directional_accuracy_pct", "forecast_accuracy_pct"],
+      "properties": {
+        "sample_size": {"type": "integer", "minimum": 0},
+        "recommendation_hit_rate_pct": {"type": ["number", "null"]},
+        "directional_accuracy_pct": {"type": ["number", "null"]},
+        "forecast_accuracy_pct": {"type": ["number", "null"]}
+      }
+    },
+    "provisional_checkpoint_diagnostics": {
+      "type": "object",
+      "description": "Diagnostic only. Must not overwrite final efficacy fields while lifecycle status is OPEN.",
+      "required": ["label", "captured_checkpoints", "forecast_scorable", "forecast_hits", "forecast_misses", "forecast_accuracy_pct", "zone_scorable", "zone_hits", "zone_misses", "zone_accuracy_pct"],
+      "properties": {
+        "label": {"const": "PROVISIONAL"},
+        "captured_checkpoints": {"type": "integer", "minimum": 0},
+        "forecast_scorable": {"type": "integer", "minimum": 0},
+        "forecast_hits": {"type": "integer", "minimum": 0},
+        "forecast_misses": {"type": "integer", "minimum": 0},
+        "forecast_accuracy_pct": {"type": ["number", "null"]},
+        "zone_scorable": {"type": "integer", "minimum": 0},
+        "zone_hits": {"type": "integer", "minimum": 0},
+        "zone_misses": {"type": "integer", "minimum": 0},
+        "zone_accuracy_pct": {"type": ["number", "null"]},
+        "latest_checkpoint_observed_at": {"type": ["string", "null"], "format": "date-time"}
+      }
+    },
+    "institutional_drilldown": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["component", "score_or_level", "key_outcome", "interpretation"],
+        "properties": {
+          "component": {"type": "string"},
+          "score_or_level": {},
+          "key_outcome": {"type": "string"},
+          "interpretation": {"type": "string"}
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
