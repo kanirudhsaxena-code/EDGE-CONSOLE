@@ -3,6 +3,7 @@ import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
 import { dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { acquireSystemResearch } from './system-research';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -47,6 +48,21 @@ async function shadowVision(env:Env,requestId:string):Promise<Response>{
   return json({ok:unavailable.length===0,mode:'SHADOW_NON_PUBLISHING',request_id:requestId,producer:'EDGE_CONSOLE_WORKERS_AI_VISION',producer_version:'0.2-shadow',adapter_stage:stage,vision_status:visionStatus,observations,blockers:unavailable.map(item=>({upload_id:item.upload_id,category:item.category,limitations:item.limitations})),next_step:unavailable.length?'FIX_OR_RETRY_SCREENSHOT_INTERPRETATION':'SYSTEM_WEB_RESEARCH'},unavailable.length?409:200);
 }
 
+async function systemResearch(env:Env,requestId:string):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  if(!rows.length)return json({error:'request_id not found'},404);
+  const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  const screenshotIntelligence=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
+  if(screenshotIntelligence.status!=='VISION_READY')return json({error:'system research requires VISION_READY screenshot intelligence',vision_status:screenshotIntelligence.status??null},409);
+  const acquisition=await acquireSystemResearch();
+  const allReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
+  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),...acquisition};
+  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record})}::jsonb,updated_at=now() where request_id=${requestId}`;
+  return json({ok:allReady,request_id:requestId,system_research:record,next_step:allReady?'RESEARCH_INTERPRETATION':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
+}
+
 async function normalizedAndDispatch(request:Request,env:Env,requestId:string):Promise<Response>{
   const normalizedResponse=await router.fetch(request.clone() as any,env as any);
   if(!normalizedResponse.ok||!env.DATABASE_URL)return normalizedResponse;
@@ -76,6 +92,8 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   if(url.pathname==='/api/5dr/vision-readiness'&&request.method==='GET')return visionReadiness(env);
   const vision=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/shadow-vision$/);
   if(vision&&request.method==='POST')return shadowVision(env,decodeURIComponent(vision[1]));
+  const research=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/system-research$/);
+  if(research&&request.method==='POST')return systemResearch(env,decodeURIComponent(research[1]));
   const normalized=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
   if(normalized&&request.method==='POST')return normalizedAndDispatch(request,env,decodeURIComponent(normalized[1]));
   return router.fetch(request,env as any);
