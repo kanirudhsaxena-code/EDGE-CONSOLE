@@ -6,7 +6,7 @@ export type VisionReadiness={ok:boolean;model:string;status:'READY'|'LICENSE_NOT
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 
-const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Return JSON only with this exact shape: {"category":"${category}","verification":"VERIFIED|DEGRADED|UNAVAILABLE","findings":[{"label":"string","value":"string|number|boolean|null","confidence":0.0,"notes":"optional"}],"limitations":["string"]}. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1.`;
+const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Return JSON only with this exact shape: {"category":"${category}","verification":"VERIFIED|DEGRADED|UNAVAILABLE","findings":[{"label":"string","value":"string|number|boolean|null","confidence":0.0,"notes":"optional"}],"limitations":["string"]}. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1. Keep the response concise: return only the material facts needed from the screenshot, with no prose outside the JSON.`;
 
 function parseResponse(raw:unknown):unknown{
   if(typeof raw==='string'){try{return JSON.parse(raw)}catch{return null}}
@@ -49,9 +49,6 @@ export function validateVisionObservation(raw:unknown,category:ScreenshotCategor
 
 export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
   try{
-    // Readiness checks account/model access only. Real screenshot inference is
-    // verified separately with actual uploaded evidence; a synthetic 1px image
-    // can be rejected by the vision backend even when the model is healthy.
     await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Reply exactly READY.'}],max_tokens:8,temperature:0});
     return {ok:true,model:VISION_MODEL,status:'READY'};
   }catch(error){
@@ -59,16 +56,24 @@ export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness
   }
 }
 
+function withTimeout<T>(promise:Promise<T>,ms:number):Promise<T>{
+  return new Promise<T>((resolve,reject)=>{
+    const timer=setTimeout(()=>reject(new Error('vision inference timeout')),ms);
+    promise.then(value=>{clearTimeout(timer);resolve(value)},error=>{clearTimeout(timer);reject(error)});
+  });
+}
+
 export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:string,category:ScreenshotCategory):Promise<VisionObservation>{
   if(!mimeType.startsWith('image/'))return {category,verification:'UNAVAILABLE',findings:[],limitations:['Vision producer accepts image evidence only'],model:VISION_MODEL};
   const bytes=new Uint8Array(image); let binary=''; for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
   const imageBase64=`data:${mimeType};base64,${btoa(binary)}`;
   try{
-    const raw=await ai.run(VISION_MODEL,{messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data.'},{role:'user',content:prompt(category)}],image:imageBase64,max_tokens:1200,temperature:0});
+    const raw=await withTimeout(ai.run(VISION_MODEL,{messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data.'},{role:'user',content:prompt(category)}],image:imageBase64,max_tokens:600,temperature:0}),30000);
     const parsed=parseResponse(raw); const valid=validateVisionObservation(parsed,category);
     return valid??{category,verification:'UNAVAILABLE',findings:[],limitations:['Vision model returned an invalid governed evidence envelope'],model:VISION_MODEL};
   }catch(error){
     const status=classifyVisionFailure(error);
-    return {category,verification:'UNAVAILABLE',findings:[],limitations:[status==='LICENSE_NOT_ACCEPTED'?'Workers AI vision model licence acceptance is required before live inference':status==='RATE_LIMITED'?'Workers AI vision inference is rate limited':'Workers AI vision inference is unavailable'],model:VISION_MODEL};
+    const timedOut=errorText(error).includes('timeout');
+    return {category,verification:'UNAVAILABLE',findings:[],limitations:[timedOut?'Workers AI vision inference timed out':status==='LICENSE_NOT_ACCEPTED'?'Workers AI vision model licence acceptance is required before live inference':status==='RATE_LIMITED'?'Workers AI vision inference is rate limited':'Workers AI vision inference is unavailable'],model:VISION_MODEL};
   }
 }
