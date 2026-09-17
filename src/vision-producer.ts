@@ -47,11 +47,12 @@ export function validateVisionObservation(raw:unknown,category:ScreenshotCategor
   return {category,verification:x.verification as VisionObservation['verification'],findings,limitations:x.limitations as string[],model:VISION_MODEL};
 }
 
-const onePixelPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-
 export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
   try{
-    await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Inspect this test image and reply READY.'}],image:onePixelPng,max_tokens:8,temperature:0});
+    // Readiness checks account/model access only. Real screenshot inference is
+    // verified separately with actual uploaded evidence; a synthetic 1px image
+    // can be rejected by the vision backend even when the model is healthy.
+    await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Reply exactly READY.'}],max_tokens:8,temperature:0});
     return {ok:true,model:VISION_MODEL,status:'READY'};
   }catch(error){
     return {ok:false,model:VISION_MODEL,status:classifyVisionFailure(error)};
