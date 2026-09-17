@@ -9,13 +9,25 @@ function stageError(data){
   }
   if(data&&data.intelligence_reconciliation&&Array.isArray(data.intelligence_reconciliation.errors)&&data.intelligence_reconciliation.errors.length)return String(data.intelligence_reconciliation.errors[0]);
   if(data&&data.gate&&typeof data.gate.error==='string')return data.gate.error;
-  return '5DR processing stage failed.';
+  return '';
 }
 
 async function postStage(requestId,suffix){
-  const response=await fetch('/api/5dr/run-requests/'+encodeURIComponent(requestId)+'/'+suffix,{method:'POST'});
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(stageError(data));
+  let response;
+  try{
+    response=await fetch('/api/5dr/run-requests/'+encodeURIComponent(requestId)+'/'+suffix,{method:'POST',cache:'no-store'});
+  }catch(error){
+    throw new Error('Network/Worker request failed before an HTTP response was received'+(error&&error.message?': '+error.message:''));
+  }
+  const raw=await response.text().catch(()=> '');
+  let data={};
+  if(raw){try{data=JSON.parse(raw)}catch{}}
+  if(!response.ok){
+    const detail=stageError(data);
+    if(detail)throw new Error(detail+' [HTTP '+response.status+']');
+    const excerpt=raw.replace(/\s+/g,' ').trim().slice(0,220);
+    throw new Error('5DR stage '+suffix+' returned HTTP '+response.status+(response.statusText?' '+response.statusText:'')+(excerpt?' · '+excerpt:''));
+  }
   return data;
 }
 
