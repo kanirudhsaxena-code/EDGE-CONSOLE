@@ -16,19 +16,7 @@ const evidenceTool=(category:ScreenshotCategory)=>({
     properties:{
       category:{type:'string',enum:[category]},
       verification:{type:'string',enum:['VERIFIED','DEGRADED','UNAVAILABLE']},
-      findings:{
-        type:'array',
-        items:{
-          type:'object',
-          properties:{
-            label:{type:'string'},
-            value:{anyOf:[{type:'string'},{type:'number'},{type:'boolean'},{type:'null'}]},
-            confidence:{type:'number',minimum:0,maximum:1},
-            notes:{type:'string'}
-          },
-          required:['label','value','confidence']
-        }
-      },
+      findings:{type:'array',items:{type:'object',properties:{label:{type:'string'},value:{anyOf:[{type:'string'},{type:'number'},{type:'boolean'},{type:'null'}]},confidence:{type:'number',minimum:0,maximum:1},notes:{type:'string'}},required:['label','value','confidence']}},
       limitations:{type:'array',items:{type:'string'}}
     },
     required:['category','verification','findings','limitations']
@@ -51,9 +39,31 @@ function parseToolCalls(value:unknown):unknown{
   for(const call of value){
     if(!call||typeof call!=='object')continue;
     const c=call as Record<string,unknown>;
-    if(c.name!=='submit_screenshot_evidence')continue;
-    if(c.arguments&&typeof c.arguments==='object')return c.arguments;
-    if(typeof c.arguments==='string')return parseJsonText(c.arguments);
+    // Workers AI traditional shape: {name, arguments}
+    if(c.name==='submit_screenshot_evidence'){
+      if(c.arguments&&typeof c.arguments==='object')return c.arguments;
+      if(typeof c.arguments==='string')return parseJsonText(c.arguments);
+    }
+    // OpenAI-compatible shape: {type:'function', function:{name, arguments}}
+    if(c.function&&typeof c.function==='object'){
+      const fn=c.function as Record<string,unknown>;
+      if(fn.name==='submit_screenshot_evidence'){
+        if(fn.arguments&&typeof fn.arguments==='object')return fn.arguments;
+        if(typeof fn.arguments==='string')return parseJsonText(fn.arguments);
+      }
+    }
+  }
+  return null;
+}
+
+function parseMessage(value:unknown):unknown{
+  if(!value||typeof value!=='object')return null;
+  const m=value as Record<string,unknown>;
+  const tool=parseToolCalls(m.tool_calls);
+  if(tool)return tool;
+  if(typeof m.content==='string'){
+    const parsed=parseJsonText(m.content);
+    if(parsed)return parsed;
   }
   return null;
 }
@@ -64,16 +74,42 @@ function parseResponse(raw:unknown):unknown{
     const r=raw as Record<string,unknown>;
     const directTool=parseToolCalls(r.tool_calls);
     if(directTool)return directTool;
+
+    if(Array.isArray(r.choices)){
+      for(const choice of r.choices){
+        if(!choice||typeof choice!=='object')continue;
+        const c=choice as Record<string,unknown>;
+        const parsed=parseMessage(c.message);
+        if(parsed)return parsed;
+      }
+    }
+
     if(r.response&&typeof r.response==='object'){
       const nested=r.response as Record<string,unknown>;
       const nestedTool=parseToolCalls(nested.tool_calls);
       if(nestedTool)return nestedTool;
+      if(Array.isArray(nested.choices)){
+        for(const choice of nested.choices){
+          if(!choice||typeof choice!=='object')continue;
+          const c=choice as Record<string,unknown>;
+          const parsed=parseMessage(c.message);
+          if(parsed)return parsed;
+        }
+      }
       if('category' in nested&&'verification' in nested&&'findings' in nested&&'limitations' in nested)return nested;
     }
     if(r.result&&typeof r.result==='object'){
       const nested=r.result as Record<string,unknown>;
       const nestedTool=parseToolCalls(nested.tool_calls);
       if(nestedTool)return nestedTool;
+      if(Array.isArray(nested.choices)){
+        for(const choice of nested.choices){
+          if(!choice||typeof choice!=='object')continue;
+          const c=choice as Record<string,unknown>;
+          const parsed=parseMessage(c.message);
+          if(parsed)return parsed;
+        }
+      }
       if('category' in nested&&'verification' in nested&&'findings' in nested&&'limitations' in nested)return nested;
     }
     if(typeof r.response==='string')return parseJsonText(r.response);
@@ -137,6 +173,8 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
       messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data. Use the submit_screenshot_evidence tool.'},{role:'user',content:prompt(category)}],
       image:imageBase64,
       tools:[evidenceTool(category)],
+      tool_choice:'required',
+      parallel_tool_calls:false,
       max_tokens:450,
       temperature:0,
       chat_template_kwargs:{enable_thinking:false}
