@@ -2,6 +2,7 @@ export const VISION_MODEL='@cf/meta/llama-3.2-11b-vision-instruct';
 export type ScreenshotCategory='PRICE_TECHNICALS'|'DERIVATIVES_OI';
 export type VisionFinding={label:string;value:string|number|boolean|null;confidence:number;notes?:string};
 export type VisionObservation={category:ScreenshotCategory;verification:'VERIFIED'|'DEGRADED'|'UNAVAILABLE';findings:VisionFinding[];limitations:string[];model:string};
+export type VisionReadiness={ok:boolean;model:string;status:'READY'|'LICENSE_NOT_ACCEPTED'|'RATE_LIMITED'|'UNAVAILABLE'};
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 
@@ -15,6 +16,18 @@ function parseResponse(raw:unknown):unknown{
     if(typeof r.result==='string'){try{return JSON.parse(r.result)}catch{return null}}
   }
   return null;
+}
+
+function errorText(error:unknown):string{
+  if(error instanceof Error)return `${error.name} ${error.message}`.toLowerCase();
+  return String(error??'').toLowerCase();
+}
+
+export function classifyVisionFailure(error:unknown):VisionReadiness['status']{
+  const text=errorText(error);
+  if(text.includes('5016')||text.includes('model agreement')||text.includes('license')||text.includes('licence'))return 'LICENSE_NOT_ACCEPTED';
+  if(text.includes('429')||text.includes('rate limit')||text.includes('quota'))return 'RATE_LIMITED';
+  return 'UNAVAILABLE';
 }
 
 export function validateVisionObservation(raw:unknown,category:ScreenshotCategory):VisionObservation|null{
@@ -34,6 +47,17 @@ export function validateVisionObservation(raw:unknown,category:ScreenshotCategor
   return {category,verification:x.verification as VisionObservation['verification'],findings,limitations:x.limitations as string[],model:VISION_MODEL};
 }
 
+const onePixelPng='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+
+export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
+  try{
+    await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Inspect this test image and reply READY.'}],image:onePixelPng,max_tokens:8,temperature:0});
+    return {ok:true,model:VISION_MODEL,status:'READY'};
+  }catch(error){
+    return {ok:false,model:VISION_MODEL,status:classifyVisionFailure(error)};
+  }
+}
+
 export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:string,category:ScreenshotCategory):Promise<VisionObservation>{
   if(!mimeType.startsWith('image/'))return {category,verification:'UNAVAILABLE',findings:[],limitations:['Vision producer accepts image evidence only'],model:VISION_MODEL};
   const bytes=new Uint8Array(image); let binary=''; for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
@@ -43,6 +67,7 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
     const parsed=parseResponse(raw); const valid=validateVisionObservation(parsed,category);
     return valid??{category,verification:'UNAVAILABLE',findings:[],limitations:['Vision model returned an invalid governed evidence envelope'],model:VISION_MODEL};
   }catch(error){
-    return {category,verification:'UNAVAILABLE',findings:[],limitations:[`Vision inference unavailable: ${error instanceof Error?error.message:'unknown error'}`],model:VISION_MODEL};
+    const status=classifyVisionFailure(error);
+    return {category,verification:'UNAVAILABLE',findings:[],limitations:[status==='LICENSE_NOT_ACCEPTED'?'Workers AI vision model licence acceptance is required before live inference':status==='RATE_LIMITED'?'Workers AI vision inference is rate limited':'Workers AI vision inference is unavailable'],model:VISION_MODEL};
   }
 }
