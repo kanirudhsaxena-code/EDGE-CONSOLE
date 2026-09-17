@@ -48,7 +48,7 @@ async function shadowVision(env:Env,requestId:string):Promise<Response>{
 }
 
 async function normalizedAndDispatch(request:Request,env:Env,requestId:string):Promise<Response>{
-  const normalizedResponse=await router.fetch(request.clone(),env as any);
+  const normalizedResponse=await router.fetch(request.clone() as any,env as any);
   if(!normalizedResponse.ok||!env.DATABASE_URL)return normalizedResponse;
   let normalizedBody:Record<string,unknown>={};
   try{const parsed=await normalizedResponse.clone().json();if(isObject(parsed))normalizedBody=parsed}catch{}
