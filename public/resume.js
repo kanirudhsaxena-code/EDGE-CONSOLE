@@ -1,4 +1,5 @@
 const summary=document.getElementById('fiveDrSummary');
+let latestEligibleRequest=null;
 
 async function postStage(requestId,suffix){
   const response=await fetch('/api/5dr/run-requests/'+encodeURIComponent(requestId)+'/'+suffix,{method:'POST'});
@@ -28,32 +29,52 @@ async function resumeRequest(button,statusNode,requestId){
   }
 }
 
-async function installResumeControl(){
+function renderResumeControl(request){
+  if(!summary||!request)return;
+  if(document.getElementById('resume5drRequest'))return;
+  const wrap=document.createElement('div');
+  wrap.className='run';
+  wrap.id='resume5drWrap';
+  const button=document.createElement('button');
+  button.id='resume5drRequest';
+  button.type='button';
+  button.className='primary';
+  button.textContent='Continue this 5DR run';
+  const status=document.createElement('p');
+  status.className='muted';
+  status.textContent='Uses the already-secured screenshots. No re-upload required.';
+  button.addEventListener('click',()=>resumeRequest(button,status,request.request_id));
+  wrap.append(button,status);
+  summary.appendChild(wrap);
+}
+
+function ensureResumeControl(){
+  if(!latestEligibleRequest)return;
+  renderResumeControl(latestEligibleRequest);
+}
+
+async function loadEligibleRequest(){
   if(!summary)return;
   try{
-    const response=await fetch('/api/5dr/run-requests/latest');
+    const response=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'});
     const data=await response.json();
     const request=data&&data.request;
-    if(!request||request.status!=='READY_FOR_ENGINE')return;
-    const metadata=request.metadata||{};
-    if(metadata.adapter_stage!=='SCREENSHOTS_READY')return;
-    if(document.getElementById('resume5drRequest'))return;
-    const wrap=document.createElement('div');
-    wrap.className='run';
-    const button=document.createElement('button');
-    button.id='resume5drRequest';
-    button.type='button';
-    button.className='primary';
-    button.textContent='Continue this 5DR run';
-    const status=document.createElement('p');
-    status.className='muted';
-    status.textContent='Uses the 5 already-secured screenshots. No re-upload required.';
-    button.addEventListener('click',()=>resumeRequest(button,status,request.request_id));
-    wrap.append(button,status);
-    summary.appendChild(wrap);
+    const metadata=request&&request.metadata?request.metadata:{};
+    if(request&&request.status==='READY_FOR_ENGINE'&&metadata.adapter_stage==='SCREENSHOTS_READY'){
+      latestEligibleRequest=request;
+      ensureResumeControl();
+    }
   }catch(error){
     console.error('resume control unavailable',error);
   }
 }
 
-window.addEventListener('load',()=>setTimeout(installResumeControl,400));
+if(summary){
+  const observer=new MutationObserver(()=>ensureResumeControl());
+  observer.observe(summary,{childList:true,subtree:true});
+}
+window.addEventListener('load',()=>{
+  setTimeout(loadEligibleRequest,150);
+  setTimeout(ensureResumeControl,800);
+  setTimeout(ensureResumeControl,1600);
+});
