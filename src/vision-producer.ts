@@ -1,4 +1,4 @@
-export const VISION_MODEL='@cf/meta/llama-3.2-11b-vision-instruct';
+export const VISION_MODEL='@cf/google/gemma-4-26b-a4b-it';
 export type ScreenshotCategory='PRICE_TECHNICALS'|'DERIVATIVES_OI';
 export type VisionFinding={label:string;value:string|number|boolean|null;confidence:number;notes?:string};
 export type VisionObservation={category:ScreenshotCategory;verification:'VERIFIED'|'DEGRADED'|'UNAVAILABLE';findings:VisionFinding[];limitations:string[];model:string};
@@ -39,7 +39,7 @@ function errorText(error:unknown):string{
 export function classifyVisionFailure(error:unknown):VisionReadiness['status']{
   const text=errorText(error);
   if(text.includes('5016')||text.includes('model agreement')||text.includes('license')||text.includes('licence'))return 'LICENSE_NOT_ACCEPTED';
-  if(text.includes('429')||text.includes('rate limit')||text.includes('quota'))return 'RATE_LIMITED';
+  if(text.includes('429')||text.includes('rate limit')||text.includes('quota')||text.includes('capacity'))return 'RATE_LIMITED';
   return 'UNAVAILABLE';
 }
 
@@ -62,7 +62,7 @@ export function validateVisionObservation(raw:unknown,category:ScreenshotCategor
 
 export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
   try{
-    await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Reply exactly READY.'}],max_tokens:8,temperature:0});
+    await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Reply exactly READY.'}],max_tokens:8,temperature:0,chat_template_kwargs:{enable_thinking:false}});
     return {ok:true,model:VISION_MODEL,status:'READY'};
   }catch(error){
     return {ok:false,model:VISION_MODEL,status:classifyVisionFailure(error)};
@@ -81,7 +81,7 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
   const bytes=new Uint8Array(image); let binary=''; for(let i=0;i<bytes.length;i+=0x8000)binary+=String.fromCharCode(...bytes.subarray(i,i+0x8000));
   const imageBase64=`data:${mimeType};base64,${btoa(binary)}`;
   try{
-    const raw=await withTimeout(ai.run(VISION_MODEL,{messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data.'},{role:'user',content:prompt(category)}],image:imageBase64,max_tokens:600,temperature:0}),30000);
+    const raw=await withTimeout(ai.run(VISION_MODEL,{messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data.'},{role:'user',content:prompt(category)}],image:imageBase64,max_tokens:450,temperature:0,chat_template_kwargs:{enable_thinking:false}}),45000);
     const parsed=parseResponse(raw); const valid=validateVisionObservation(parsed,category);
     return valid??{category,verification:'UNAVAILABLE',findings:[],limitations:['Vision model returned an invalid governed evidence envelope'],model:VISION_MODEL};
   }catch(error){
