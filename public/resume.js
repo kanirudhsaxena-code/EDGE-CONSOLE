@@ -1,13 +1,21 @@
 const summary=document.getElementById('fiveDrSummary');
 let latestEligibleRequest=null;
 
+function stageError(data){
+  if(data&&typeof data.error==='string'&&data.error)return data.error;
+  if(data&&Array.isArray(data.blockers)&&data.blockers.length){
+    const blocker=data.blockers[0]||{};
+    if(Array.isArray(blocker.limitations)&&blocker.limitations.length)return String(blocker.limitations[0]);
+  }
+  if(data&&data.intelligence_reconciliation&&Array.isArray(data.intelligence_reconciliation.errors)&&data.intelligence_reconciliation.errors.length)return String(data.intelligence_reconciliation.errors[0]);
+  if(data&&data.gate&&typeof data.gate.error==='string')return data.gate.error;
+  return '5DR processing stage failed.';
+}
+
 async function postStage(requestId,suffix){
   const response=await fetch('/api/5dr/run-requests/'+encodeURIComponent(requestId)+'/'+suffix,{method:'POST'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok){
-    const detail=data.error||(data.intelligence_reconciliation&&Array.isArray(data.intelligence_reconciliation.errors)?data.intelligence_reconciliation.errors[0]:null)||'5DR processing stage failed.';
-    throw new Error(detail);
-  }
+  if(!response.ok)throw new Error(stageError(data));
   return data;
 }
 
