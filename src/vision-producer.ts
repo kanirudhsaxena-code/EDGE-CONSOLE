@@ -6,31 +6,33 @@ export type VisionReadiness={ok:boolean;model:string;status:'READY'|'LICENSE_NOT
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 
-const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1. Keep findings concise and material.`;
+const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Call submit_screenshot_evidence exactly once with your factual extraction. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1. Keep findings concise and material.`;
 
-const evidenceSchema=(category:ScreenshotCategory)=>({
-  type:'object',
-  additionalProperties:false,
-  properties:{
-    category:{type:'string',enum:[category]},
-    verification:{type:'string',enum:['VERIFIED','DEGRADED','UNAVAILABLE']},
-    findings:{
-      type:'array',
-      items:{
-        type:'object',
-        additionalProperties:false,
-        properties:{
-          label:{type:'string'},
-          value:{anyOf:[{type:'string'},{type:'number'},{type:'boolean'},{type:'null'}]},
-          confidence:{type:'number',minimum:0,maximum:1},
-          notes:{type:'string'}
-        },
-        required:['label','value','confidence']
-      }
+const evidenceTool=(category:ScreenshotCategory)=>({
+  name:'submit_screenshot_evidence',
+  description:'Submit only factual evidence visibly supported by the screenshot.',
+  parameters:{
+    type:'object',
+    properties:{
+      category:{type:'string',enum:[category]},
+      verification:{type:'string',enum:['VERIFIED','DEGRADED','UNAVAILABLE']},
+      findings:{
+        type:'array',
+        items:{
+          type:'object',
+          properties:{
+            label:{type:'string'},
+            value:{anyOf:[{type:'string'},{type:'number'},{type:'boolean'},{type:'null'}]},
+            confidence:{type:'number',minimum:0,maximum:1},
+            notes:{type:'string'}
+          },
+          required:['label','value','confidence']
+        }
+      },
+      limitations:{type:'array',items:{type:'string'}}
     },
-    limitations:{type:'array',items:{type:'string'}}
-  },
-  required:['category','verification','findings','limitations']
+    required:['category','verification','findings','limitations']
+  }
 });
 
 function parseJsonText(text:string):unknown{
@@ -44,14 +46,38 @@ function parseJsonText(text:string):unknown{
   return null;
 }
 
+function parseToolCalls(value:unknown):unknown{
+  if(!Array.isArray(value))return null;
+  for(const call of value){
+    if(!call||typeof call!=='object')continue;
+    const c=call as Record<string,unknown>;
+    if(c.name!=='submit_screenshot_evidence')continue;
+    if(c.arguments&&typeof c.arguments==='object')return c.arguments;
+    if(typeof c.arguments==='string')return parseJsonText(c.arguments);
+  }
+  return null;
+}
+
 function parseResponse(raw:unknown):unknown{
   if(typeof raw==='string')return parseJsonText(raw);
   if(raw&&typeof raw==='object'){
     const r=raw as Record<string,unknown>;
+    const directTool=parseToolCalls(r.tool_calls);
+    if(directTool)return directTool;
+    if(r.response&&typeof r.response==='object'){
+      const nested=r.response as Record<string,unknown>;
+      const nestedTool=parseToolCalls(nested.tool_calls);
+      if(nestedTool)return nestedTool;
+      if('category' in nested&&'verification' in nested&&'findings' in nested&&'limitations' in nested)return nested;
+    }
+    if(r.result&&typeof r.result==='object'){
+      const nested=r.result as Record<string,unknown>;
+      const nestedTool=parseToolCalls(nested.tool_calls);
+      if(nestedTool)return nestedTool;
+      if('category' in nested&&'verification' in nested&&'findings' in nested&&'limitations' in nested)return nested;
+    }
     if(typeof r.response==='string')return parseJsonText(r.response);
-    if(r.response&&typeof r.response==='object')return r.response;
     if(typeof r.result==='string')return parseJsonText(r.result);
-    if(r.result&&typeof r.result==='object')return r.result;
     if('category' in r&&'verification' in r&&'findings' in r&&'limitations' in r)return r;
   }
   return null;
@@ -108,9 +134,9 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
   const imageBase64=`data:${mimeType};base64,${btoa(binary)}`;
   try{
     const raw=await withTimeout(ai.run(VISION_MODEL,{
-      messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data. Return only data matching the required JSON schema.'},{role:'user',content:prompt(category)}],
+      messages:[{role:'system',content:'Extract governed screenshot evidence. Never fabricate unreadable data. Use the submit_screenshot_evidence tool.'},{role:'user',content:prompt(category)}],
       image:imageBase64,
-      response_format:{type:'json_schema',json_schema:evidenceSchema(category)},
+      tools:[evidenceTool(category)],
       max_tokens:450,
       temperature:0,
       chat_template_kwargs:{enable_thinking:false}
