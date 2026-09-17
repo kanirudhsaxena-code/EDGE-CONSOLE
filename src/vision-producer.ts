@@ -8,12 +8,25 @@ type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown
 
 const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Return JSON only with this exact shape: {"category":"${category}","verification":"VERIFIED|DEGRADED|UNAVAILABLE","findings":[{"label":"string","value":"string|number|boolean|null","confidence":0.0,"notes":"optional"}],"limitations":["string"]}. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1. Keep the response concise: return only the material facts needed from the screenshot, with no prose outside the JSON.`;
 
+function parseJsonText(text:string):unknown{
+  const trimmed=text.trim();
+  const candidates=[trimmed];
+  const fenced=trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if(fenced?.[1])candidates.push(fenced[1].trim());
+  const first=trimmed.indexOf('{'),last=trimmed.lastIndexOf('}');
+  if(first>=0&&last>first)candidates.push(trimmed.slice(first,last+1));
+  for(const candidate of candidates){try{return JSON.parse(candidate)}catch{}}
+  return null;
+}
+
 function parseResponse(raw:unknown):unknown{
-  if(typeof raw==='string'){try{return JSON.parse(raw)}catch{return null}}
+  if(typeof raw==='string')return parseJsonText(raw);
   if(raw&&typeof raw==='object'){
     const r=raw as Record<string,unknown>;
-    if(typeof r.response==='string'){try{return JSON.parse(r.response)}catch{return null}}
-    if(typeof r.result==='string'){try{return JSON.parse(r.result)}catch{return null}}
+    if(typeof r.response==='string')return parseJsonText(r.response);
+    if(typeof r.result==='string')return parseJsonText(r.result);
+    if(r.response&&typeof r.response==='object')return r.response;
+    if(r.result&&typeof r.result==='object')return r.result;
   }
   return null;
 }
