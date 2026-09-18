@@ -3,12 +3,14 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
+import { dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 
 type Env = {
   ASSETS: Fetcher;
   EVIDENCE_BUCKET: R2Bucket;
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
+  EDGE_GITHUB_TOKEN?: string;
   APP_ENV: string;
   OUTPUT_CONTRACT_VERSION: string;
 };
@@ -80,6 +82,111 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
   if (String(rows[0].status) === 'COMPLETED') return json({ error: 'completed request cannot be failed' }, 409);
   await sql`update analysis_requests set status = 'FAILED', error = ${JSON.stringify({ stage: 'EXECUTION', detail })}::jsonb, updated_at = now() where request_id = ${requestId}`;
   return json({ ok: true, request_id: requestId, status: 'FAILED' });
+}
+
+
+async function resolveEdgeTicker(env: Env, target: string): Promise<{ ticker?: string; error?: string; status?: number }> {
+  const direct = normalizeTickerCandidate(target);
+  if (direct) return { ticker: direct };
+  if (!env.EDGE_DATABASE_URL) {
+    return { error: 'Company-name resolution requires the EDGE database; use an NSE ticker symbol', status: 422 };
+  }
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select distinct ticker, company_name
+      from recommendations
+     where company_name is not null
+       and lower(trim(company_name)) = lower(trim(${target}))
+     order by ticker
+     limit 3
+  `;
+  if (!rows.length) return { error: 'Company name not found in governed EDGE history; use the exact NSE ticker', status: 404 };
+  if (rows.length > 1) return { error: 'Company name is ambiguous; use the exact NSE ticker', status: 409 };
+  return { ticker: String(rows[0].ticker).toUpperCase() };
+}
+
+async function latestEdgeRecommendationId(env: Env, ticker: string): Promise<string | null> {
+  if (!env.EDGE_DATABASE_URL) return null;
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select recommendation_id
+      from recommendations
+     where ticker = ${ticker}
+     order by run_timestamp desc
+     limit 1
+  `;
+  return rows.length ? String(rows[0].recommendation_id) : null;
+}
+
+async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
+  let body: unknown;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (!isObject(body)) return json({ error: 'request body must be a JSON object' }, 422);
+  const command = parseEdgeCommand(body.command);
+  if (!command) return json({ error: 'Command must be in the form EDGE <stock/company/ticker>' }, 422);
+
+  const resolved = await resolveEdgeTicker(env, command.target);
+  if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
+  const ticker = resolved.ticker;
+  const baselineRunId = await latestEdgeRecommendationId(env, ticker);
+  const dispatchedAt = new Date().toISOString();
+
+  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN');
+  if (!dispatch.ok) {
+    return json({
+      error: 'EDGE autonomous dispatch failed',
+      detail: dispatch.error,
+      ticker,
+      code: dispatch.status === 503 ? 'EDGE_DISPATCH_NOT_CONFIGURED' : 'EDGE_DISPATCH_FAILED',
+    }, dispatch.status === 401 || dispatch.status === 403 ? 502 : dispatch.status);
+  }
+
+  return json({
+    ok: true,
+    status: 'DISPATCHED',
+    engine: 'EDGE_STOCKS',
+    contract_version: 'EDGE_STOCKS_V1_2',
+    ticker,
+    command: command.raw,
+    baseline_run_id: baselineRunId,
+    dispatched_at: dispatchedAt,
+    trading_enabled: false,
+    next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
+  }, 202);
+}
+
+async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string): Promise<Response> {
+  if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
+  const ticker = normalizeTickerCandidate(tickerRaw);
+  if (!ticker) return json({ error: 'Invalid ticker' }, 422);
+  if (!isNonEmptyString(afterRaw) || Number.isNaN(Date.parse(afterRaw))) return json({ error: 'after must be a valid ISO timestamp' }, 422);
+  const after = new Date(afterRaw).toISOString();
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select recommendation_id, run_timestamp
+      from recommendations
+     where ticker = ${ticker}
+       and run_timestamp > ${after}
+     order by run_timestamp desc
+     limit 1
+  `;
+  if (!rows.length) {
+    return json({
+      status: 'RUNNING_OR_BLOCKED',
+      ticker,
+      after,
+      trading_enabled: false,
+      note: 'No newer governed recommendation is published yet. The autonomous runner may still be running or may have failed closed.',
+    });
+  }
+  return json({
+    status: 'COMPLETE',
+    ticker,
+    run_id: String(rows[0].recommendation_id),
+    run_timestamp: rows[0].run_timestamp,
+    report_url: `/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+    trading_enabled: false,
+  });
 }
 
 async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
@@ -252,6 +359,8 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
+  if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
   return app.fetch(request, env);
