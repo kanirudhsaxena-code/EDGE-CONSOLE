@@ -3,6 +3,7 @@ import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
 import { dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
 
@@ -186,7 +187,26 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
 
   if(status==='PROCESSING'){
     const dispatch=isObject(metadata.engine_dispatch)?metadata.engine_dispatch:{};
-    return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,idempotent:true});
+    const sync=await sync5drEngineResult(env,requestId);
+    if(sync.status==='PROCESSING'||sync.status==='NOT_FOUND')return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
+    if(sync.status==='FAILED'){
+      const failedDispatch={...dispatch,ok:false,status:'ENGINE_FAILED',workflow_run_id:sync.workflow_run_id,failed_at:new Date().toISOString(),detail:sync.detail};
+      await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify({...metadata,engine_dispatch:failedDispatch})}::jsonb,error=${JSON.stringify({stage:'EXECUTION',detail:sync.detail??'5DR engine workflow failed'})}::jsonb,updated_at=now() where request_id=${requestId}`;
+      return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:stage,engine_dispatch:failedDispatch,next_step:'RETRY_ENGINE_DISPATCH'},409);
+    }
+    if(sync.status==='SUCCEEDED'&&sync.envelope){
+      const origin=new URL(request.url).origin;
+      const publishReq=new Request(`${origin}/api/5dr/runs`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sync.envelope)});
+      const published=await router.fetch(publishReq as any,env as any);
+      const body=await responseJson(published);
+      if(!published.ok)return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_sync:sync,error:'validated engine result could not be persisted',publish_gate:body},409);
+      const completedDispatch={...dispatch,ok:true,status:'RESULT_SYNCED',workflow_run_id:sync.workflow_run_id,result_synced_at:new Date().toISOString()};
+      const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
+      const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
+      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({...body,ok:true,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch});
+    }
+    return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
   }
 
   if(stage==='NORMALIZED_READY')return dispatchNormalizedReady(env,requestId,request.url);
