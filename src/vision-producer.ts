@@ -6,7 +6,27 @@ export type VisionReadiness={ok:boolean;model:string;status:'READY'|'LICENSE_NOT
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 
-const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Call submit_screenshot_evidence exactly once with your factual extraction. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1. Keep findings concise and material.`;
+const prompt=(category:ScreenshotCategory)=>`You are the screenshot evidence extractor for a governed NIFTY 5-day forecasting system. Analyze ONLY what is visibly supported by this image. Category: ${category}. Do not infer missing values and do not create a forecast, recommendation, score, regime or normalized 5DR input. Call submit_screenshot_evidence exactly once with your factual extraction. Use VERIFIED only when the relevant screenshot content is clearly legible; DEGRADED when useful evidence exists but important parts are ambiguous; UNAVAILABLE when the image cannot support the category. Confidence must be between 0 and 1.
+
+IMPORTANT: extract the richest decision-relevant facts that are actually visible instead of collapsing the screenshot into one headline number.
+
+For PRICE_TECHNICALS, capture whenever visibly supported:
+- timeframe / chart interval and visible lookback window,
+- current/last price, open, previous close, day range and volume,
+- visible trend structure across the chart (for example higher highs/higher lows, lower highs/lower lows, sideways/range), but only when the chart visibly supports it,
+- whether price is above/below visibly labelled VWAP, EMA, SMA or other plotted reference,
+- visible support/resistance, swing high/low, breakout/rejection or gap levels,
+- momentum/volume behaviour if visibly labelled or unambiguous,
+- longer-term direction when the screenshot clearly displays a multi-day/multi-week/multi-month chart. Label it "Visible Trend Structure" and state the visible timeframe in notes.
+
+For DERIVATIVES_OI, do NOT reduce an option-chain screenshot to aggregate Put/Call OI when strike rows are visible. Capture:
+- expiry and spot/underlying value when visible,
+- every clearly legible near-ATM strike row, up to 12 strikes,
+- for each visible strike and each CE/PE side: premium/LTP, OI, change in OI, volume and IV when shown,
+- use standardized labels such as "Strike 24300 CE LTP", "Strike 24300 CE OI", "Strike 24300 CE Change OI", "Strike 24300 CE Volume", and equivalent PE labels,
+- PCR or aggregate totals only as additional context, never as a substitute for visible strike-level facts.
+
+Do not claim a field is missing if it is visibly present elsewhere in the same screenshot. Keep limitations specific to what is genuinely unreadable or absent.`;
 
 const evidenceTool=(category:ScreenshotCategory)=>({
   name:'submit_screenshot_evidence',
@@ -175,7 +195,7 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
       tools:[evidenceTool(category)],
       tool_choice:'required',
       parallel_tool_calls:false,
-      max_tokens:450,
+      max_tokens:1400,
       temperature:0,
       chat_template_kwargs:{enable_thinking:false}
     }),45000);
