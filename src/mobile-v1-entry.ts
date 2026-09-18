@@ -137,7 +137,7 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
 async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:string,normalizedBody:Record<string,unknown>={}):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const sql=neon(env.DATABASE_URL);
-  const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  const rows=await sql`select status,provenance_mode,framework_version,output_contract_version,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if(!rows.length)return json({error:'request_id not found after normalization'},404);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
   const previous=isObject(metadata.engine_dispatch)?metadata.engine_dispatch:{};
@@ -147,7 +147,15 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     await sql`update analysis_requests set status='PROCESSING',error=null,updated_at=now() where request_id=${requestId}`;
     return json({...normalizedBody,ok:true,status:'PROCESSING',adapter_stage:'NORMALIZED_READY',engine_dispatch:previous,idempotent:true});
   }
-  const dispatch=await dispatch5drEngine(env,requestId,requestUrl);
+  const executionPacket={
+    request_id:requestId,
+    provenance_mode:String(rows[0].provenance_mode),
+    framework_version:String(rows[0].framework_version),
+    output_contract_version:String(rows[0].output_contract_version),
+    evidence:Array.isArray(metadata.normalized_evidence)?metadata.normalized_evidence:[]
+  };
+  if(!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
+  const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
   const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
   if(dispatch.ok){
