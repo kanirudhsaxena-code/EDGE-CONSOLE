@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from '../src/edge-command';
+import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from '../src/edge-command';
 
 test('parses canonical EDGE command case-insensitively', () => {
   assert.deepEqual(parseEdgeCommand('  edge LTF  '), { raw: 'edge LTF', target: 'LTF' });
@@ -43,6 +43,23 @@ test('dispatch uses existing governed autonomous workflow and no trading endpoin
     assert.equal(body.inputs.ticker, 'LTF');
     assert.equal(body.inputs.holding_state, 'UNKNOWN');
     assert.equal(capturedInit?.method, 'POST');
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+
+test('workflow access check is non-mutating', async () => {
+  const original = globalThis.fetch;
+  let method = '';
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    method = String(init?.method || 'GET');
+    return new Response(JSON.stringify({ id: 1, name: 'EDGE Autonomous Publish' }), { status: 200 });
+  };
+  try {
+    const result = await checkEdgeWorkflowAccess('secret-token');
+    assert.equal(result.ok, true);
+    assert.equal(method, 'GET');
   } finally {
     globalThis.fetch = original;
   }
