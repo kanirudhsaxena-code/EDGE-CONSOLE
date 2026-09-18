@@ -23,7 +23,7 @@ export function parseEdgeCommand(input: unknown): EdgeCommand | null {
 
 export function normalizeTickerCandidate(value: string): string | null {
   const symbol = value.trim().toUpperCase();
-  return /^[A-Z0-9._-]{1,20}$/.test(symbol) ? symbol : null;
+  return /^[A-Z0-9._&-]{1,20}$/.test(symbol) ? symbol : null;
 }
 
 export async function dispatchEdgeWorkflow(
