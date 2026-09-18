@@ -23,7 +23,7 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - name: Probe production Console execution packet reachability
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name == 'push'
         run: |
           curl --location --fail-with-body --silent --show-error \
             -H "Accept: application/json" \
