@@ -66,10 +66,10 @@ export function renderEdgeV13(report) {
 export const renderEdgeV12 = renderEdgeV13;
 
 if (typeof document !== 'undefined') {
-  const root=document.getElementById('stocksSummary');
+  const root=document.getElementById('edgePanel');
   if(root){
-    const summary=root;
-    summary.id='edgeLiveSummary';summary.className='stack';
+    const summary=document.createElement('div');
+    summary.id='edgeLiveSummary';summary.className='stack';root.appendChild(summary);
     let loading=false;
     async function refreshEdgeLive(){
       if(loading)return;loading=true;
