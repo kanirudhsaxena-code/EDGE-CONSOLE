@@ -384,10 +384,10 @@ if(edgeCommandForm){
       const r=await fetch('/api/edge-stocks/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({command})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
-      if(d.status==='ALREADY_PUBLISHED_TODAY'){
+      if(d.ticker)localStorage.setItem('edge-console-selected-stock',d.ticker);if(d.status==='ALREADY_PUBLISHED_TODAY'){
         edgeCommandStatus.className='upload-status success';
         edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+d.run_id+' · loading canonical V1.2 result…';
-        window.location.reload();
+        window.refreshEdgeLive?window.refreshEdgeLive():window.location.reload();
         return;
       }
       edgeCommandStatus.textContent='Dispatched '+d.ticker+' · monitoring for governed publication…';
