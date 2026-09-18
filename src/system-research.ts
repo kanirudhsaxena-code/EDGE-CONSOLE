@@ -12,6 +12,7 @@ export type ResearchSnapshot={
   sha256?:string;
   excerpt?:string;
   limitation?:string;
+  facts?:Record<string,unknown>;
 };
 
 // Zero-cost, official-source registry. API endpoints remain preferred where available,
@@ -43,6 +44,42 @@ const FETCH_TIMEOUT_MS=12000;
 const hex=(buffer:ArrayBuffer)=>[...new Uint8Array(buffer)].map(v=>v.toString(16).padStart(2,'0')).join('');
 const digest=async(text:string)=>hex(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(text)));
 const cleanExcerpt=(text:string)=>text.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim().slice(0,MAX_EXCERPT_CHARS);
+
+const nums=(value:string)=>[...value.matchAll(/-?\d+(?:\.\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite);
+function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<string,unknown>|undefined{
+  try{
+    if(source.id==='NSE_ALL_INDICES'){
+      const parsed=JSON.parse(body),rows=Array.isArray(parsed?.data)?parsed.data:[];
+      const n=rows.find((x:any)=>x&&x.index==='NIFTY 50');
+      if(n)return {nifty50:{last:n.last,percent_change:n.percentChange,open:n.open,high:n.high,low:n.low,previous_close:n.previousClose,advances:Number(n.advances),declines:Number(n.declines),unchanged:Number(n.unchanged),change_30d:n.perChange30d,change_365d:n.perChange365d,one_week_ago:n.oneWeekAgoVal,one_month_ago:n.oneMonthAgoVal,one_year_ago:n.oneYearAgoVal}};
+    }
+    if(source.id==='NSE_MARKET_STATUS'){
+      const parsed=JSON.parse(body),rows=Array.isArray(parsed?.marketState)?parsed.marketState:[];
+      const cash=rows.find((x:any)=>x&&x.market==='Capital Market');
+      if(cash)return {capital_market:{status:cash.marketStatus,trade_date:cash.tradeDate,index:cash.index,last:cash.last,variation:cash.variation,percent_change:cash.percentChange,message:cash.marketStatusMessage}};
+    }
+    if(source.id==='EIA_CRUDE_SPOT'){
+      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
+      const brent=excerpt.match(/Brent\s*-\s*Europe\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
+      const wf=wti?nums(wti[1]):[],bf=brent?nums(brent[1]):[];
+      const facts:Record<string,unknown>={};
+      if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf};
+      if(bf.length)facts.brent_usd_per_barrel={latest:bf.at(-1),recent:bf};
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='RBI_CURRENT_RATES'){
+      const repo=excerpt.match(/Policy Repo Rate[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
+      const sdf=excerpt.match(/Standing Deposit Facility[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
+      const msf=excerpt.match(/Marginal Standing Facility[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
+      const facts:Record<string,unknown>={};
+      if(repo)facts.policy_repo_rate_pct=Number(repo[1]);
+      if(sdf)facts.standing_deposit_facility_pct=Number(sdf[1]);
+      if(msf)facts.marginal_standing_facility_pct=Number(msf[1]);
+      return Object.keys(facts).length?facts:undefined;
+    }
+  }catch{}
+  return undefined;
+}
 
 async function boundedText(response:Response):Promise<string>{
   const declared=Number(response.headers.get('content-length')||'0');
@@ -80,7 +117,8 @@ export async function acquireResearchSource(source:ResearchSource,fetcher:typeof
     if(!body.trim())return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY'};
     const excerpt=cleanExcerpt(body);
     if(!excerpt)return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY_AFTER_CLEANING'};
-    return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'RETRIEVED',http_status:response.status,content_type,sha256:await digest(body),excerpt};
+    const facts=extractFacts(source,body,excerpt);
+    return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'RETRIEVED',http_status:response.status,content_type,sha256:await digest(body),excerpt,facts};
   }catch(error){
     const message=error instanceof Error?error.message:'';
     const reason=message==='SOURCE_TOO_LARGE'?'SOURCE_TOO_LARGE':message.toLowerCase().includes('abort')?'SOURCE_TIMEOUT':'SOURCE_FETCH_FAILED';
