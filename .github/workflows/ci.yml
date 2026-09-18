@@ -1,6 +1,7 @@
 name: EDGE Console CI
 
 on:
+  workflow_dispatch:
   pull_request:
     branches: [main]
   push:
@@ -21,3 +22,16 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
+      - name: Probe production Console execution packet reachability
+        if: github.event_name != 'workflow_dispatch'
+        run: |
+          curl --location --fail-with-body --silent --show-error \
+            -H "Accept: application/json" \
+            "https://edge-console.k-anirudhsaxena.workers.dev/api/5dr/run-requests/5drreq_f9a9e354-6463-4096-81ed-99c149f32430/execution-packet" \
+            --output /tmp/execution-packet.json
+          node - <<'NODE'
+          const fs=require('fs');
+          const payload=JSON.parse(fs.readFileSync('/tmp/execution-packet.json','utf8'));
+          if(!payload || !Array.isArray(payload.evidence)) throw new Error('production Console did not return governed execution evidence');
+          console.log('production_console_packet_ok evidence_items='+payload.evidence.length);
+          NODE
