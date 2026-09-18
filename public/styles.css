@@ -224,3 +224,5 @@ body{font-size:var(--fs-body);line-height:var(--lh-body)}
   .scorecard-day.pending small{grid-column:1}
   .active-call-grid,.ipo-issue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
+
+.semantic-contract-tables{display:none!important}
