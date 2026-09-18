@@ -168,6 +168,18 @@ export function validateVisionObservation(raw:unknown,category:ScreenshotCategor
   return {category,verification:x.verification as VisionObservation['verification'],findings,limitations:x.limitations as string[],model:VISION_MODEL};
 }
 
+function applyCurrentEvidenceSanity(observation:VisionObservation,category:ScreenshotCategory):VisionObservation{
+  if(category!=='DERIVATIVES_OI')return observation;
+  const expiry=observation.findings.find(f=>String(f.label).toLowerCase()==='expiry');
+  if(typeof expiry?.value!=='string')return observation;
+  const parsed=Date.parse(expiry.value);
+  if(Number.isNaN(parsed))return observation;
+  const now=new Date();
+  const today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
+  if(parsed<today)return {...observation,verification:'UNAVAILABLE',limitations:[...observation.limitations,'Extracted option expiry is already past the current run date; current derivatives evidence cannot be trusted.']};
+  return observation;
+}
+
 export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
   try{
     await ai.run(VISION_MODEL,{messages:[{role:'user',content:'Reply exactly READY.'}],max_tokens:8,temperature:0,chat_template_kwargs:{enable_thinking:false}});
@@ -200,7 +212,7 @@ export async function analyzeScreenshot(ai:AiBinding,image:ArrayBuffer,mimeType:
       chat_template_kwargs:{enable_thinking:false}
     }),45000);
     const parsed=parseResponse(raw); const valid=validateVisionObservation(parsed,category);
-    return valid??{category,verification:'UNAVAILABLE',findings:[],limitations:['Vision model returned an invalid governed evidence envelope'],model:VISION_MODEL};
+    return valid?applyCurrentEvidenceSanity(valid,category):{category,verification:'UNAVAILABLE',findings:[],limitations:['Vision model returned an invalid governed evidence envelope'],model:VISION_MODEL};
   }catch(error){
     const status=classifyVisionFailure(error);
     const timedOut=errorText(error).includes('timeout');
