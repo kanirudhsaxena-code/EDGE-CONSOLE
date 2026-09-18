@@ -1,0 +1,137 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "edge-console.edge-stocks-output.v1.3",
+  "title": "EDGE Stocks Output Contract V1.3 / Efficacy V2",
+  "type": "object",
+  "required": [
+    "contract_version",
+    "presentation_contract",
+    "engine",
+    "framework_version",
+    "ticker",
+    "run_id",
+    "generated_at",
+    "presentation",
+    "master_assessment",
+    "active_calls",
+    "current_stock_outcome",
+    "drilldown"
+  ],
+  "properties": {
+    "contract_version": {
+      "const": "EDGE_STOCKS_V1_3"
+    },
+    "presentation_contract": {
+      "const": "EFFICACY_V2"
+    },
+    "engine": {
+      "const": "EDGE_STOCKS"
+    },
+    "framework_version": {
+      "const": "EDGE_V1"
+    },
+    "ticker": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "presentation": {
+      "type": "object",
+      "required": [
+        "standard_table_count",
+        "table_1",
+        "table_2",
+        "table_3",
+        "table_4"
+      ],
+      "properties": {
+        "standard_table_count": {
+          "const": 4
+        },
+        "table_1": {
+          "const": "EDGE_MASTER_ASSESSMENT"
+        },
+        "table_2": {
+          "const": "ACTIVE_CALLS"
+        },
+        "table_3": {
+          "const": "CURRENT_STOCK_OUTCOME"
+        },
+        "table_4": {
+          "const": "DRILLDOWN"
+        }
+      },
+      "additionalProperties": false
+    },
+    "master_assessment": {
+      "type": "object"
+    },
+    "active_calls": {
+      "type": "array"
+    },
+    "current_stock_outcome": {
+      "type": "object",
+      "required": [
+        "des",
+        "market_trust",
+        "directional_agreement",
+        "effective_conviction",
+        "probabilities",
+        "definitive_forecast",
+        "expected_price_zone",
+        "forecast_horizon",
+        "risk_override",
+        "primary_action",
+        "decision_ladder",
+        "bot",
+        "execution"
+      ]
+    },
+    "drilldown": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": [
+          "component",
+          "score_or_level",
+          "verification_status",
+          "key_outcome",
+          "interpretation"
+        ],
+        "properties": {
+          "component": {
+            "type": "string",
+            "minLength": 1
+          },
+          "score_or_level": {},
+          "verification_status": {
+            "enum": [
+              "VERIFIED",
+              "NOT_VERIFIED",
+              "NOT_AVAILABLE",
+              "NOT_SCORABLE",
+              "N/A"
+            ]
+          },
+          "key_outcome": {
+            "type": "string",
+            "minLength": 1
+          },
+          "interpretation": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}
