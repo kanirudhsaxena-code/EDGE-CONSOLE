@@ -98,3 +98,10 @@ test('risk override code is mandatory only when active', () => {
   bad.decision.risk_override = { status: 'ACTIVE', code: null };
   assert.ok(validateEdgeStocksResult(bad).some(x => x.includes('code is mandatory when ACTIVE')));
 });
+
+
+test('empty institutional drill-down is rejected', () => {
+  const bad = structuredClone(base);
+  bad.institutional_drilldown = [];
+  assert.ok(validateEdgeStocksResult(bad).some(x => x.includes('at least one component')));
+});
