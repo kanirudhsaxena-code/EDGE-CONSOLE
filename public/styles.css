@@ -34,3 +34,5 @@ body{background:linear-gradient(180deg,#08131f 0%,#0b1b2b 42%,#07111b 100%)}
 
 .change-intro{margin:10px 0 0;color:#9aadc3;font-size:13px;line-height:1.5}
 .assessment-future{border-top:1px solid #27435f;margin-top:14px;padding-top:12px}.assessment-future summary{cursor:pointer;font-weight:800;color:#d7e9f8}.assessment-future p{color:#9aadc3;font-size:13px;line-height:1.5}
+
+.active-run-banner{margin:0 0 14px;padding:13px 14px;border-radius:14px;background:#10263b;border:1px solid #31506e;display:grid;gap:4px}.active-run-banner strong{color:#eaf6ff}.active-run-banner span{color:#9ad7ff;font-size:13px}.active-run-banner small{color:#8fa5bb;line-height:1.4}
