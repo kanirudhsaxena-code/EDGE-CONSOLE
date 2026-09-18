@@ -19,8 +19,8 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 12); do
-            if curl --fail --silent --show-error \
-              'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js' \
+            if curl --fail --silent --show-error -H 'Cache-Control: no-cache' \
+              'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
               && grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js; then
               exit 0
@@ -28,6 +28,9 @@ jobs:
             sleep 10
           done
           echo "Deployed EDGE V1.2 renderer was not observed"
+          echo "--- renderer response preview ---"
+          head -c 500 /tmp/edge-live.js || true
+          echo
           exit 1
 
       - name: Check EDGE health
