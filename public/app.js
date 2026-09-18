@@ -13,6 +13,44 @@ const DECISION_PREFS_KEY='edge-console-5dr-decision-setup-v1';
 function loadDecisionPrefs(){try{const saved=JSON.parse(localStorage.getItem(DECISION_PREFS_KEY)||'{}');if(decisionObjective&&saved.objective)decisionObjective.value=saved.objective;if(riskPosture&&saved.risk_posture)riskPosture.value=saved.risk_posture;if(capitalPriority&&saved.capital_priority)capitalPriority.value=saved.capital_priority}catch{}}
 function saveDecisionPrefs(){try{localStorage.setItem(DECISION_PREFS_KEY,JSON.stringify({objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'}))}catch{}}
 [decisionObjective,riskPosture,capitalPriority].filter(Boolean).forEach(el=>el.addEventListener('change',saveDecisionPrefs));loadDecisionPrefs();
+function firstFinding(observations,category,labelPattern){
+  const obs=(Array.isArray(observations)?observations:[]).filter(o=>o&&o.category===category);
+  for(const o of obs){for(const f of (Array.isArray(o.findings)?o.findings:[])){if(labelPattern.test(String(f.label||'')))return f.value}}
+  return null
+}
+function parseNumberText(v){const n=Number(String(v??'').replace(/[^0-9.\-]/g,''));return Number.isFinite(n)?n:null}
+function governedWhy(meta,normalized,result){
+  const vision=meta&&meta.screenshot_intelligence&&Array.isArray(meta.screenshot_intelligence.observations)?meta.screenshot_intelligence.observations:[];
+  const research=meta&&meta.system_research_acquisition&&Array.isArray(meta.system_research_acquisition.snapshots)?meta.system_research_acquisition.snapshots:[];
+  const idx=firstFinding(vision,'PRICE_TECHNICALS',/Index Value/i),chg=firstFinding(vision,'PRICE_TECHNICALS',/Daily Change/i),range=firstFinding(vision,'PRICE_TECHNICALS',/Day.?s Range/i);
+  const putOi=firstFinding(vision,'DERIVATIVES_OI',/Put OI/i),callOi=firstFinding(vision,'DERIVATIVES_OI',/Call OI/i),chgOi=firstFinding(vision,'DERIVATIVES_OI',/Change in OI/i);
+  const p=parseNumberText(putOi),c=parseNumberText(callOi),pcr=p&&c?Math.round((p/c)*100)/100:null;
+  let breadth=null;
+  for(const snap of research){
+    if(snap&&snap.category==='MARKET_TRUST'&&typeof snap.excerpt==='string'){
+      try{
+        const data=JSON.parse(snap.excerpt);
+        const n50=Array.isArray(data.data)?data.data.find(x=>x&&x.index==='NIFTY 50'):null;
+        if(n50){breadth={change:n50.percentChange,advances:n50.advances,declines:n50.declines};break}
+      }catch{}
+    }
+  }
+  const priceObserved=idx?('Uploaded NIFTY snapshot showed '+idx+(chg?' with a daily move of '+chg:'')+(range?' inside a session range of '+range:'')+'.'):'The uploaded chart provided a point-in-time NIFTY reading.';
+  const priceMeaning='That shows the market tone at the time of the screenshot, but one snapshot is not enough to establish a reliable multi-day trend, breakout or reversal.';
+  const optionsObserved=(putOi&&callOi)?('Put OI was '+putOi+' versus Call OI '+callOi+(pcr?' (put/call OI ratio about '+pcr+')':'')+(chgOi?', with total OI change '+chgOi:'')+'.'):'The derivatives screenshots contained aggregate open-interest information.';
+  const optionsMeaning='This gives some positioning context, but without strike-by-strike premium, volume and OI behaviour the system cannot confirm where traders are actively defending or attacking levels.';
+  const marketObserved=breadth?('The official market snapshot showed NIFTY '+(Number(breadth.change)>=0?'+':'')+breadth.change+'%, with '+breadth.advances+' advancing stocks versus '+breadth.declines+' declining stocks.'):'Broader-market checks were available, but participation confirmation remained incomplete.';
+  const marketMeaning='That is not strong enough on its own to confirm broad participation across sectors and heavyweight stocks, so confidence stays limited.';
+  const rr=Number(normalized.expected_rr??0),edge=Number(result.execution_edge??0);
+  const tradeObserved='The current setup has expected reward/risk of '+(Number.isFinite(rr)?rr:'—')+' and execution quality of '+(Number.isFinite(edge)?edge:'—')+'/100.';
+  const tradeMeaning='That is below the framework minimums, so even if the market view is directionally useful, it does not yet qualify as a trade setup.';
+  return {
+    price:{observed:priceObserved,meaning:priceMeaning,impact:'Useful for context, but not enough for strong directional conviction.'},
+    options:{observed:optionsObserved,meaning:optionsMeaning,impact:'Positioning is suggestive, not confirmed.'},
+    market:{observed:marketObserved,meaning:marketMeaning,impact:'Broader confirmation is incomplete.'},
+    trade:{observed:tradeObserved,meaning:tradeMeaning,impact:'The setup is not actionable yet.'}
+  }
+}
 function fileKey(file){return[file.name,file.size,file.lastModified].join('::')}function appendUniqueFiles(existing,incoming){const seen=new Set(existing.map(fileKey));for(const file of incoming){const key=fileKey(file);if(!seen.has(key)){existing.push(file);seen.add(key)}}}function selectedFiles(){return{price:[...selectedPriceFiles],derivatives:[...selectedDerivativesFiles]}}function validateFiles(files){const e=[];if(!files.length)e.push('Select at least one file in each screenshot group.');if(files.length>MAX_FILES)e.push('Maximum 20 files are allowed in one run.');files.forEach(f=>{if(!ALLOWED_TYPES.has(f.type))e.push(f.name+': unsupported file type.');if(f.size<=0||f.size>MAX_FILE_BYTES)e.push(f.name+': file must be 10 MB or smaller.')});return e}function fileNames(files){return files.length?files.map((file,index)=>'<span>'+(index+1)+'. '+escapeHtml(file.name)+'</span>').join(''):'<span class="muted">None selected</span>'}function renderFileSelection(){const f=selectedFiles(),all=[...f.price,...f.derivatives],errors=[...(f.price.length?[]:['NIFTY chart screenshot is required.']),...(f.derivatives.length?[]:['Options / OI screenshot is required.']),...validateFiles(all).filter(x=>all.length)];if(!all.length){fileSelection.className='file-selection muted';fileSelection.textContent='Select both screenshot groups to continue.';setUploadStatus('','');return}const total=all.reduce((s,x)=>s+x.size,0);fileSelection.className='file-selection';fileSelection.innerHTML=['<strong>'+f.price.length+' chart · '+f.derivatives.length+' derivatives/OI file(s)</strong>','<span>'+escapeHtml(readableBytes(total))+' total</span>','<strong>NIFTY charts</strong>',fileNames(f.price),'<strong>Options / OI</strong>',fileNames(f.derivatives),'<span class="muted">These files are staged in your browser and will be uploaded only when you tap Run 5DR. Tap Choose files again to add more screenshots one at a time.</span>'].join('');errors.length?setUploadStatus(errors[0],'error'):setUploadStatus('Ready to run 5DR.','ready')}priceFiles.addEventListener('change',()=>{appendUniqueFiles(selectedPriceFiles,Array.from(priceFiles.files||[]));priceFiles.value='';renderFileSelection()});derivativesFiles.addEventListener('change',()=>{appendUniqueFiles(selectedDerivativesFiles,Array.from(derivativesFiles.files||[]));derivativesFiles.value='';renderFileSelection()});
 async function createRunRequest(batchId){const assessment={objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'};const r=await fetch('/api/5dr/run-requests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch_id:batchId,evidence_categories:REQUIRED_USER_CATEGORIES,assessment})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Could not create 5DR run request.');return d.request}
 function extractStageError(data){if(data&&typeof data.error==='string'&&data.error)return data.error;if(data&&Array.isArray(data.blockers)&&data.blockers.length){const blocker=data.blockers[0]||{};if(Array.isArray(blocker.limitations)&&blocker.limitations.length)return String(blocker.limitations[0]);if(typeof blocker.reason==='string'&&blocker.reason)return blocker.reason}if(data&&data.intelligence_reconciliation&&Array.isArray(data.intelligence_reconciliation.errors)&&data.intelligence_reconciliation.errors.length)return String(data.intelligence_reconciliation.errors[0]);if(data&&data.gate&&typeof data.gate.error==='string')return data.gate.error;if(data&&typeof data.message==='string'&&data.message)return data.message;return''}
@@ -36,10 +74,7 @@ function render5dr(run,request,outcomeAssessment){
   const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},components=normalized.component_scores||{},trust=normalized.market_trust_inputs||{},execution=normalized.execution_inputs||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
   fiveDrState.textContent='Result ready';
   const action=tradeable?'A trade setup currently meets the 5DR gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
-  const priceWhy='Price & structure score: '+escapeHtml(components.PRICE_STRUCTURE??'—')+'. '+(limits.find(x=>/price|historical|technical/i.test(x))?escapeHtml(limits.find(x=>/price|historical|technical/i.test(x))):'Price evidence was included in the directional assessment.');
-  const optionsWhy='Options & positioning score: '+escapeHtml(components.PVPO??'—')+'. '+(limits.find(x=>/option|premium|OI|volume/i.test(x))?escapeHtml(limits.find(x=>/option|premium|OI|volume/i.test(x))):'Derivatives evidence was included using the price → volume → premium → OI sequence.');
-  const marketWhy='Broader market confirmation is '+escapeHtml(trust.cross_engine_consistency??'—')+'/100, participation '+escapeHtml(trust.participation_confirmation??'—')+'/100, with event risk '+escapeHtml(normalized.event_shock??'—')+'.';
-  const tradeWhy='Expected reward/risk: '+escapeHtml(normalized.expected_rr??'—')+'. Execution-quality inputs are '+escapeHtml(execution.rr_score??'—')+' R:R, '+escapeHtml(execution.liquidity_spread_score??'—')+' liquidity, '+escapeHtml(execution.entry_invalidation_score??'—')+' entry clarity.';
+  const why=governedWhy(meta,normalized,result);
   const changes=[];
   if(result.market_trust<50)changes.push('Confidence needs to rise above the minimum 50/100 gate.');
   if(Math.abs(Number(result.des5))<30)changes.push('Directional strength needs to move beyond the ±30 DES5 threshold.');
@@ -62,10 +97,10 @@ function render5dr(run,request,outcomeAssessment){
       '<div class="analysis-detail" data-analysis-detail hidden>',
       '<details class="why-details" open><summary>Why this view?</summary>',
         '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p>'+priceWhy+'</p><small>Impact: '+(Number(components.PRICE_STRUCTURE||0)>15?'supports the view':'weak / mixed')+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p>'+optionsWhy+'</p><small>Impact: '+(Number(components.PVPO||0)>15?'supports the view':'weak / mixed')+'</small></div>',
-          '<div class="why-card"><strong>Broader market conditions</strong><p>'+marketWhy+'</p><small>Impact: '+(Number(trust.cross_engine_consistency||0)>=50?'mixed':'weak')+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p>'+tradeWhy+'</p><small>Impact: '+(tradeable?'actionable':'not actionable')+'</small></div>',
+          '<div class="why-card"><strong>Price & structure</strong><p><b>What we saw:</b> '+escapeHtml(why.price.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
+          '<div class="why-card"><strong>Options & positioning</strong><p><b>What we saw:</b> '+escapeHtml(why.options.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
+          '<div class="why-card"><strong>Broader market conditions</strong><p><b>What we saw:</b> '+escapeHtml(why.market.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
+          '<div class="why-card"><strong>Trade quality</strong><p><b>What we saw:</b> '+escapeHtml(why.trade.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',
