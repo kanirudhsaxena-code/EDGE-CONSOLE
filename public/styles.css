@@ -137,3 +137,90 @@ dialog::backdrop{background:rgba(27,42,58,.28)}
 .verify{background:#e8f2fb;color:#2b6c95}.verify.verified{background:#e9f7ef;color:#2f7a4e}.verify.not_verified,.verify.not_available,.verify.not_scorable{background:#fff2e3;color:#9a5b1c}
 .edge-efficacy-title{color:var(--accent-2)}.edge-efficacy .metric{border-color:var(--border-light);background:var(--surface-soft)}
 .edge-command-form{margin-bottom:14px;box-shadow:none}
+
+
+/* Frozen UI acceptance pass — unified typography + mobile cards */
+:root{
+  --fs-xs:11px;--fs-sm:13px;--fs-body:15px;--fs-md:17px;--fs-lg:21px;--fs-xl:27px;
+  --lh-body:1.55;--card-radius:18px;--card-gap:12px;
+}
+body{font-size:var(--fs-body);line-height:var(--lh-body)}
+.shell{max-width:980px}
+.topbar h1{font-size:var(--fs-xl);line-height:1.15}
+.module-name{font-size:var(--fs-lg);line-height:1.2}
+.module-desc,.muted,.result-copy{font-size:var(--fs-sm);line-height:1.5}
+.module-action-row h2,.section-head h3{font-size:var(--fs-lg);line-height:1.25}
+.eyebrow,.result-kicker,.step-label,.decision-card span,.action-box span,.tech-body span,.assessment-metric span{font-size:var(--fs-xs)}
+.simple-result h2{font-size:var(--fs-xl);line-height:1.15;margin:8px 0 14px}
+.simple-result,.integration,.assessment-summary-card{border-radius:var(--card-radius)}
+.probability-line strong{font-size:var(--fs-md)}
+.probability-line span{font-size:var(--fs-sm)}
+.decision-card strong{font-size:var(--fs-lg);line-height:1.2}
+.decision-card small,.action-box small,.assessment-metric small{font-size:var(--fs-xs);line-height:1.45}
+.action-box strong{font-size:var(--fs-md);line-height:1.4}
+.why-details summary,.change-details summary,.tech-details summary,.active-details summary,.assessment-detail-row summary,.assessment-future summary{font-size:var(--fs-md);line-height:1.3}
+.why-card strong{font-size:var(--fs-md);line-height:1.25}
+.why-card p,.change-details li,.assessment-history p{font-size:var(--fs-body);line-height:1.55}
+.why-card p{margin:8px 0}
+.assessment-header h3{font-size:var(--fs-lg);line-height:1.2}
+.assessment-header small{font-size:var(--fs-sm)}
+.assessment-metric strong{font-size:24px;line-height:1.15}
+.assessment-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+.assessment-metric:last-child{grid-column:1/-1}
+.scorecard-context{padding:12px 0 4px}
+.scorecard-context span{display:block;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.08em;color:var(--text-soft)}
+.scorecard-context strong{display:block;font-size:var(--fs-md);margin:3px 0}
+.scorecard-context p{margin:4px 0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5}
+.scorecard-days{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
+.scorecard-day{display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:start;padding:12px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface-soft)}
+.scorecard-day>strong{font-size:var(--fs-md);color:var(--ink)}
+.scorecard-day>div{display:grid;gap:2px}
+.scorecard-day>div span{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-soft)}
+.scorecard-day>div b{font-size:var(--fs-md);color:var(--ink)}
+.scorecard-day>div small{font-size:var(--fs-xs);color:var(--text-soft)}
+.scorecard-day.pending{grid-template-columns:64px 1fr}
+.scorecard-day.pending span{font-size:var(--fs-sm);color:var(--text-soft);font-weight:700}
+.scorecard-day.pending small{grid-column:2;font-size:var(--fs-xs);color:var(--text-soft)}
+.assessment-history-row{display:none}
+.assessment-empty-copy{font-size:var(--fs-sm);color:var(--text-soft)}
+.evidence-chip{display:inline-flex;width:max-content;margin-top:6px;padding:3px 8px;border-radius:999px;font-size:var(--fs-xs);font-weight:800}
+.evidence-chip.verified{background:#e9f7ef;color:#2f7a4e}.evidence-chip.limited{background:#fff2e3;color:#945b22}
+.active-details{border-top:1px solid var(--border-light);margin-top:14px;padding-top:12px}
+.active-details summary{cursor:pointer;font-weight:800;color:var(--ink)}
+.active-call-grid,.ipo-issue-grid{display:grid;grid-template-columns:1fr;gap:10px;margin-top:12px}
+.active-call-card,.ipo-issue-card{padding:13px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface-soft)}
+.active-call-card>div,.ipo-issue-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.active-call-card strong,.ipo-issue-card strong{font-size:var(--fs-md);color:var(--ink)}
+.active-call-card span{font-size:var(--fs-xs);color:var(--accent-2);font-weight:800}
+.active-call-card p,.ipo-issue-card p{margin:5px 0;color:var(--ink-2);font-size:var(--fs-sm)}
+.active-call-card small,.ipo-issue-card small{display:block;color:var(--text-soft);font-size:var(--fs-xs);line-height:1.45}
+.ipo-blocker{margin-top:4px;color:#9a5b1c!important}
+.edge-command-form{box-shadow:none;background:var(--surface-soft);margin:0 0 14px}
+.edge-command-form input{font-size:var(--fs-body)}
+.edge-v13,.edge-table-wrap,.edge-table{display:none!important}
+.generic-standard-result{display:none}
+.tech-body strong{font-size:var(--fs-sm);line-height:1.35}
+.history-row strong{font-size:var(--fs-md)}
+.history-row .muted{font-size:var(--fs-sm)}
+@media(max-width:760px){
+  .shell{padding:16px 14px 38px}
+  .module-selector{gap:10px;margin-bottom:18px}
+  .module-tile{padding:14px 16px;border-radius:16px}
+  .module-action-row{margin-bottom:12px}
+  .module-action-row h2{font-size:22px}
+  .assessment-summary-card,.integration{padding:14px}
+  .simple-result{padding:14px}
+  .decision-grid,.probability-line{gap:8px}
+  .why-grid{grid-template-columns:1fr}
+  .why-card{padding:14px}
+}
+@media(min-width:700px){
+  .assessment-grid{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .assessment-metric:last-child{grid-column:auto}
+  .scorecard-days{grid-template-columns:repeat(5,minmax(0,1fr))}
+  .scorecard-day{grid-template-columns:1fr}
+  .scorecard-day>div{border-top:1px solid var(--border-light);padding-top:6px}
+  .scorecard-day.pending{grid-template-columns:1fr}
+  .scorecard-day.pending small{grid-column:1}
+  .active-call-grid,.ipo-issue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
