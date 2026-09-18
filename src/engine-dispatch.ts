@@ -27,7 +27,8 @@ export async function dispatch5drEngine(
   env:EngineDispatchEnv,
   requestId:string,
   consoleUrl:string,
-  fetcher:typeof fetch=fetch
+  fetcher:typeof fetch=fetch,
+  executionPacket?:unknown
 ):Promise<EngineDispatchResult>{
   const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
   const workflow=env.FIVEDR_WORKFLOW?.trim()||DEFAULT_WORKFLOW;
@@ -50,7 +51,11 @@ export async function dispatch5drEngine(
         'user-agent':'EDGE-CONSOLE-5DR-DISPATCH',
         'x-github-api-version':'2022-11-28'
       },
-      body:JSON.stringify({ref,inputs:{request_id:requestId,console_url:origin}})
+      body:JSON.stringify({ref,inputs:{
+        request_id:requestId,
+        console_url:origin,
+        execution_packet:executionPacket===undefined?'':JSON.stringify(executionPacket)
+      }})
     });
     if(response.status===204)return {ok:true,status:'DISPATCHED',repository,workflow};
     return {ok:false,status:'DISPATCH_REJECTED',repository,workflow,detail:safeDetail(response.status)};
