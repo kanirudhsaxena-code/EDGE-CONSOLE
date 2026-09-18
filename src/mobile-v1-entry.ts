@@ -80,6 +80,46 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   return json({ok:allReady,request_id:requestId,system_research:record,next_step:allReady?'RESEARCH_INTERPRETATION':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
 }
 
+function numericValue(value:unknown):number|null{
+  const n=Number(String(value??'').replace(/[^0-9.\-]/g,''));
+  return Number.isFinite(n)?n:null;
+}
+function median(values:number[]):number|null{
+  if(!values.length)return null;
+  const a=[...values].sort((x,y)=>x-y),m=Math.floor(a.length/2);
+  return a.length%2?a[m]:(a[m-1]+a[m])/2;
+}
+function detectCurrentMarketLevelConflict(metadata:Record<string,unknown>):{conflict:boolean;detail?:string;screenshot_level?:number;official_level?:number;difference_pct?:number}{
+  const screenshot=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
+  const observations=Array.isArray(screenshot.observations)?screenshot.observations.filter(isObject):[];
+  const prices:number[]=[];
+  for(const o of observations){
+    const findings=Array.isArray(o.findings)?o.findings.filter(isObject):[];
+    for(const f of findings){
+      const label=String(f.label??'');
+      if(!/^(Current Price|Spot Price|Underlying Value|Index Value)$/i.test(label))continue;
+      const n=numericValue(f.value);if(n&&n>1000)prices.push(n);
+    }
+  }
+  const screenshotLevel=median(prices);
+  const research=isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:{};
+  const snapshots=Array.isArray(research.snapshots)?research.snapshots.filter(isObject):[];
+  let officialLevel:number|null=null;
+  for(const item of snapshots){
+    if(item.source_id!=='NSE_ALL_INDICES'||item.status!=='RETRIEVED'||typeof item.excerpt!=='string')continue;
+    try{
+      const parsed=JSON.parse(item.excerpt);
+      const rows=Array.isArray(parsed?.data)?parsed.data:[];
+      const nifty=rows.find((x:any)=>x&&x.index==='NIFTY 50');
+      const n=numericValue(nifty?.last);if(n)officialLevel=n;
+    }catch{}
+  }
+  if(!screenshotLevel||!officialLevel)return {conflict:false};
+  const diff=Math.abs(screenshotLevel-officialLevel)/officialLevel*100;
+  if(diff>1.5)return {conflict:true,detail:`Current screenshot market level (${screenshotLevel.toFixed(2)}) conflicts with the official NSE NIFTY 50 level (${officialLevel.toFixed(2)}) by ${diff.toFixed(2)}%. The run is blocked because current-market evidence is inconsistent.`,screenshot_level:screenshotLevel,official_level:officialLevel,difference_pct:Number(diff.toFixed(2))};
+  return {conflict:false,screenshot_level:screenshotLevel,official_level:officialLevel,difference_pct:Number(diff.toFixed(2))};
+}
+
 async function reconcileIntelligence(request:Request,env:Env,requestId:string):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   if(!env.AI||typeof env.AI.run!=='function')return json({error:'Workers AI binding is not configured'},503);
@@ -92,6 +132,12 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
   if(screenshot.status!=='VISION_READY'||research.status!=='RESEARCH_RETRIEVED')return json({error:'intelligence reconciliation prerequisites are not ready',vision_status:screenshot.status??null,research_status:research.status??null},409);
   const screenshotObservations=Array.isArray(screenshot.observations)?screenshot.observations.filter(isObject):[];
   const snapshots=Array.isArray(research.snapshots)?research.snapshots.filter(isObject):[];
+  const marketConflict=detectCurrentMarketLevelConflict(metadata);
+  if(marketConflict.conflict){
+    const record={status:'INTELLIGENCE_BLOCKED',attempted_at:new Date().toISOString(),errors:[marketConflict.detail],evidence_conflict:marketConflict};
+    await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify({...metadata,intelligence_reconciliation:record})}::jsonb,error=${JSON.stringify({stage:'EVIDENCE_CONFLICT',detail:marketConflict.detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
+    return json({ok:false,request_id:requestId,error:'current market evidence conflicts with official NSE data',evidence_conflict:marketConflict,next_step:'REUPLOAD_CURRENT_SCREENSHOTS'},409);
+  }
   const packet={screenshots:screenshotObservations,research:snapshots.map(item=>({...item,excerpt:typeof item.excerpt==='string'?item.excerpt.slice(0,4000):undefined}))};
   const sourceCategory=new Map<string,string>();
   for(const item of screenshotObservations)if(typeof item.source_ref==='string'&&typeof item.category==='string')sourceCategory.set(item.source_ref,item.category);
@@ -195,6 +241,12 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
       return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:stage,engine_dispatch:failedDispatch,next_step:'RETRY_ENGINE_DISPATCH'},409);
     }
     if(sync.status==='SUCCEEDED'&&sync.envelope){
+      const conflict=detectCurrentMarketLevelConflict(metadata);
+      if(conflict.conflict){
+        const failedDispatch={...dispatch,ok:false,status:'EVIDENCE_CONFLICT',workflow_run_id:sync.workflow_run_id,failed_at:new Date().toISOString(),detail:conflict.detail};
+        await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify({...metadata,engine_dispatch:failedDispatch})}::jsonb,error=${JSON.stringify({stage:'EVIDENCE_CONFLICT',detail:conflict.detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
+        return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:stage,evidence_conflict:conflict,next_step:'REUPLOAD_CURRENT_SCREENSHOTS'},409);
+      }
       const origin=new URL(request.url).origin;
       const publishReq=new Request(`${origin}/api/5dr/runs`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sync.envelope)});
       const published=await router.fetch(publishReq as any,env as any);
