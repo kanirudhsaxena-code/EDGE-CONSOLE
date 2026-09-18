@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "edge-console.edge-stocks-output.v1.2",
+  "title": "EDGE Stocks Output Contract V1.2",
+  "type": "object",
+  "required": ["contract_version","engine","framework_version","ticker","run_id","generated_at","presentation","decision","official_efficacy","provisional_checkpoint_diagnostics","institutional_drilldown"],
+  "properties": {
+    "contract_version": {"const":"EDGE_STOCKS_V1_2"},
+    "engine": {"const":"EDGE_STOCKS"},
+    "framework_version": {"const":"EDGE_V1"},
+    "ticker": {"type":"string","minLength":1},
+    "run_id": {"type":"string","minLength":1},
+    "generated_at": {"type":"string","format":"date-time"},
+    "presentation": {
+      "type":"object",
+      "required":["standard_table_count","table_1","table_2","efficacy_position"],
+      "properties":{
+        "standard_table_count":{"const":2},
+        "table_1":{"const":"EDGE_OUTCOME_DECISION"},
+        "table_2":{"const":"INSTITUTIONAL_DRILLDOWN"},
+        "efficacy_position":{"const":"SEPARATE_AFTER_STANDARD_TABLES"}
+      },
+      "additionalProperties":false
+    },
+    "decision": {
+      "type":"object",
+      "required":["des","market_trust","directional_agreement","effective_conviction","probabilities","definitive_forecast","expected_price_zone","forecast_horizon","risk_override","primary_action","decision_ladder","bot","execution"],
+      "properties":{
+        "des":{"type":"number","minimum":-100,"maximum":100},
+        "market_trust":{"type":"object","required":["score","band"],"properties":{"score":{"type":"number","minimum":0,"maximum":100},"band":{"type":"string","minLength":1}}},
+        "directional_agreement":{"type":"number","minimum":0,"maximum":100},
+        "effective_conviction":{"type":"number","minimum":0,"maximum":1},
+        "probabilities":{"type":"object","required":["bull","base","bear"],"properties":{"bull":{"type":"number","minimum":0,"maximum":100},"base":{"type":"number","minimum":0,"maximum":100},"bear":{"type":"number","minimum":0,"maximum":100}}},
+        "definitive_forecast":{"enum":["BULLISH","BASE_RANGE","BEARISH"]},
+        "expected_price_zone":{"type":"object","required":["low","high"],"properties":{"low":{"type":["number","null"]},"high":{"type":["number","null"]}}},
+        "forecast_horizon":{"type":"string","minLength":1},
+        "risk_override":{"type":"object","required":["status","code"],"properties":{"status":{"enum":["CLEAR","ACTIVE"]},"code":{"type":["string","null"]}}},
+        "primary_action":{"type":"string","minLength":1},
+        "decision_ladder":{"type":"string","minLength":1},
+        "bot":{"type":"object","required":["score","grade"],"properties":{"score":{"type":"number","minimum":0,"maximum":100},"grade":{"type":"string","minLength":1}}},
+        "execution":{"type":"object"}
+      },
+      "additionalProperties":true
+    },
+    "official_efficacy":{"type":"object"},
+    "provisional_checkpoint_diagnostics":{"type":"object"},
+    "institutional_drilldown":{
+      "type":"array",
+      "minItems":1,
+      "items":{
+        "type":"object",
+        "required":["component","score_or_level","verification_status","key_outcome","interpretation"],
+        "properties":{
+          "component":{"type":"string","minLength":1},
+          "score_or_level":{},
+          "verification_status":{"enum":["VERIFIED","NOT_VERIFIED","NOT_AVAILABLE","NOT_SCORABLE","N/A"]},
+          "key_outcome":{"type":"string"},
+          "interpretation":{"type":"string"}
+        }
+      }
+    }
+  },
+  "additionalProperties":true
+}

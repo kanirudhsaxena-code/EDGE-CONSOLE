@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
-import { validateEdgeStocksResult } from './edge-stocks';
+import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
 
 type Env = {
   ASSETS: Fetcher;
@@ -90,30 +90,113 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const sql = neon(env.EDGE_DATABASE_URL);
   const reportRows = await sql`select * from v_edge_stock_report where ticker = ${symbol} limit 1`;
   if (!reportRows.length) return json({ error: 'Ticker not found in EDGE report view', ticker: symbol }, 404);
-  const activeRows = await sql`select * from v_edge_active_calls where ticker = ${symbol} order by run_timestamp desc limit 1`;
+
+  const activeRows = await sql`
+    select r.*, l.expiry_trading_date, p.current_price, p.outcome_verdict,
+           mt.directional_agreement_score,
+           coalesce(mt.market_trust_score, r.market_trust_score) as resolved_market_trust_score,
+           coalesce(mt.market_trust_band, r.market_trust_band) as resolved_market_trust_band,
+           coalesce(b.bot_score, r.bot_score) as resolved_bot_score,
+           coalesce(b.bot_grade, r.bot_grade) as resolved_bot_grade,
+           coalesce(b.decision_ladder, r.decision_ladder) as resolved_decision_ladder,
+           e.instrument, e.entry_low, e.entry_high, e.stop_price, e.invalidation_text,
+           e.target1, e.target2, e.time_exit, e.option_strike, e.option_expiry,
+           e.observed_premium, e.option_suitability_status, e.execution_quality_score
+      from recommendations r
+      join recommendation_lifecycle l using (recommendation_id)
+      left join recommendation_performance p using (recommendation_id)
+      left join market_trust mt using (recommendation_id)
+      left join bot_scores b using (recommendation_id)
+      left join execution_plans e using (recommendation_id)
+     where r.ticker = ${symbol}
+       and l.include_in_master_metrics
+       and l.status = 'OPEN'
+     order by r.run_timestamp desc
+     limit 1
+  `;
   if (!activeRows.length) return json({ error: 'No active EDGE call found', ticker: symbol }, 404);
 
   const report = reportRows[0] as Record<string, unknown>;
   const active = activeRows[0] as Record<string, unknown>;
+  const componentRows = await sql`
+    select component, raw_score, evidence_quality, availability_status, conflict_flag, notes
+      from component_scores
+     where recommendation_id = ${String(active.recommendation_id)}
+     order by component
+  `;
+
+  const des = numberOrNull(active.des);
+  const marketTrust = numberOrNull(active.resolved_market_trust_score);
+  const directionalAgreement = numberOrNull(active.directional_agreement_score);
+  const botScore = numberOrNull(active.resolved_bot_score);
+  const marketTrustBand = active.resolved_market_trust_band;
+  const botGrade = active.resolved_bot_grade;
+  const decisionLadder = active.resolved_decision_ladder;
+  const forecastHorizon = active.forecast_horizon;
+  const primaryAction = active.definitive_recommendation;
+  const definitiveForecast = active.definitive_forecast;
+  if (
+    des === null || marketTrust === null || directionalAgreement === null || botScore === null ||
+    !isNonEmptyString(marketTrustBand) || !isNonEmptyString(botGrade) ||
+    !isNonEmptyString(decisionLadder) || !isNonEmptyString(forecastHorizon) ||
+    !isNonEmptyString(primaryAction) || !isNonEmptyString(definitiveForecast)
+  ) {
+    return json({ error: 'EDGE Stocks V1.2 publication blocked: governed decision fields missing', ticker: symbol }, 409);
+  }
+  if (!componentRows.length) {
+    return json({ error: 'EDGE Stocks V1.2 publication blocked: institutional drill-down is empty', ticker: symbol }, 409);
+  }
+  const effectiveConviction = Math.min(Math.abs(des) / 100, 1) * (marketTrust / 100);
   const sampleSize = integerOrZero(report.official_scorable_recommendations);
+  const overrideCode = active.active_override == null ? null : String(active.active_override);
+
   const payload = {
-    contract_version: 'EDGE_STOCKS_V1_1',
+    contract_version: 'EDGE_STOCKS_V1_2',
     engine: 'EDGE_STOCKS',
     framework_version: 'EDGE_V1',
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date().toISOString(),
+    presentation: {
+      standard_table_count: 2,
+      table_1: 'EDGE_OUTCOME_DECISION',
+      table_2: 'INSTITUTIONAL_DRILLDOWN',
+      efficacy_position: 'SEPARATE_AFTER_STANDARD_TABLES'
+    },
     decision: {
-      forecast: String(active.definitive_forecast),
-      recommendation: String(active.definitive_recommendation),
+      des,
+      market_trust: { score: marketTrust, band: marketTrustBand },
+      directional_agreement: directionalAgreement,
+      effective_conviction: Number(effectiveConviction.toFixed(6)),
       probabilities: {
-        bull: numberOrNull(active.bull_probability) ?? 0,
-        base: numberOrNull(active.base_probability) ?? 0,
-        bear: numberOrNull(active.bear_probability) ?? 0
+        bull: numberOrNull(active.bull_probability),
+        base: numberOrNull(active.base_probability),
+        bear: numberOrNull(active.bear_probability)
       },
+      definitive_forecast: definitiveForecast,
       expected_price_zone: {
         low: numberOrNull(active.expected_price_zone_low),
         high: numberOrNull(active.expected_price_zone_high)
+      },
+      forecast_horizon: forecastHorizon,
+      risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
+      primary_action: primaryAction,
+      decision_ladder: decisionLadder,
+      bot: { score: botScore, grade: botGrade },
+      execution: {
+        instrument: active.instrument ?? 'NONE',
+        entry_low: numberOrNull(active.entry_low),
+        entry_high: numberOrNull(active.entry_high),
+        stop_price: numberOrNull(active.stop_price),
+        invalidation: active.invalidation_text ?? null,
+        target1: numberOrNull(active.target1),
+        target2: numberOrNull(active.target2),
+        time_exit: active.time_exit ?? null,
+        option_strike: numberOrNull(active.option_strike),
+        option_expiry: active.option_expiry ?? null,
+        observed_premium: numberOrNull(active.observed_premium),
+        option_suitability_status: active.option_suitability_status ?? null,
+        execution_quality_score: numberOrNull(active.execution_quality_score)
       },
       current_price: numberOrNull(active.current_price),
       expiry_trading_date: active.expiry_trading_date ?? null,
@@ -124,7 +207,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       sample_size: sampleSize,
       recommendation_hit_rate_pct: sampleSize === 0 ? null : numberOrNull(report.recommendation_hit_rate_pct),
       directional_accuracy_pct: sampleSize === 0 ? null : numberOrNull(report.direction_hit_rate_pct),
-      forecast_accuracy_pct: null
+      forecast_accuracy_pct: sampleSize === 0 ? null : numberOrNull(report.forecast_accuracy_pct)
     },
     provisional_checkpoint_diagnostics: {
       label: 'PROVISIONAL',
@@ -139,11 +222,17 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       zone_accuracy_pct: numberOrNull(report.provisional_zone_accuracy_pct),
       latest_checkpoint_observed_at: report.latest_checkpoint_observed_at ?? null
     },
-    institutional_drilldown: []
+    institutional_drilldown: componentRows.map((row: Record<string, unknown>) => ({
+      component: String(row.component),
+      score_or_level: row.raw_score ?? 'N/A',
+      verification_status: componentVerificationStatus(row.availability_status, row.evidence_quality),
+      key_outcome: row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED'),
+      interpretation: row.notes ? String(row.notes) : 'No additional interpretation recorded in the governed audit record.'
+    }))
   };
 
   const errors = validateEdgeStocksResult(payload);
-  if (errors.length) return json({ error: 'EDGE Stocks report contract validation failed', details: errors, ticker: symbol }, 500);
+  if (errors.length) return json({ error: 'EDGE Stocks V1.2 report contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }
 
