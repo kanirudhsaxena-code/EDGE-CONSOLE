@@ -34,37 +34,83 @@ function firstFinding(observations,category,labelPattern){
   return null
 }
 function parseNumberText(v){const n=Number(String(v??'').replace(/[^0-9.\-]/g,''));return Number.isFinite(n)?n:null}
+function allFindings(observations,category){
+  const out=[];for(const o of (Array.isArray(observations)?observations:[])){if(!o||o.category!==category)continue;for(const f of (Array.isArray(o.findings)?o.findings:[])){if(f&&typeof f.label==='string')out.push(f)}}return out
+}
+function firstFindingByPatterns(findings,patterns){for(const p of patterns){const f=findings.find(x=>p.test(String(x.label||'')));if(f)return f}return null}
+function signedSignal(v){const n=Number(v);if(!Number.isFinite(n))return'not verified';if(n>=1)return n>=2?'strongly supportive':'supportive';if(n<=-1)return n<=-2?'strongly adverse':'adverse';return'neutral'}
+function friendlySetup(setup){
+  const objective={BOTH:'Market view + options setup',MARKET_VIEW:'Market view only',OPTIONS_SETUP:'Options setup only'}[String(setup?.objective)]||'Not recorded';
+  const risk={CONSERVATIVE:'Conservative',BALANCED:'Balanced',OPPORTUNISTIC:'Opportunistic'}[String(setup?.risk_posture)]||'Not recorded';
+  const priority={CAPITAL_PROTECTION:'Protect capital first',BALANCED:'Balanced',GROWTH:'Growth first'}[String(setup?.capital_priority)]||'Not recorded';
+  return {objective,risk,priority,horizon:'Next 5 market days'}
+}
+function optionStrikeSummary(findings,spot){
+  const rows=new Map();
+  for(const f of findings){
+    const m=String(f.label||'').match(/^Strike\s+([0-9.]+)\s+(CE|PE)\s+(LTP|Premium|OI|Change OI|Volume|IV)$/i);
+    if(!m)continue;const strike=Number(m[1]),side=m[2].toUpperCase(),field=m[3].toUpperCase().replace('PREMIUM','LTP').replace('CHANGE OI','CHG_OI');
+    if(!rows.has(strike))rows.set(strike,{strike,CE:{},PE:{}});rows.get(strike)[side][field]=f.value
+  }
+  const arr=[...rows.values()];
+  if(!arr.length)return null;
+  arr.sort((a,b)=>Math.abs(a.strike-spot)-Math.abs(b.strike-spot));
+  return arr.slice(0,5).map(r=>{
+    const ce=[],pe=[];
+    if(r.CE.LTP!=null)ce.push('premium '+r.CE.LTP);if(r.CE.OI!=null)ce.push('OI '+r.CE.OI);if(r.CE.CHG_OI!=null)ce.push('ΔOI '+r.CE.CHG_OI);if(r.CE.VOLUME!=null)ce.push('vol '+r.CE.VOLUME);
+    if(r.PE.LTP!=null)pe.push('premium '+r.PE.LTP);if(r.PE.OI!=null)pe.push('OI '+r.PE.OI);if(r.PE.CHG_OI!=null)pe.push('ΔOI '+r.PE.CHG_OI);if(r.PE.VOLUME!=null)pe.push('vol '+r.PE.VOLUME);
+    return r.strike+': '+(ce.length?'CE '+ce.join(', '):'CE —')+' | '+(pe.length?'PE '+pe.join(', '):'PE —')
+  }).join('; ')
+}
 function governedWhy(meta,normalized,result){
   const vision=meta&&meta.screenshot_intelligence&&Array.isArray(meta.screenshot_intelligence.observations)?meta.screenshot_intelligence.observations:[];
   const research=meta&&meta.system_research_acquisition&&Array.isArray(meta.system_research_acquisition.snapshots)?meta.system_research_acquisition.snapshots:[];
-  const idx=firstFinding(vision,'PRICE_TECHNICALS',/Index Value/i),chg=firstFinding(vision,'PRICE_TECHNICALS',/Daily Change/i),range=firstFinding(vision,'PRICE_TECHNICALS',/Day.?s Range/i);
+  const rec=meta&&meta.intelligence_reconciliation?meta.intelligence_reconciliation:{},judgment=rec&&rec.judgment?rec.judgment:{},raw=judgment.directional_raw||{};
+  const pf=allFindings(vision,'PRICE_TECHNICALS'),df=allFindings(vision,'DERIVATIVES_OI');
+  const idxF=firstFindingByPatterns(pf,[/Index Value/i,/Current.*Price/i,/Last Price/i]),chgF=firstFindingByPatterns(pf,[/Daily Change/i]),rangeF=firstFindingByPatterns(pf,[/Day.?s Range/i]);
+  const trendF=firstFindingByPatterns(pf,[/Visible Trend Structure/i,/Trend Structure/i,/Long.?term Trend/i]),vwapF=firstFindingByPatterns(pf,[/^VWAP$/i,/Price.*VWAP/i]),supportF=firstFindingByPatterns(pf,[/Support/i]),resistanceF=firstFindingByPatterns(pf,[/Resistance/i]);
+  const idx=idxF?.value,chg=chgF?.value,range=rangeF?.value,spot=parseNumberText(idx)||0;
+  const strikeSummary=optionStrikeSummary(df,spot);
   const putOi=firstFinding(vision,'DERIVATIVES_OI',/Put OI/i),callOi=firstFinding(vision,'DERIVATIVES_OI',/Call OI/i),chgOi=firstFinding(vision,'DERIVATIVES_OI',/Change in OI/i);
   const p=parseNumberText(putOi),c=parseNumberText(callOi),pcr=p&&c?Math.round((p/c)*100)/100:null;
   let breadth=null;
-  for(const snap of research){
-    if(snap&&snap.category==='MARKET_TRUST'&&typeof snap.excerpt==='string'){
-      try{
-        const data=JSON.parse(snap.excerpt);
-        const n50=Array.isArray(data.data)?data.data.find(x=>x&&x.index==='NIFTY 50'):null;
-        if(n50){breadth={change:n50.percentChange,advances:n50.advances,declines:n50.declines};break}
-      }catch{}
-    }
-  }
-  const priceObserved=idx?('Uploaded NIFTY snapshot showed '+idx+(chg?' with a daily move of '+chg:'')+(range?' inside a session range of '+range:'')+'.'):'The uploaded chart provided a point-in-time NIFTY reading.';
-  const priceMeaning='That shows the market tone at the time of the screenshot, but one snapshot is not enough to establish a reliable multi-day trend, breakout or reversal.';
-  const optionsObserved=(putOi&&callOi)?('Put OI was '+putOi+' versus Call OI '+callOi+(pcr?' (put/call OI ratio about '+pcr+')':'')+(chgOi?', with total OI change '+chgOi:'')+'.'):'The derivatives screenshots contained aggregate open-interest information.';
-  const optionsMeaning='This gives some positioning context, but without strike-by-strike premium, volume and OI behaviour the system cannot confirm where traders are actively defending or attacking levels.';
-  const marketObserved=breadth?('The official market snapshot showed NIFTY '+(Number(breadth.change)>=0?'+':'')+breadth.change+'%, with '+breadth.advances+' advancing stocks versus '+breadth.declines+' declining stocks.'):'Broader-market checks were available, but participation confirmation remained incomplete.';
-  const marketMeaning='That is not strong enough on its own to confirm broad participation across sectors and heavyweight stocks, so confidence stays limited.';
+  for(const snap of research){if(snap&&snap.category==='MARKET_TRUST'&&typeof snap.excerpt==='string'){try{const data=JSON.parse(snap.excerpt);const n50=Array.isArray(data.data)?data.data.find(x=>x&&x.index==='NIFTY 50'):null;if(n50){breadth={change:n50.percentChange,advances:n50.advances,declines:n50.declines,month:n50.perChange30d,year:n50.perChange365d};break}}catch{}}}
+  const priceBits=[];if(idx!=null)priceBits.push('NIFTY '+idx);if(chg!=null)priceBits.push('day move '+chg);if(range!=null)priceBits.push('session range '+range);if(trendF?.value)priceBits.push('visible trend: '+trendF.value);if(vwapF?.value)priceBits.push('VWAP: '+vwapF.value);if(supportF?.value)priceBits.push('support: '+supportF.value);if(resistanceF?.value)priceBits.push('resistance: '+resistanceF.value);
+  const priceObserved=priceBits.length?priceBits.join(' · ')+'.':'The screenshots contained price information, but the stored extraction did not preserve enough structure detail.';
+  const priceMeaning=trendF?.value?'The chart structure is being used directly in the 5-day view; the system also checks whether current price behaviour confirms that broader visible trend.':'The current stored extraction does not contain a reliable trend-structure label, so the system should not pretend the long-term trend is unknown if it is visibly present; newer runs now extract it explicitly.';
+  const optionsObserved=strikeSummary?('Near-ATM strike data: '+strikeSummary+'.'):(putOi&&callOi?('Aggregate Put OI '+putOi+' versus Call OI '+callOi+(pcr?' (PCR about '+pcr+')':'')+(chgOi?', total OI change '+chgOi:'')+'.'):'The derivatives evidence did not preserve enough strike-level fields for a reliable explanation.');
+  const optionsMeaning=strikeSummary?'The view now compares premium, volume and OI change strike by strike. A directional options signal is accepted only when those measures point the same way; OI by itself is not treated as direction.':'This historical extraction is too coarse for a proper strike-by-strike PVPO explanation. New runs now capture visible strike premium, volume, OI and change in OI instead of collapsing the chain into totals.';
+  const marketObserved=breadth?('Official breadth: NIFTY '+(Number(breadth.change)>=0?'+':'')+breadth.change+'%, '+breadth.advances+' advances versus '+breadth.declines+' declines'+(breadth.month!=null?', 30-day move '+breadth.month+'%':'')+'.'):'Broader market participation could not be verified from a structured market-breadth snapshot.';
+  const marketMeaning=breadth?(Number(breadth.advances)>Number(breadth.declines)?'Breadth is positive, but the system still requires sector/heavyweight participation to agree with the directional view.':'Breadth is not broad enough to provide strong participation confirmation.'):'Without participation evidence, a price move cannot be treated as broadly confirmed.';
+  const macro=raw.MACRO_CATALYSTS||{};
+  const macroObserved='Global risk: '+signedSignal(macro.global_risk_environment)+'; India RBI/INR/rates: '+signedSignal(macro.india_macro_rbi_inr_rates)+'; crude/geopolitics: '+signedSignal(macro.crude_commodities_geopolitics)+'; scheduled catalysts: '+signedSignal(macro.scheduled_high_impact_catalysts)+'.';
+  const macroLimit=(Array.isArray(rec.limitations)?rec.limitations:[]).find(x=>/macro|rbi|inr|rate|crude|geopolit|catalyst/i.test(String(x)));
+  const macroMeaning=macroLimit?('Macro confirmation was limited because '+String(macroLimit).replace(/\.$/,'').toLowerCase()+'. That means macro was not used as a confirming reason for a trade, rather than being assumed bullish or bearish.'):'Macro only supports a trade when the relevant global-risk, India rates/INR, crude/geopolitical and scheduled-event signals align with the same direction.';
   const rr=Number(normalized.expected_rr??0),edge=Number(result.execution_edge??0);
-  const tradeObserved='The current setup has expected reward/risk of '+(Number.isFinite(rr)?rr:'—')+' and execution quality of '+(Number.isFinite(edge)?edge:'—')+'/100.';
-  const tradeMeaning='That is below the framework minimums, so even if the market view is directionally useful, it does not yet qualify as a trade setup.';
+  const tradeObserved='Expected reward/risk '+(Number.isFinite(rr)?rr:'—')+'; execution quality '+(Number.isFinite(edge)?edge:'—')+'/100.';
+  const tradeMeaning='A market view and a trade are different decisions. The setup is actionable only when entry, invalidation, liquidity/premium behaviour and reward/risk are all good enough.';
   return {
-    price:{observed:priceObserved,meaning:priceMeaning,impact:'Useful for context, but not enough for strong directional conviction.'},
-    options:{observed:optionsObserved,meaning:optionsMeaning,impact:'Positioning is suggestive, not confirmed.'},
-    market:{observed:marketObserved,meaning:marketMeaning,impact:'Broader confirmation is incomplete.'},
-    trade:{observed:tradeObserved,meaning:tradeMeaning,impact:'The setup is not actionable yet.'}
+    price:{observed:priceObserved,meaning:priceMeaning,impact:trendF?.value?'Chart structure is part of the assessment.':'Trend extraction needs richer evidence.'},
+    options:{observed:optionsObserved,meaning:optionsMeaning,impact:strikeSummary?'Strike-level positioning is being assessed.':'Strike-level confirmation was not available in this stored run.'},
+    market:{observed:marketObserved,meaning:marketMeaning,impact:'Participation must confirm the price move.'},
+    macro:{observed:macroObserved,meaning:macroMeaning,impact:'Macro must align; unavailable evidence is not treated as neutral confirmation.'},
+    trade:{observed:tradeObserved,meaning:tradeMeaning,impact:result.tradeable===true?'The setup passed the tradeability gates.':'The current setup is not actionable.'},
+    levels:{support:supportF?.value||null,resistance:resistanceF?.value||null},
+    hasStrikes:Boolean(strikeSummary)
   }
+}
+function userChangeConditions(why,normalized,result){
+  const items=[];
+  if(result.directional_label==='RANGE'){
+    if(why.levels.resistance)items.push('A sustained move and close above '+why.levels.resistance+' with stronger participation would shift the view toward bullish.');
+    if(why.levels.support)items.push('A sustained break and close below '+why.levels.support+' with stronger participation would shift the view toward bearish.');
+    if(!why.levels.resistance&&!why.levels.support)items.push('Price needs to break out of the current range and hold outside it, not merely touch an intraday level.');
+  }else items.push('Price must continue to hold in the forecast direction; a failed breakout or loss of the key structure would weaken the view.');
+  items.push(why.hasStrikes?'Nearby option strikes need premium, volume and OI change to confirm the same direction rather than give mixed signals.':'The option chain needs clear strike-level agreement between premium, volume and OI change.');
+  items.push('The move needs broader participation from sectors and heavyweight stocks, not only the headline index.');
+  items.push('Macro conditions need to stop conflicting with the direction: global risk, RBI/INR/rates, crude/geopolitics and scheduled events should be supportive or at least non-adverse.');
+  if(result.tradeable!==true)items.push('A trade also needs a clear entry and invalidation point with acceptable liquidity and at least 2:1 expected reward versus risk.');
+  return items
 }
 function fileKey(file){return[file.name,file.size,file.lastModified].join('::')}function appendUniqueFiles(existing,incoming){const seen=new Set(existing.map(fileKey));for(const file of incoming){const key=fileKey(file);if(!seen.has(key)){existing.push(file);seen.add(key)}}}function selectedFiles(){return{price:[...selectedPriceFiles],derivatives:[...selectedDerivativesFiles]}}function validateFiles(files){const e=[];if(!files.length)e.push('Select at least one file in each screenshot group.');if(files.length>MAX_FILES)e.push('Maximum 20 files are allowed in one run.');files.forEach(f=>{if(!ALLOWED_TYPES.has(f.type))e.push(f.name+': unsupported file type.');if(f.size<=0||f.size>MAX_FILE_BYTES)e.push(f.name+': file must be 10 MB or smaller.')});return e}function fileNames(files){return files.length?files.map((file,index)=>'<span>'+(index+1)+'. '+escapeHtml(file.name)+'</span>').join(''):'<span class="muted">None selected</span>'}function renderFileSelection(){const f=selectedFiles(),all=[...f.price,...f.derivatives],errors=[...(f.price.length?[]:['NIFTY chart screenshot is required.']),...(f.derivatives.length?[]:['Options / OI screenshot is required.']),...validateFiles(all).filter(x=>all.length)];if(!all.length){fileSelection.className='file-selection muted';fileSelection.textContent='Select both screenshot groups to continue.';setUploadStatus('','');return}const total=all.reduce((s,x)=>s+x.size,0);fileSelection.className='file-selection';fileSelection.innerHTML=['<strong>'+f.price.length+' chart · '+f.derivatives.length+' derivatives/OI file(s)</strong>','<span>'+escapeHtml(readableBytes(total))+' total</span>','<strong>NIFTY charts</strong>',fileNames(f.price),'<strong>Options / OI</strong>',fileNames(f.derivatives),'<span class="muted">These files are staged in your browser and will be uploaded only when you tap Run 5DR. Tap Choose files again to add more screenshots one at a time.</span>'].join('');errors.length?setUploadStatus(errors[0],'error'):setUploadStatus('Ready to run 5DR.','ready')}priceFiles.addEventListener('change',()=>{appendUniqueFiles(selectedPriceFiles,Array.from(priceFiles.files||[]));priceFiles.value='';renderFileSelection()});derivativesFiles.addEventListener('change',()=>{appendUniqueFiles(selectedDerivativesFiles,Array.from(derivativesFiles.files||[]));derivativesFiles.value='';renderFileSelection()});
 async function createRunRequest(batchId){const assessment={objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'};const r=await fetch('/api/5dr/run-requests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch_id:batchId,evidence_categories:REQUIRED_USER_CATEGORIES,assessment})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Could not create 5DR run request.');return d.request}
@@ -90,12 +136,7 @@ function render5dr(run,request,outcomeAssessment){
   fiveDrState.textContent='Result ready';
   const action=tradeable?'A trade setup currently meets the 5DR gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
   const why=governedWhy(meta,normalized,result);
-  const changes=[];
-  if(result.market_trust<50)changes.push('Confidence needs to rise above the minimum 50/100 gate.');
-  if(Math.abs(Number(result.des5))<30)changes.push('Directional strength needs to move beyond the ±30 DES5 threshold.');
-  if(result.execution_edge<65)changes.push('Trade quality needs to reach the 65/100 execution threshold.');
-  if(Number(normalized.expected_rr??0)<2)changes.push('Expected reward/risk needs to improve to at least 2:1.');
-  if(normalized.data_adequate===false)changes.push('Evidence quality and completeness must improve.');
+  const changes=userChangeConditions(why,normalized,result);
   const blockersPlain=blockers.map(blockerText);
   fiveDrSummary.innerHTML=[
     '<article class="simple-result direction-'+escapeHtml(String(result.directional_label||'RANGE').toLowerCase())+'">',
@@ -107,19 +148,21 @@ function render5dr(run,request,outcomeAssessment){
         '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'Current gates passed':'Current gates are not met')+'</small></div>',
       '</div>',
       '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
-      '<div class="assessment-card"><div><span>Performance assessment</span><strong>'+(outcomeAssessment?(escapeHtml(outcomeAssessment.outcome||'Assessed')):'Pending')+'</strong></div><p>'+(outcomeAssessment?('Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'This forecast will be evaluated as the D+1 to D+5 outcomes become available. The result above is the forecast; this later assessment measures how well it performed.')+'</p></div>',
+      '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
       '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
       '<div class="analysis-detail" data-analysis-detail hidden>',
       '<details class="why-details" open><summary>Why this view?</summary>',
         '<div class="why-grid">',
           '<div class="why-card"><strong>Price & structure</strong><p><b>What we saw:</b> '+escapeHtml(why.price.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
           '<div class="why-card"><strong>Options & positioning</strong><p><b>What we saw:</b> '+escapeHtml(why.options.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Broader market conditions</strong><p><b>What we saw:</b> '+escapeHtml(why.market.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
+          '<div class="why-card"><strong>Market participation</strong><p><b>What we saw:</b> '+escapeHtml(why.market.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
+          '<div class="why-card"><strong>Macro & events</strong><p><b>What we saw:</b> '+escapeHtml(why.macro.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
           '<div class="why-card"><strong>Trade quality</strong><p><b>What we saw:</b> '+escapeHtml(why.trade.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',
-      '<details class="change-details"><summary>What could change the view?</summary><ul>'+(changes.length?changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join(''):'<li>No specific upgrade condition is currently required.</li>')+'</ul></details>',
+      '<details class="change-details"><summary>What could change the view?</summary><p class="change-intro">These are the market developments that would actually make the current assessment stronger, weaker or tradeable:</p><ul>'+changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></details>',
+      '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. This forecast will be scored after its D+1 to D+5 outcomes are available. That scorecard measures forecast/recommendation performance; it is separate from the run assessment above.')+'</p></details>',
       '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
         '<div><span>DES5</span><strong>'+escapeHtml(result.des5??'—')+'</strong></div>',
         '<div><span>Market Trust</span><strong>'+escapeHtml(result.market_trust??'—')+' · '+escapeHtml(result.market_trust_band||'—')+'</strong></div>',
@@ -133,4 +176,4 @@ function render5dr(run,request,outcomeAssessment){
     '</article>'
   ].join('');
 }
-async function loadDashboard(){try{const h=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';const ed=await fetch('/api/engines',{cache:'no-store'}).then(r=>r.json());engines.innerHTML=ed.engines.map(e=>'<article class="engine"><div class="engine-row"><div><h4>'+escapeHtml(e.name)+'</h4><p>'+(e.id==='5DR'?'5-day NIFTY market view':e.id==='EDGE_STOCKS'?'Stock decision support':'IPO decision support')+'</p></div><span class="badge">'+escapeHtml(friendlyEngineStatus(e.status))+'</span></div></article>').join('');const f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json()),q=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json());let oa=null;if(f.run&&f.run.run_id){oa=await fetch('/api/5dr/outcome-assessment?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.assessment||null).catch(()=>null)}render5dr(f.run||null,q.request||null,oa);const l=await fetch('/api/runs/latest',{cache:'no-store'}).then(r=>r.json());if(!l.runs||!l.runs.length){runs.innerHTML='<div class="run muted">No published runs yet.</div>';runsNote.textContent=l.note||'Ready for first run';return}runs.innerHTML=l.runs.map(r=>'<article class="run history-row"><strong>'+escapeHtml(r.engine==='5DR'?'5DR result':r.engine)+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=l.runs.length+' recent'}catch(e){console.error(e);health.textContent='Offline';engines.innerHTML='<div class="run muted">Unable to load engine status.</div>';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="run muted">Unable to load 5DR integration status.</div>'}}loadDashboard();
+async function loadDashboard(){try{const h=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';const ed=await fetch('/api/engines',{cache:'no-store'}).then(r=>r.json());engines.innerHTML=ed.engines.map(e=>'<article class="engine"><div class="engine-row"><div><h4>'+escapeHtml(e.name)+'</h4><p>'+(e.id==='5DR'?'5-day NIFTY market view':e.id==='EDGE_STOCKS'?'Stock decision support':'IPO decision support')+'</p></div><span class="badge">'+escapeHtml(friendlyEngineStatus(e.status))+'</span></div></article>').join('');const f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());let matchedRequest=null,oa=null;if(f.run&&f.run.run_id){matchedRequest=await fetch('/api/5dr/run-request?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);oa=await fetch('/api/5dr/outcome-assessment?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.assessment||null).catch(()=>null)}else{matchedRequest=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null)}render5dr(f.run||null,matchedRequest,oa);const l=await fetch('/api/runs/latest',{cache:'no-store'}).then(r=>r.json());if(!l.runs||!l.runs.length){runs.innerHTML='<div class="run muted">No published runs yet.</div>';runsNote.textContent=l.note||'Ready for first run';return}runs.innerHTML=l.runs.map(r=>'<article class="run history-row"><strong>'+escapeHtml(r.engine==='5DR'?'5DR result':r.engine)+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=l.runs.length+' recent'}catch(e){console.error(e);health.textContent='Offline';engines.innerHTML='<div class="run muted">Unable to load engine status.</div>';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="run muted">Unable to load 5DR integration status.</div>'}}loadDashboard();
