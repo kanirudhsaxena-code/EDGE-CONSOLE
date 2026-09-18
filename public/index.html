@@ -3,44 +3,101 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1020" />
+  <meta name="theme-color" content="#f4f7fb" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=adaptive-light-v1b-20260918" />
 </head>
 <body>
   <main class="shell">
-    <header class="topbar"><div><div class="eyebrow">DECISION INTELLIGENCE</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
-    <section class="hero card"><div><div class="eyebrow">CONTROL PANEL</div><h2>One console. Three engines.</h2><p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p></div><button id="runButton" class="primary">Run analysis</button></section>
-    <section><div class="section-head"><h3>Engines</h3><span>Live integration status</span></div><div id="engines" class="grid"></div></section>
-    <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR INTEGRATION</div><h3>Production contract V2.1.2</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
-    <section id="edgePanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Canonical V1.2 decision output</h3></div><span id="edgeState" class="badge">Checking</span></div><form id="edgeCommandForm" class="run"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. This triggers the existing governed autonomous EDGE publisher; it does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="edgeSummary" class="stack"><div class="run muted">Checking EDGE Stocks efficacy read model…</div></div></section>
-    <section><div class="section-head"><h3>Latest published runs</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
+    <header class="topbar">
+      <div><div class="eyebrow">MARKET DECISION SUPPORT</div><h1>EDGE Console</h1></div>
+      <div id="health" class="pill">Checking…</div>
+    </header>
+
+    <section class="module-selector" aria-label="Select decision module">
+      <button class="module-tile active" data-module="5DR" type="button">
+        <span class="module-name">5DR</span><span class="module-desc">5-day NIFTY market view</span><span class="module-status">Ready</span>
+      </button>
+      <button class="module-tile" data-module="EDGE_STOCKS" type="button">
+        <span class="module-name">EDGE Stocks</span><span class="module-desc">Stock decision support</span><span class="module-status">Ready</span>
+      </button>
+      <button class="module-tile" data-module="EDGE_IPO" type="button">
+        <span class="module-name">EDGE IPO</span><span class="module-desc">IPO decision support</span><span class="module-status">Ready</span>
+      </button>
+    </section>
+
+    <section class="module-action-row">
+      <div><div class="eyebrow" id="selectedModuleEyebrow">5DR</div><h2 id="selectedModuleTitle">Latest market view</h2></div>
+      <button id="runButton" class="primary">Run 5DR</button>
+    </section>
+
+    <section id="fiveDrPanel" class="module-panel active">
+      <div id="assessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card">
+        <div class="section-head compact"><div><div class="eyebrow">5DR</div><h3>Current result</h3></div><span id="fiveDrState" class="badge">Checking</span></div>
+        <div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div>
+      </div>
+    </section>
+
+    <section id="edgeStocksPanel" class="module-panel" hidden>
+      <div id="stocksAssessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><form id="edgeCommandForm" class="run edge-command-form"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. This triggers the governed autonomous EDGE publisher; it does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="stocksSummary" class="stack"></div></div>
+    </section>
+
+    <section id="edgeIpoPanel" class="module-panel" hidden>
+      <div id="ipoAssessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE IPO</div><h3>Latest IPO decision</h3></div><span class="badge">Ready</span></div><div id="ipoSummary" class="stack"></div></div>
+    </section>
+
+    <section class="recent-section">
+      <div class="section-head"><h3>Recent results</h3><span id="runsNote">Loading</span></div>
+      <div id="runs" class="stack"></div>
+    </section>
   </main>
-  <nav class="bottom-nav" aria-label="Primary"><button class="active" data-view="home">Home</button><button id="navRun" data-view="run">Run</button><button id="nav5dr" data-view="5dr">5DR</button><button id="navEdge" data-view="edge">EDGE</button><button data-view="ipo">IPO</button></nav>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
-      <div class="section-head"><h3>Run Analysis</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
-      <label>Engine<select id="runEngine"><option value="5DR">5DR</option><option value="EDGE_STOCKS" disabled>EDGE Stocks — dashboard validation first</option><option value="EDGE_IPO" disabled>EDGE IPO — automated</option></select></label>
-      <label>Evidence mode<select id="evidenceMode"><option value="HYBRID">Hybrid</option><option value="MANUAL">Manual</option></select></label>
-      <div class="run"><strong>5DR evidence readiness</strong><p class="muted">Before staging, select the evidence categories represented in this batch. This is a readiness declaration only; it does not extract or invent market values.</p><label><input class="readiness-check" type="checkbox" value="PRICE_TECHNICALS" /> Price / technical chart evidence</label><label><input class="readiness-check" type="checkbox" value="DERIVATIVES_OI" /> Options / OI / derivatives evidence</label><label><input class="readiness-check" type="checkbox" value="MARKET_TRUST" /> Market Trust / breadth / cross-market evidence</label><label><input class="readiness-check" type="checkbox" value="EVENT_SHOCK" /> Event / news / shock evidence</label><label><input class="readiness-check" type="checkbox" value="EXECUTION_RISK" /> Execution / entry / stop / risk-reward evidence</label><div id="readinessStatus" class="upload-status">No evidence categories declared yet.</div></div>
-      <label class="upload">Upload screenshots or evidence<input id="evidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /><span class="upload-help">Up to 20 files · JPEG, PNG, WebP or PDF · maximum 10 MB each</span></label>
-      <div id="fileSelection" class="file-selection muted">No files selected.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted"><strong>Current step:</strong> evidence is secured in private R2 and recorded in Neon. Incomplete category coverage remains explicitly blocked before normalization.</p>
-      <button id="uploadEvidenceButton" type="submit" class="primary">Check readiness &amp; prepare</button>
+      <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
+      <div class="run-steps" aria-label="5DR run progress">
+        <span class="active">1 Decision setup</span><span>2 Evidence</span><span>3 Analysis</span><span>4 Result</span>
+      </div>
+      <input id="runEngine" type="hidden" value="5DR" />
+      <input id="evidenceMode" type="hidden" value="HYBRID" />
+      <div class="run decision-setup">
+        <div class="step-label">1 · Decision setup</div>
+        <strong>What do you want 5DR to help with?</strong>
+        <label>Objective
+          <select id="decisionObjective">
+            <option value="BOTH" selected>Market view + options setup</option>
+            <option value="MARKET_VIEW">Market view only</option>
+            <option value="OPTIONS_SETUP">Options setup only</option>
+          </select>
+        </label>
+        <label>Risk style
+          <select id="riskPosture">
+            <option value="CONSERVATIVE" selected>Conservative</option>
+            <option value="BALANCED">Balanced</option>
+            <option value="OPPORTUNISTIC">Opportunistic</option>
+          </select>
+        </label>
+        <label>Priority
+          <select id="capitalPriority">
+            <option value="CAPITAL_PROTECTION" selected>Protect capital first</option>
+            <option value="BALANCED">Balanced</option>
+            <option value="GROWTH">Growth first</option>
+          </select>
+        </label>
+        <p class="muted">5DR horizon is fixed at the next 5 market days. These choices define the decision context; they do not change the frozen 5DR methodology.</p>
+      </div>
+      <div class="run"><div class="step-label">2 · Evidence</div><strong>NIFTY charts</strong><p class="muted">Add your current NIFTY chart screenshots.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div class="run"><strong>Options / OI</strong><p class="muted">Add your current options or open-interest screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div id="fileSelection" class="file-selection muted">Select both screenshot groups to continue.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+      <p class="muted">Next: EDGE Console reads the screenshots, checks wider market conditions and runs 5DR automatically.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
     </form>
   </dialog>
-  <dialog id="normalizeDialog">
-    <form id="normalizeForm" class="dialog-card">
-      <div class="section-head"><h3>Supply governed 5DR inputs</h3><button id="closeNormalizeDialog" type="button" class="ghost">Close</button></div>
-      <p class="muted">Manual/hybrid bridge. Paste only normalized evidence supported by the uploaded sources. The Console validates structure, completeness and conflicts; it does not infer missing values.</p>
-      <label>Request ID<input id="normalizeRequestId" type="text" readonly /></label>
-      <label>Normalized evidence JSON<textarea id="normalizedEvidenceJson" rows="12" spellcheck="false" placeholder='{"evidence":[{"evidence_type":"...","source_ref":"...","captured_at":"...","normalized":{...}}]}'></textarea></label>
-      <div id="normalizeStatus" class="upload-status" aria-live="polite"></div>
-      <button id="submitNormalizedEvidence" type="submit" class="primary">Validate &amp; prepare execution</button>
-    </form>
-  </dialog>
-  <script type="module" src="/app.js"></script>
-  <script type="module" src="/edge-live.js"></script>
+  <script type="module" src="/app.js?v=adaptive-light-v1b-20260918"></script>
+  <script type="module" src="/resume.js?v=adaptive-light-v1b-20260918"></script>
+  <script type="module" src="/edge-live.js?v=adaptive-light-v1b-20260918"></script>
 </body>
 </html>
