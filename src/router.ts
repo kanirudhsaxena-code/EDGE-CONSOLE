@@ -4,7 +4,6 @@ import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvide
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
-import { MDOS_ENGINE_REGISTRY, MDOS_LEARNING_RUNTIME_CONTRACT, dispatchRegisteredEngine, parseMdosCommand } from './mdos-backbone';
 
 type Env = {
   ASSETS: Fetcher;
@@ -12,7 +11,6 @@ type Env = {
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
   EDGE_GITHUB_TOKEN?: string;
-  MDOS_GITHUB_TOKEN?: string;
   APP_ENV: string;
   OUTPUT_CONTRACT_VERSION: string;
 };
@@ -86,100 +84,6 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
   return json({ ok: true, request_id: requestId, status: 'FAILED' });
 }
 
-
-
-async function mdosLearningStatus(env: Env): Promise<Response> {
-  if (!env.DATABASE_URL) return json({ error: 'Console database is not configured' }, 503);
-  const sql = neon(env.DATABASE_URL);
-  const rows = await sql`
-    select distinct on (engine)
-           engine,cycle_id,status,sample_size,candidate_count,source_ref,
-           occurred_at,automatic_adoption,methodology_changed,details
-      from learning_runtime_events
-     order by engine,occurred_at desc,id desc
-  `;
-  const byEngine = Object.fromEntries(rows.map((row: Record<string, unknown>) => [String(row.engine), row]));
-  return json({
-    schema: MDOS_LEARNING_RUNTIME_CONTRACT.schema,
-    contract: MDOS_LEARNING_RUNTIME_CONTRACT,
-    engines: MDOS_ENGINE_REGISTRY.map(registration => ({
-      ...registration,
-      runtime: byEngine[registration.engine] ?? {
-        engine: registration.engine,
-        status: 'DEFERRED',
-        sample_size: 0,
-        candidate_count: 0,
-        automatic_adoption: false,
-        methodology_changed: false,
-        note: 'No shared runtime event recorded yet',
-      },
-    })),
-  });
-}
-
-async function mdosBackboneStatus(env: Env): Promise<Response> {
-  return json({
-    schema: 'mdos-shared-backbone-v1',
-    status: 'REGISTERED',
-    engine_count: MDOS_ENGINE_REGISTRY.length,
-    engines: MDOS_ENGINE_REGISTRY,
-    learning_runtime: MDOS_LEARNING_RUNTIME_CONTRACT,
-    dispatch_configured: Boolean((env.MDOS_GITHUB_TOKEN ?? env.EDGE_GITHUB_TOKEN ?? '').trim()),
-    methodology_shared: false,
-    trading_enabled: false,
-  });
-}
-
-async function invokeMdos(request: Request, env: Env): Promise<Response> {
-  let body: unknown;
-  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
-  if (!isObject(body)) return json({ error: 'request body must be a JSON object' }, 422);
-  const plan = parseMdosCommand(body.command);
-  if (!plan) return json({
-    error: 'Unsupported MDOS command',
-    accepted: ['5DR', '5DR NIFTY', 'EDGE <stock/company/ticker>', 'IPO EDGE'],
-  }, 422);
-
-  if (plan.engine === 'EDGE_STOCKS') {
-    const delegated = new Request(request.url, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ command: plan.command }),
-    });
-    return invokeEdgeStocks(delegated, env);
-  }
-
-  const requestedAt = new Date().toISOString();
-  const requestId = `mdos_${crypto.randomUUID()}`;
-  const dispatched = await dispatchRegisteredEngine({
-    token: (env.MDOS_GITHUB_TOKEN ?? env.EDGE_GITHUB_TOKEN ?? ''),
-    engine: plan.engine,
-    command: plan.command,
-    requestId,
-    requestedAt,
-  });
-  if (!dispatched.ok) return json({
-    ok: false,
-    engine: plan.engine,
-    status: 'DISPATCH_BLOCKED',
-    request_id: requestId,
-    detail: dispatched.error,
-    trading_enabled: false,
-  }, dispatched.status === 401 || dispatched.status === 403 ? 502 : dispatched.status);
-
-  return json({
-    ok: true,
-    status: 'DISPATCHED',
-    engine: plan.engine,
-    command: plan.command,
-    request_id: requestId,
-    requested_at: requestedAt,
-    repository: dispatched.repository,
-    workflow: dispatched.workflow,
-    trading_enabled: false,
-    methodology_changed: false,
-  }, 202);
-}
 
 async function edgeStocksDispatchHealth(env: Env): Promise<Response> {
   const result = await checkEdgeWorkflowAccess(env.EDGE_GITHUB_TOKEN ?? '');
@@ -557,9 +461,6 @@ async function edgeStocksMaster(env: Env): Promise<Response> {
 
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
-  if (url.pathname === '/api/mdos/backbone' && request.method === 'GET') return mdosBackboneStatus(env);
-  if (url.pathname === '/api/mdos/learning' && request.method === 'GET') return mdosLearningStatus(env);
-  if (url.pathname === '/api/mdos/invoke' && request.method === 'POST') return invokeMdos(request, env);
   if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return readinessGate(request, env);
   const normalized = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
   if (normalized && request.method === 'POST') return saveNormalizedEvidence(request, env, decodeURIComponent(normalized[1]));
