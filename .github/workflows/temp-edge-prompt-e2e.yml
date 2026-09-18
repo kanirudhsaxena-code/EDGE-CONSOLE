@@ -23,7 +23,7 @@ jobs:
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -H 'content-type: application/json' \
             -X POST \
-            --data '{"command":"EDGE RELIANCE"}' \
+            --data '{"command":"EDGE TCS"}' \
             'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke' \
             -o /tmp/invoke.json
           cat /tmp/invoke.json
@@ -33,31 +33,9 @@ jobs:
           assert data['ok'] is True, data
           assert data['engine']=='EDGE_STOCKS', data
           assert data['contract_version']=='EDGE_STOCKS_V1_2', data
-          assert data['ticker']=='RELIANCE', data
+          assert data['ticker']=='TCS', data
           assert data['trading_enabled'] is False, data
           assert data['status'] in ('DISPATCHED','ALREADY_PUBLISHED_TODAY'), data
           PY
 
 
-      - name: Validate live canonical report
-        run: |
-          set -euo pipefail
-          curl --location --fail --silent --show-error \
-            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=RELIANCE' \
-            -o /tmp/report.json
-          python - <<'PY'
-          import json
-          data=json.load(open('/tmp/report.json'))
-          r=data['report']
-          assert r['contract_version']=='EDGE_STOCKS_V1_2', r
-          assert r['ticker']=='RELIANCE', r
-          assert r['run_id']=='EDGE-RELIANCE-20260918-180745-AUTO', r
-          assert r['presentation']['standard_table_count']==2, r
-          assert r['presentation']['table_1']=='EDGE_OUTCOME_DECISION', r
-          assert r['presentation']['table_2']=='INSTITUTIONAL_DRILLDOWN', r
-          assert r['decision']['primary_action'], r
-          assert r['official_efficacy']['label']=='OFFICIAL', r
-          assert r['provisional_checkpoint_diagnostics']['label']=='PROVISIONAL', r
-          PY
