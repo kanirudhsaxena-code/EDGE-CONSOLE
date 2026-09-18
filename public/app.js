@@ -221,6 +221,55 @@ function probabilityCards(result,engine){
   if([strong,base,weak].every(v=>v==null))return'';
   return '<div class="probability-line"><span class="bull">Strong <strong>'+escapeHtml(strong??'—')+'%</strong></span><span class="range">Base <strong>'+escapeHtml(base??'—')+'%</strong></span><span class="bear">Weak <strong>'+escapeHtml(weak??'—')+'%</strong></span></div>'
 }
+function ipoIssueCard(issue){
+  const band=issue.price_band_low!=null||issue.price_band_high!=null?('₹'+(issue.price_band_low??'—')+' – ₹'+(issue.price_band_high??'—')):'Price band pending';
+  const dateText=[issue.issue_open_date,issue.issue_close_date].filter(Boolean).map(x=>new Date(x).toLocaleDateString()).join(' → ');
+  const blocker=issue.hard_blocker==='CRITICAL_EVIDENCE_NOT_VERIFIED'?'Critical evidence not verified':humanText(issue.hard_blocker||'');
+  return '<div class="ipo-issue-card"><div class="ipo-issue-head"><strong>'+escapeHtml(issue.company_name||'—')+'</strong><span class="evidence-chip '+(issue.grade==='NV'?'limited':'verified')+'">'+escapeHtml(issue.grade||'—')+'</span></div><p>'+escapeHtml(issue.segment||'—')+(issue.exchange?' · '+escapeHtml(issue.exchange):'')+' · '+escapeHtml(band)+'</p><small>'+escapeHtml(dateText||'Dates pending')+' · '+escapeHtml(humanText(issue.decision||'NO_ACTION'))+'</small>'+(blocker?'<small class="ipo-blocker">'+escapeHtml(blocker)+'</small>':'')+'</div>'
+}
+function humanText(v){return String(v??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}
+function renderIpoAssessment(result){
+  if(!ipoAssessmentSummary)return;
+  const e=result.efficacy||{},counts=result.counts||{};
+  const recs=Number(e.recommendation_count||0);
+  ipoAssessmentSummary.innerHTML=[
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+escapeHtml(counts.assessments??0)+' assessments</small></div>',
+    '<div class="assessment-grid">',
+      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>—</strong><small>No matured forecast-accuracy sample in latest efficacy snapshot</small></div>',
+      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(e.positive_hit_rate==null?null:Number(e.positive_hit_rate)*100)+'</strong><small>'+recs+' recommendations in efficacy sample</small></div>',
+      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(e.avg_recommended_gain==null?null:Number(e.avg_recommended_gain)*100)+'</strong><small>Average recommended gain where available</small></div>',
+      '<div class="assessment-metric"><span>Correct avoidance</span><strong>'+pct(e.correct_avoidance_rate==null?null:Number(e.correct_avoidance_rate)*100)+'</strong><small>Rejected/avoided issues correctly filtered</small></div>',
+      '<div class="assessment-metric"><span>Opportunity capture</span><strong>'+pct(e.opportunity_capture_rate==null?null:Number(e.opportunity_capture_rate)*100)+'</strong><small>Latest governed efficacy snapshot</small></div>',
+    '</div>',
+    '<details class="assessment-detail-row"><summary>Assessment details</summary><div class="scorecard-context"><span>Coverage</span><strong>'+escapeHtml(counts.ipos??0)+' IPOs · '+escapeHtml(counts.listing_outcomes??0)+' listing outcomes</strong><p>'+escapeHtml(counts.checkpoints??0)+' checkpoints · '+escapeHtml(counts.evidence??0)+' evidence records · '+escapeHtml(counts.runs??0)+' autonomous runs.</p></div></details>'
+  ].join('')
+}
+function renderIpoSnapshot(target,runsData){
+  const list=Array.isArray(runsData)?runsData:[],latest=list[0]||null;
+  if(!target)return;
+  if(!latest){target.innerHTML='<div class="generic-empty">No IPO EDGE snapshot is available.</div>';return}
+  const r=latest.result||{},issues=Array.isArray(r.current_issues)?r.current_issues:[],ready=issues.filter(x=>x&&x.grade&&x.grade!=='NV'),nv=issues.filter(x=>x&&x.grade==='NV'),focus=issues[0]||null,validated=r.latest_validated||null;
+  renderIpoAssessment(r);
+  const headline=ready.length?ready.length+' current issue'+(ready.length===1?' is':'s are')+' decision-ready':'No current IPO is decision-ready';
+  const why=[
+    '<div class="why-card"><strong>Current coverage</strong><p><b>What we saw:</b> '+escapeHtml(issues.length)+' open/upcoming issues are in the current snapshot; '+escapeHtml(nv.length)+' are NV because critical evidence is not yet verified.</p><p><b>What it means:</b> NV is an evidence state, not a negative investment score. The system is refusing to grade issues that do not yet meet the evidence gates.</p></div>',
+    '<div class="why-card"><strong>Decision quality</strong><p><b>What we saw:</b> '+escapeHtml(ready.length)+' current issues have a validated non-NV grade.</p><p><b>What it means:</b> The Console should show “wait/no action” rather than manufacture an apply/reject call when R2/R3/R4/R6/R7 evidence is incomplete.</p></div>',
+    validated?'<div class="why-card"><strong>Latest validated checkpoint</strong><p><b>What we saw:</b> '+escapeHtml(validated.company_name)+' scored '+escapeHtml(validated.score)+' with grade '+escapeHtml(validated.grade)+' and decision '+escapeHtml(humanText(validated.decision))+'.</p><p><b>What it means:</b> The IPO engine is capable of producing a governed grade once the evidence gates are complete; current NVs are a data-readiness issue, not an empty engine.</p></div>':''
+  ].join('');
+  target.innerHTML=[
+    '<article class="simple-result ipo-standard-result">',
+      '<div class="result-kicker">CURRENT IPO VIEW</div>',
+      '<h2>'+escapeHtml(headline)+'</h2>',
+      '<p class="result-copy">'+escapeHtml(issues.length)+' current issues monitored · '+escapeHtml(nv.length)+' awaiting critical evidence verification.</p>',
+      '<div class="decision-grid"><div class="decision-card"><span>Decision status</span><strong>'+(ready.length?'Review graded issues':'Wait')+'</strong><small>Do not act on NV issues</small></div><div class="decision-card"><span>Framework</span><strong>V'+escapeHtml(r.framework_version||latest.framework_version||'1.1')+'</strong><small>IPO EDGE governed snapshot</small></div></div>',
+      '<div class="action-box"><span>Suggested action</span><strong>'+(ready.length?'Review the graded current issues below.':'Wait for critical evidence to be verified before any apply/reject decision.')+'</strong></div>',
+      '<details class="why-details" open><summary>Why this view?</summary><div class="why-grid">'+why+'</div></details>',
+      '<details class="change-details" open><summary>What could change the view?</summary><ul><li>Critical R2/R3/R4/R6/R7 evidence must move from unresolved to verified.</li><li>Subscription/QIB/NII/retail demand and GMP should be incorporated when available and governed.</li><li>The final-day checkpoint can upgrade, retain or reject the issue once evidence coverage is sufficient.</li><li>A hard blocker keeps the issue at NV/No Action regardless of superficial market enthusiasm.</li></ul></details>',
+      '<details class="active-details" open><summary>Current IPO queue</summary><div class="ipo-issue-grid">'+(issues.length?issues.map(ipoIssueCard).join(''):'<p class="muted">No current issues.</p>')+'</div></details>',
+      '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body"><div><span>IPOs tracked</span><strong>'+escapeHtml(r.counts?.ipos??'—')+'</strong></div><div><span>Evidence records</span><strong>'+escapeHtml(r.counts?.evidence??'—')+'</strong></div><div><span>Assessments</span><strong>'+escapeHtml(r.counts?.assessments??'—')+'</strong></div><div><span>Checkpoints</span><strong>'+escapeHtml(r.counts?.checkpoints??'—')+'</strong></div><div><span>Listing outcomes</span><strong>'+escapeHtml(r.counts?.listing_outcomes??'—')+'</strong></div><div><span>Snapshot</span><strong>'+escapeHtml(latest.run_id)+'</strong></div></div></details>',
+    '</article>'
+  ].join('')
+}
 function renderGenericModule(engine,target,runsData){
   const list=Array.isArray(runsData)?runsData:[],latest=list[0]||null;
   if(!target)return;
@@ -328,7 +377,7 @@ async function loadDashboard(){
     const h=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';
     const ed=await fetch('/api/engines',{cache:'no-store'}).then(r=>r.json()).catch(()=>({engines:[]}));
     (ed.engines||[]).forEach(e=>{const tile=moduleTiles.find(t=>t.dataset.module===e.id);const status=tile&&tile.querySelector('.module-status');if(status)status.textContent=friendlyEngineStatus(e.status)});
-    await Promise.all([loadAssessment('5DR',assessmentSummary),loadAssessment('EDGE_STOCKS',stocksAssessmentSummary),loadAssessment('EDGE_IPO',ipoAssessmentSummary)]);
+    await loadAssessment('5DR',assessmentSummary);
 
     let f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
     let latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
@@ -349,10 +398,10 @@ async function loadDashboard(){
     }else render5dr(null,latestReq,null);
 
     const ipoRuns=await fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]);
-    renderGenericModule('EDGE_IPO',ipoSummary,ipoRuns);
+    renderIpoSnapshot(ipoSummary,ipoRuns);
     await loadRecentResults(activeModule);
   }catch(e){
-    console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderGenericModule('EDGE_IPO',ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
+    console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderIpoSnapshot(ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
   }
 }
 setActiveModule('5DR');
