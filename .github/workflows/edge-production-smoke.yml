@@ -19,7 +19,7 @@ jobs:
         run: |
           set -euo pipefail
           for i in $(seq 1 12); do
-            if curl --fail --silent --show-error -H 'Cache-Control: no-cache' \
+            if curl --location --fail --silent --show-error -H 'Cache-Control: no-cache' \
               'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
               && grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js; then
@@ -36,7 +36,7 @@ jobs:
       - name: Check EDGE health
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
+          curl --location --fail --silent --show-error \
             'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/health' \
             -o /tmp/health.json
           python - <<'PY'
@@ -49,7 +49,7 @@ jobs:
       - name: Validate LTF report contract
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
+          curl --location --fail --silent --show-error \
             'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=LTF' \
             -o /tmp/report.json
           python - <<'PY'
@@ -83,7 +83,7 @@ jobs:
       - name: Validate canonical V1.2 renderer asset
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
+          curl --location --fail --silent --show-error \
             'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js' \
             -o /tmp/edge-live.js
           grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js
@@ -93,7 +93,7 @@ jobs:
       - name: Validate master efficacy separation
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error \
+          curl --location --fail --silent --show-error \
             'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/master' \
             -o /tmp/master.json
           python - <<'PY'
