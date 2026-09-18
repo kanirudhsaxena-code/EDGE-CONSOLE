@@ -53,7 +53,7 @@ jobs:
           r=data['report']
           assert r['contract_version']=='EDGE_STOCKS_V1_2', r
           assert r['ticker']=='RELIANCE', r
-          assert r['run_id']=='EDGE-RELIANCE-20260918-180236-AUTO', r
+          assert r['run_id']=='EDGE-RELIANCE-20260918-180745-AUTO', r
           assert r['presentation']['standard_table_count']==2, r
           assert r['presentation']['table_1']=='EDGE_OUTCOME_DECISION', r
           assert r['presentation']['table_2']=='INSTITUTIONAL_DRILLDOWN', r
