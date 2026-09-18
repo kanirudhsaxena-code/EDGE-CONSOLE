@@ -42,11 +42,55 @@ const isObject=(v:unknown):v is JsonRecord=>typeof v==='object'&&v!==null&&!Arra
 const exactKeys=(value:JsonRecord,keys:readonly string[])=>Object.keys(value).length===keys.length&&keys.every(k=>k in value);
 const finite=(v:unknown):v is number=>typeof v==='number'&&Number.isFinite(v);
 
+function parseJsonText(text:string):unknown{
+  const trimmed=text.trim();
+  const candidates=[trimmed];
+  const fenced=trimmed.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i);
+  if(fenced?.[1])candidates.push(fenced[1].trim());
+  const first=trimmed.indexOf('{'),last=trimmed.lastIndexOf('}');
+  if(first>=0&&last>first)candidates.push(trimmed.slice(first,last+1));
+  for(const candidate of candidates){try{return JSON.parse(candidate)}catch{}}
+  return null;
+}
+
+function parseMessage(value:unknown):unknown{
+  if(!isObject(value))return null;
+  if(typeof value.content==='string'){
+    const parsed=parseJsonText(value.content);
+    if(parsed)return parsed;
+  }
+  return null;
+}
+
 function parseJson(raw:unknown):unknown{
-  const candidate=typeof raw==='string'?raw:isObject(raw)&&typeof raw.response==='string'?raw.response:isObject(raw)&&typeof raw.result==='string'?raw.result:null;
-  if(typeof candidate!=='string')return null;
-  const text=candidate.trim().replace(/^```(?:json)?\s*/i,'').replace(/\s*```$/,'');
-  try{return JSON.parse(text)}catch{return null}
+  if(typeof raw==='string')return parseJsonText(raw);
+  if(!isObject(raw))return null;
+  if('verification' in raw&&'source_refs' in raw&&'directional_raw' in raw)return raw;
+  if(Array.isArray(raw.choices)){
+    for(const choice of raw.choices){
+      if(!isObject(choice))continue;
+      const parsed=parseMessage(choice.message);
+      if(parsed)return parsed;
+    }
+  }
+  for(const key of ['response','result'] as const){
+    const nested=raw[key];
+    if(isObject(nested)){
+      if('verification' in nested&&'source_refs' in nested&&'directional_raw' in nested)return nested;
+      if(Array.isArray(nested.choices)){
+        for(const choice of nested.choices){
+          if(!isObject(choice))continue;
+          const parsed=parseMessage(choice.message);
+          if(parsed)return parsed;
+        }
+      }
+    }
+    if(typeof nested==='string'){
+      const parsed=parseJsonText(nested);
+      if(parsed)return parsed;
+    }
+  }
+  return null;
 }
 
 function validateRawGroup(value:unknown,schema:Record<string,number>,path:string,errors:string[]){
