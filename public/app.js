@@ -149,14 +149,59 @@ async function loadAssessment(engine,container){
   try{const d=await fetch('/api/assessment-summary?engine='+encodeURIComponent(engine),{cache:'no-store'}).then(r=>r.json());renderAssessment(container,d)}catch(e){console.error(e);renderAssessment(container,null)}
 }
 function genericResultTitle(engine,result){if(!result)return'No published result';if(engine==='EDGE_STOCKS')return result.recommendation||result.decision||result.definitive_forecast||result.direction||'Stock result ready';return result.recommendation||result.decision||result.grade||result.ipo_grade||'IPO result ready'}
+function normalizeReasons(value){if(Array.isArray(value))return value.map(v=>typeof v==='string'?v:JSON.stringify(v));if(typeof value==='string')return[value];if(value&&typeof value==='object')return Object.entries(value).map(([k,v])=>k.replaceAll('_',' ')+': '+(typeof v==='object'?JSON.stringify(v):String(v)));return[]}
+function probabilityCards(result,engine){
+  const p=result.probabilities||result.scenario_probabilities||{};
+  if(engine==='EDGE_STOCKS'){
+    const bull=p.BULL??p.bull??p.up,base=p.BASE??p.base??p.range,bear=p.BEAR??p.bear??p.down;
+    if([bull,base,bear].every(v=>v==null))return'';
+    return '<div class="probability-line"><span class="bull">Bull <strong>'+escapeHtml(bull??'—')+'%</strong></span><span class="range">Base <strong>'+escapeHtml(base??'—')+'%</strong></span><span class="bear">Bear <strong>'+escapeHtml(bear??'—')+'%</strong></span></div>'
+  }
+  const strong=p.STRONG??p.strong??p.bull,base=p.BASE??p.base,weak=p.WEAK??p.weak??p.bear;
+  if([strong,base,weak].every(v=>v==null))return'';
+  return '<div class="probability-line"><span class="bull">Strong <strong>'+escapeHtml(strong??'—')+'%</strong></span><span class="range">Base <strong>'+escapeHtml(base??'—')+'%</strong></span><span class="bear">Weak <strong>'+escapeHtml(weak??'—')+'%</strong></span></div>'
+}
 function renderGenericModule(engine,target,runsData){
   const list=Array.isArray(runsData)?runsData:[],latest=list[0]||null;
   if(!target)return;
+  const label=engine==='EDGE_STOCKS'?'EDGE STOCKS':'EDGE IPO';
   if(!latest){target.innerHTML='<div class="generic-empty">No published '+(engine==='EDGE_STOCKS'?'EDGE Stocks':'EDGE IPO')+' result yet.</div>';return}
   const result=latest.result||{},title=genericResultTitle(engine,result);
-  const keys=engine==='EDGE_STOCKS'?['expected_price_zone','market_trust','des','tradeable','suggested_action']:['issue_name','grade','listing_view','medium_term_view','suggested_action'];
-  const detail=keys.filter(k=>result[k]!=null).map(k=>'<div class="metric"><span>'+escapeHtml(k.replaceAll('_',' '))+'</span><strong>'+escapeHtml(typeof result[k]==='object'?JSON.stringify(result[k]):result[k])+'</strong></div>').join('');
-  target.innerHTML='<article class="generic-result-card"><div class="result-kicker">'+(engine==='EDGE_STOCKS'?'EDGE STOCKS':'EDGE IPO')+'</div><h3>'+escapeHtml(title)+'</h3><p>Latest published result · '+escapeHtml(new Date(latest.generated_at).toLocaleString())+'</p>'+detail+'<details class="tech-details"><summary>Advanced details</summary><div class="tech-body"><div><span>Run ID</span><strong>'+escapeHtml(latest.run_id)+'</strong></div><div><span>Framework</span><strong>'+escapeHtml(latest.framework_version||'—')+'</strong></div><div><span>Source mode</span><strong>'+escapeHtml(latest.provenance_mode||'—')+'</strong></div></div></details></article>'
+  const confidence=result.confidence??result.market_trust??result.trust??null;
+  const actionable=result.tradeable===true||result.actionable===true||/apply|buy|trade/i.test(String(result.recommendation||result.decision||''));
+  const action=result.suggested_action||result.action||result.recommendation||result.decision||'Review the published assessment.';
+  const why=normalizeReasons(result.why||result.reasons||result.key_drivers||result.rationale||result.decision_reasons);
+  const changes=normalizeReasons(result.what_could_change||result.change_conditions||result.invalidation||result.key_risks||result.risks);
+  const primaryZone=result.expected_price_zone||result.price_zone||result.expected_zone||result.listing_range||result.expected_listing_zone||null;
+  const secondary=engine==='EDGE_STOCKS'?(result.des??result.des5??result.directional_agreement??null):(result.grade??result.ipo_grade??result.issue_quality??null);
+  target.innerHTML=[
+    '<article class="simple-result generic-standard-result">',
+      '<div class="result-kicker">'+label+'</div>',
+      '<h2>'+escapeHtml(title)+'</h2>',
+      probabilityCards(result,engine),
+      '<div class="decision-grid">',
+        '<div class="decision-card"><span>Confidence</span><strong>'+escapeHtml(confidence==null?'—':confidence)+'</strong><small>'+(confidence==null?'Not provided in this run':'Published confidence')+'</small></div>',
+        '<div class="decision-card"><span>'+(engine==='EDGE_STOCKS'?'Can I act on this?':'Decision status')+'</span><strong>'+(actionable?'Actionable':'Review')+'</strong><small>'+escapeHtml(primaryZone?('Key zone: '+(typeof primaryZone==='object'?JSON.stringify(primaryZone):primaryZone)):'See analysis below')+'</small></div>',
+      '</div>',
+      '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
+      '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
+      '<div class="analysis-detail" data-analysis-detail hidden>',
+        '<details class="why-details" open><summary>Why this view?</summary><div class="why-grid">',
+          (why.length?why.slice(0,6).map((x,i)=>'<div class="why-card"><strong>'+(engine==='EDGE_STOCKS'?'Decision factor ':'IPO factor ')+(i+1)+'</strong><p>'+escapeHtml(x)+'</p></div>').join(''):'<div class="why-card"><strong>Published evidence</strong><p>The current result does not yet expose structured user-facing reasoning fields. The Console will show them here when the engine publishes them.</p></div>'),
+        '</div></details>',
+        '<details class="change-details"><summary>What could change the view?</summary><ul>',
+          (changes.length?changes.slice(0,8).map(x=>'<li>'+escapeHtml(x)+'</li>').join(''):'<li>No structured change conditions were published with this run.</li>'),
+        '</ul></details>',
+        '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
+          (primaryZone!=null?'<div><span>Key zone</span><strong>'+escapeHtml(typeof primaryZone==='object'?JSON.stringify(primaryZone):primaryZone)+'</strong></div>':''),
+          (secondary!=null?'<div><span>'+(engine==='EDGE_STOCKS'?'Directional metric':'Grade / quality')+'</span><strong>'+escapeHtml(typeof secondary==='object'?JSON.stringify(secondary):secondary)+'</strong></div>':''),
+          '<div><span>Run ID</span><strong>'+escapeHtml(latest.run_id)+'</strong></div>',
+          '<div><span>Framework</span><strong>'+escapeHtml(latest.framework_version||'—')+'</strong></div>',
+          '<div><span>Source mode</span><strong>'+escapeHtml(latest.provenance_mode||'—')+'</strong></div>',
+        '</div></details>',
+      '</div>',
+    '</article>'
+  ].join('')
 }
 async function loadRecentResults(module){
   if(!runs||!runsNote)return;
