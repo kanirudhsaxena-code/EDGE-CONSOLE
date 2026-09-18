@@ -3,7 +3,7 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
-import { dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
+import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 
 type Env = {
   ASSETS: Fetcher;
@@ -84,6 +84,18 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
   return json({ ok: true, request_id: requestId, status: 'FAILED' });
 }
 
+
+async function edgeStocksDispatchHealth(env: Env): Promise<Response> {
+  const result = await checkEdgeWorkflowAccess(env.EDGE_GITHUB_TOKEN ?? '');
+  return json({
+    ok: result.ok,
+    status: result.ok ? 'READY' : 'BLOCKED',
+    engine: 'EDGE_STOCKS',
+    workflow: 'autonomous-publish.yml',
+    trading_enabled: false,
+    error: result.error ?? null,
+  }, result.ok ? 200 : (result.status === 401 || result.status === 403 ? 502 : result.status));
+}
 
 async function resolveEdgeTicker(env: Env, target: string): Promise<{ ticker?: string; error?: string; status?: number }> {
   const direct = normalizeTickerCandidate(target);
@@ -391,6 +403,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
