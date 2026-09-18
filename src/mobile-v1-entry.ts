@@ -109,9 +109,12 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
   }
   const autonomousItems=SYSTEM_FAMILIES.map(category=>({category,status:produced.judgment!.verification==='VERIFIED'?'VERIFIED':'DEGRADED',source_refs:produced.judgment!.source_refs.filter(ref=>sourceCategory.get(ref)===category),retrieved_at:new Date().toISOString(),detail:`Governed intelligence reconciliation ${produced.judgment!.verification}`}));
   const origin=new URL(request.url).origin;
-  const autonomousReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/autonomous-evidence`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({items:autonomousItems})});
-  const autonomousResponse=await router.fetch(autonomousReq as any,env as any);
-  if(!autonomousResponse.ok)return json({error:'autonomous evidence gate blocked after reconciliation',gate:await responseJson(autonomousResponse)},409);
+  const adapterStage=String(metadata.adapter_stage??'');
+  if(!['AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED'].includes(adapterStage)){
+    const autonomousReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/autonomous-evidence`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({items:autonomousItems})});
+    const autonomousResponse=await router.fetch(autonomousReq as any,env as any);
+    if(!autonomousResponse.ok)return json({error:'autonomous evidence gate blocked after reconciliation',gate:await responseJson(autonomousResponse)},409);
+  }
   const observations=[
     ...screenshotObservations.filter(item=>produced.judgment!.source_refs.includes(String(item.source_ref))).map(item=>({category:String(item.category),source_kind:'SCREENSHOT',source_ref:String(item.source_ref),observed_at:String(item.observed_at),retrieved_at:String(item.retrieved_at),verification:produced.judgment!.verification,notes:Array.isArray(item.limitations)?item.limitations.join('; '):undefined})),
     ...snapshots.filter(item=>item.status==='RETRIEVED'&&produced.judgment!.source_refs.includes(String(item.source_ref))).map(item=>({category:String(item.category),source_kind:'WEB_RESEARCH',source_ref:String(item.source_ref),observed_at:String(item.retrieved_at),retrieved_at:String(item.retrieved_at),verification:produced.judgment!.verification,notes:typeof item.limitation==='string'?item.limitation:undefined}))
@@ -131,19 +134,20 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
   return json({...normalizedBody,intelligence_reconciliation:reconciliationRecord},normalizedResponse.status);
 }
 
-async function normalizedAndDispatch(request:Request,env:Env,requestId:string):Promise<Response>{
-  const normalizedResponse=await router.fetch(request.clone() as any,env as any);
-  if(!normalizedResponse.ok||!env.DATABASE_URL)return normalizedResponse;
-  let normalizedBody:Record<string,unknown>={};
-  try{const parsed=await normalizedResponse.clone().json();if(isObject(parsed))normalizedBody=parsed}catch{}
-  if(normalizedBody.adapter_stage!=='NORMALIZED_READY')return normalizedResponse;
+async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:string,normalizedBody:Record<string,unknown>={}):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const sql=neon(env.DATABASE_URL);
   const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if(!rows.length)return json({error:'request_id not found after normalization'},404);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
   const previous=isObject(metadata.engine_dispatch)?metadata.engine_dispatch:{};
-  if(previous.status==='DISPATCHED')return json({...normalizedBody,engine_dispatch:previous});
-  const dispatch=await dispatch5drEngine(env,requestId,request.url);
+  if(String(rows[0].status)==='PROCESSING'&&previous.status==='DISPATCHED')return json({...normalizedBody,ok:true,status:'PROCESSING',adapter_stage:metadata.adapter_stage??'NORMALIZED_READY',engine_dispatch:previous,idempotent:true});
+  if(metadata.adapter_stage!=='NORMALIZED_READY')return json({error:'request is not ready for engine dispatch',adapter_stage:metadata.adapter_stage??null},409);
+  if(previous.status==='DISPATCHED'){
+    await sql`update analysis_requests set status='PROCESSING',error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:true,status:'PROCESSING',adapter_stage:'NORMALIZED_READY',engine_dispatch:previous,idempotent:true});
+  }
+  const dispatch=await dispatch5drEngine(env,requestId,requestUrl);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
   const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
   if(dispatch.ok){
@@ -152,6 +156,55 @@ async function normalizedAndDispatch(request:Request,env:Env,requestId:string):P
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(nextMetadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({...normalizedBody,ok:false,engine_dispatch:dispatchRecord,next_step:'RETRY_ENGINE_DISPATCH'},503);
+}
+
+async function normalizedAndDispatch(request:Request,env:Env,requestId:string):Promise<Response>{
+  const normalizedResponse=await router.fetch(request.clone() as any,env as any);
+  if(!normalizedResponse.ok||!env.DATABASE_URL)return normalizedResponse;
+  let normalizedBody:Record<string,unknown>={};
+  try{const parsed=await normalizedResponse.clone().json();if(isObject(parsed))normalizedBody=parsed}catch{}
+  if(normalizedBody.adapter_stage!=='NORMALIZED_READY')return normalizedResponse;
+  return dispatchNormalizedReady(env,requestId,request.url,normalizedBody);
+}
+
+async function resumeProcessing(request:Request,env:Env,requestId:string):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  if(!rows.length)return json({error:'request_id not found'},404);
+  const status=String(rows[0].status);
+  const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  const stage=String(metadata.adapter_stage??'');
+
+  if(status==='PROCESSING'){
+    const dispatch=isObject(metadata.engine_dispatch)?metadata.engine_dispatch:{};
+    return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,idempotent:true});
+  }
+
+  if(stage==='NORMALIZED_READY')return dispatchNormalizedReady(env,requestId,request.url);
+
+  if(stage==='INTELLIGENCE_READY'||stage==='NORMALIZATION_BLOCKED'){
+    const handoff=isObject(metadata.intelligence_handoff)?metadata.intelligence_handoff:{};
+    if(!isObject(handoff.normalized))return json({error:'validated intelligence handoff is missing normalized inputs',adapter_stage:stage},409);
+    const evidence=[{evidence_type:'INTELLIGENCE_RECONCILIATION',source_ref:`5dr-intelligence://${requestId}`,captured_at:new Date().toISOString(),normalized:handoff.normalized}];
+    const origin=new URL(request.url).origin;
+    const normalizedReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/normalized`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({evidence})});
+    return normalizedAndDispatch(normalizedReq,env,requestId);
+  }
+
+  if(stage==='AUTONOMOUS_EVIDENCE_READY'||stage==='INTELLIGENCE_BLOCKED'){
+    return reconcileIntelligence(request,env,requestId);
+  }
+
+  if(stage==='SCREENSHOTS_READY'||stage==='AUTONOMOUS_EVIDENCE_BLOCKED'){
+    const vision=await shadowVision(env,requestId);
+    if(!vision.ok)return vision;
+    const research=await systemResearch(env,requestId);
+    if(!research.ok)return research;
+    return reconcileIntelligence(request,env,requestId);
+  }
+
+  return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
 
 export default {async fetch(request:Request,env:Env):Promise<Response>{
@@ -164,6 +217,8 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   if(research&&request.method==='POST')return systemResearch(env,decodeURIComponent(research[1]));
   const reconcile=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/reconcile-intelligence$/);
   if(reconcile&&request.method==='POST')return reconcileIntelligence(request,env,decodeURIComponent(reconcile[1]));
+  const resume=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/resume-processing$/);
+  if(resume&&request.method==='POST')return resumeProcessing(request,env,decodeURIComponent(resume[1]));
   const normalized=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
   if(normalized&&request.method==='POST')return normalizedAndDispatch(request,env,decodeURIComponent(normalized[1]));
   return router.fetch(request,env as any);
