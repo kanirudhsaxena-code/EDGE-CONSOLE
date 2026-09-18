@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { assessCompleteness, validateNormalizedEvidence } from '../src/normalization';
+import { assessCompleteness, jsonEquivalent, validateNormalizedEvidence } from '../src/normalization';
 
 const fullNormalized = {
   regime:'TREND',
@@ -57,4 +57,11 @@ test('rejects malformed governed ranges and horizon slots',()=>{
   assert.ok(errors.some(error=>error.includes('component_scores')));
   assert.ok(errors.some(error=>error.includes('expected_rr')));
   assert.ok(errors.some(error=>error.includes('horizon_slots')));
+});
+
+
+test('semantic JSON equality ignores object key ordering from jsonb persistence',()=>{
+  const a={component_scores:{PRICE_STRUCTURE:20,PVPO:12.5,PARTICIPATION:0,MACRO_CATALYSTS:0}};
+  const b={component_scores:{MACRO_CATALYSTS:0,PARTICIPATION:0,PVPO:12.5,PRICE_STRUCTURE:20}};
+  assert.equal(jsonEquivalent(a,b),true);
 });
