@@ -31,3 +31,6 @@ body{background:linear-gradient(180deg,#08131f 0%,#0b1b2b 42%,#07111b 100%)}
 .why-card p b{color:#dff3ff;font-weight:700}.why-card small{display:block;margin-top:6px;color:#a9bdd1}.assessment-card>div{gap:8px}.assessment-card>div strong{white-space:nowrap}.assessment-card p{font-size:13px}
 
 .diagnostic-details{margin-top:12px;border-top:1px solid #27435f;padding-top:10px}.diagnostic-details summary{cursor:pointer;color:#9ad7ff;font-weight:700}.diagnostic-body{margin-top:8px;padding:10px 12px;border-radius:12px;background:#0a1827;color:#8fa5bb;font-size:11px;line-height:1.45;word-break:break-word}.diagnostic-body p{margin:0 0 7px}.diagnostic-body p:last-child{margin-bottom:0}
+
+.change-intro{margin:10px 0 0;color:#9aadc3;font-size:13px;line-height:1.5}
+.assessment-future{border-top:1px solid #27435f;margin-top:14px;padding-top:12px}.assessment-future summary{cursor:pointer;font-weight:800;color:#d7e9f8}.assessment-future p{color:#9aadc3;font-size:13px;line-height:1.5}
