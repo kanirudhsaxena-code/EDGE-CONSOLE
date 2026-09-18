@@ -216,4 +216,41 @@ function render5dr(run,request,outcomeAssessment){
     '</article>'
   ].join('');
 }
-async function loadDashboard(){try{const h=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';const ed=await fetch('/api/engines',{cache:'no-store'}).then(r=>r.json());engines.innerHTML=ed.engines.map(e=>'<article class="engine"><div class="engine-row"><div><h4>'+escapeHtml(e.name)+'</h4><p>'+(e.id==='5DR'?'5-day NIFTY market view':e.id==='EDGE_STOCKS'?'Stock decision support':'IPO decision support')+'</p></div><span class="badge">'+escapeHtml(friendlyEngineStatus(e.status))+'</span></div></article>').join('');let f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());let latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);let active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);if(active&&latestReq.status==='PROCESSING'){try{const rr=await fetch('/api/5dr/run-requests/'+encodeURIComponent(latestReq.request_id)+'/resume-processing',{method:'POST',cache:'no-store'});const rd=await rr.json();if(rd&&rd.status==='COMPLETED'){f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);active=false}else if(rd&&rd.status==='FAILED'){latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||latestReq).catch(()=>latestReq)}}catch(e){console.error('5DR result sync failed',e)}}let matchedRequest=null,oa=null;if(active){render5dr(null,latestReq,null)}else if(f.run&&f.run.run_id){matchedRequest=await fetch('/api/5dr/run-request?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);oa=await fetch('/api/5dr/outcome-assessment?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.assessment||null).catch(()=>null);render5dr(f.run,matchedRequest,oa)}else{render5dr(null,latestReq,null)}const l=await fetch('/api/runs/latest',{cache:'no-store'}).then(r=>r.json());if(!l.runs||!l.runs.length){runs.innerHTML='<div class="run muted">No published runs yet.</div>';runsNote.textContent=l.note||'Ready for first run';return}runs.innerHTML=l.runs.map(r=>'<article class="run history-row"><strong>'+escapeHtml(r.engine==='5DR'?'5DR result':r.engine)+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=l.runs.length+' recent'}catch(e){console.error(e);health.textContent='Offline';engines.innerHTML='<div class="run muted">Unable to load engine status.</div>';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="run muted">Unable to load 5DR integration status.</div>'}}loadDashboard();
+async function loadDashboard(){
+  try{
+    const h=await fetch('/api/health',{cache:'no-store'}).then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';
+    const ed=await fetch('/api/engines',{cache:'no-store'}).then(r=>r.json()).catch(()=>({engines:[]}));
+    (ed.engines||[]).forEach(e=>{const tile=moduleTiles.find(t=>t.dataset.module===e.id);const status=tile&&tile.querySelector('.module-status');if(status)status.textContent=friendlyEngineStatus(e.status)});
+    await Promise.all([loadAssessment('5DR',assessmentSummary),loadAssessment('EDGE_STOCKS',stocksAssessmentSummary),loadAssessment('EDGE_IPO',ipoAssessmentSummary)]);
+
+    let f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
+    let latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
+    let active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
+    if(active&&latestReq.status==='PROCESSING'){
+      try{
+        const rr=await fetch('/api/5dr/run-requests/'+encodeURIComponent(latestReq.request_id)+'/resume-processing',{method:'POST',cache:'no-store'}),rd=await rr.json();
+        if(rd&&rd.status==='COMPLETED'){f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);active=false}
+        else if(rd&&rd.status==='FAILED'){latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||latestReq).catch(()=>latestReq)}
+      }catch(e){console.error('5DR result sync failed',e)}
+    }
+    let matchedRequest=null,oa=null;
+    if(active)render5dr(null,latestReq,null);
+    else if(f.run&&f.run.run_id){
+      matchedRequest=await fetch('/api/5dr/run-request?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
+      oa=await fetch('/api/5dr/outcome-assessment?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.assessment||null).catch(()=>null);
+      render5dr(f.run,matchedRequest,oa)
+    }else render5dr(null,latestReq,null);
+
+    const [stockRuns,ipoRuns]=await Promise.all([
+      fetch('/api/runs/latest?engine=EDGE_STOCKS',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]),
+      fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[])
+    ]);
+    renderGenericModule('EDGE_STOCKS',stocksSummary,stockRuns);
+    renderGenericModule('EDGE_IPO',ipoSummary,ipoRuns);
+    await loadRecentResults(activeModule);
+  }catch(e){
+    console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderGenericModule('EDGE_STOCKS',stocksSummary,[]);renderGenericModule('EDGE_IPO',ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
+  }
+}
+setActiveModule('5DR');
+loadDashboard();
