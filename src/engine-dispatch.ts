@@ -3,6 +3,7 @@ export type EngineDispatchEnv={
   FIVEDR_REPOSITORY?:string;
   FIVEDR_WORKFLOW?:string;
   FIVEDR_WORKFLOW_REF?:string;
+  FIVEDR_CALLBACK_URL?:string;
 };
 
 export type EngineDispatchResult={
@@ -38,8 +39,8 @@ export async function dispatch5drEngine(
     return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'GitHub workflow dispatch secret or governed request metadata is not configured'};
   }
   let origin:string;
-  try{origin=new URL(consoleUrl).origin}catch{
-    return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Console public origin is invalid'};
+  try{origin=new URL(env.FIVEDR_CALLBACK_URL?.trim()||consoleUrl).origin}catch{
+    return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Console callback origin is invalid'};
   }
   try{
     const response=await fetcher(`https://api.github.com/repos/${repository}/actions/workflows/${encodeURIComponent(workflow)}/dispatches`,{
