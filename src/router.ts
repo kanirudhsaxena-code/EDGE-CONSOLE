@@ -105,17 +105,33 @@ async function resolveEdgeTicker(env: Env, target: string): Promise<{ ticker?: s
   return { ticker: String(rows[0].ticker).toUpperCase() };
 }
 
-async function latestEdgeRecommendationId(env: Env, ticker: string): Promise<string | null> {
+async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id: string; runTimestamp: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
   const rows = await sql`
-    select recommendation_id
+    select recommendation_id, run_timestamp
       from recommendations
      where ticker = ${ticker}
      order by run_timestamp desc
      limit 1
   `;
-  return rows.length ? String(rows[0].recommendation_id) : null;
+  return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
+}
+
+async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise<{ id: string; runTimestamp: unknown } | null> {
+  if (!env.EDGE_DATABASE_URL) return null;
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const pattern = `EDGE-${ticker}-%-AUTO`;
+  const rows = await sql`
+    select recommendation_id, run_timestamp
+      from recommendations
+     where ticker = ${ticker}
+       and recommendation_id like ${pattern}
+       and (run_timestamp at time zone 'Asia/Kolkata')::date = (now() at time zone 'Asia/Kolkata')::date
+     order by run_timestamp desc
+     limit 1
+  `;
+  return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
 async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
@@ -128,7 +144,23 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const resolved = await resolveEdgeTicker(env, command.target);
   if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
   const ticker = resolved.ticker;
-  const baselineRunId = await latestEdgeRecommendationId(env, ticker);
+  const existingToday = await todaysAutonomousRecommendation(env, ticker);
+  if (existingToday) {
+    return json({
+      ok: true,
+      status: 'ALREADY_PUBLISHED_TODAY',
+      engine: 'EDGE_STOCKS',
+      contract_version: 'EDGE_STOCKS_V1_2',
+      ticker,
+      command: command.raw,
+      run_id: existingToday.id,
+      run_timestamp: existingToday.runTimestamp,
+      report_url: `/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+      trading_enabled: false,
+    });
+  }
+  const baseline = await latestEdgeRecommendation(env, ticker);
+  const baselineRunId = baseline?.id ?? null;
   const dispatchedAt = new Date().toISOString();
 
   const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN');
