@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED / HISTORICAL ACCEPTANCE ONLY.** This V1.2 acceptance did not validate the later Efficacy V2 semantic ordering and component-interpretation completeness. Current governance is `EDGE_STOCKS_V1_3 / EFFICACY_V2`; see `docs/EDGE_STOCKS_V1_3_CORRECTIVE_PRODUCTION_ACCEPTANCE.md`.
+
 # EDGE Stocks Prompt-Driven Autonomous Invocation — Production Acceptance
 
 **Status:** PRODUCTION ACCEPTED / GO  
