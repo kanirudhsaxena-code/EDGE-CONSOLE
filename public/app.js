@@ -15,6 +15,7 @@ function friendlyFailureMessage(raw){
   if(/missing cited evidence|data inadequate|not enough|missing.*evidence/.test(text))return'5DR could not verify enough reliable evidence to complete the analysis.';
   if(/conflict|reconciliation/.test(text))return'The available evidence did not agree strongly enough for 5DR to complete safely.';
   if(/vision|image|screenshot/.test(text))return'One or more screenshots could not be interpreted reliably.';
+  if(/source_refs|evidence reference|provenance/.test(text))return'5DR could not validate the evidence references for this run. Your screenshots are saved; retry is safe.';
   if(/research|market status|source/.test(text))return'5DR could not verify one or more required market sources.';
   if(/workflow|dispatch|engine/.test(text))return'The 5DR engine did not complete normally.';
   return'The run stopped safely before producing a result.';
