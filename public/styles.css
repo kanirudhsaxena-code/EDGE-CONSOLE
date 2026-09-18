@@ -123,3 +123,5 @@ dialog::backdrop{background:rgba(27,42,58,.28)}
   .why-grid{grid-template-columns:1fr 1fr}
   .integration{padding:22px}
 }
+
+.assessment-history{display:grid;gap:8px;margin-top:10px}.assessment-history-row{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:10px 0;border-top:1px solid var(--border-light)}.assessment-history-row:first-child{border-top:0}.assessment-history-row strong{color:var(--ink)}.assessment-history-row span{color:var(--ink-2);text-align:right}.assessment-history-row small{grid-column:1/-1;color:var(--text-soft);font-size:11px;line-height:1.4}
