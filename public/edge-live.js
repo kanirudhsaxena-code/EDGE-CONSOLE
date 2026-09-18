@@ -82,12 +82,11 @@ export function renderEdgeV12(report, master = {}) {
 }
 
 if (typeof document !== 'undefined') {
-  const root=document.getElementById('edgePanel');
+  const root=document.getElementById('stocksSummary');
   if(root){
-    const summary=document.createElement('div');
+    const summary=root;
     summary.id='edgeLiveSummary';
     summary.className='stack';
-    root.appendChild(summary);
     let loading=false;
     async function refreshEdgeLive(){
       if(loading)return;loading=true;
