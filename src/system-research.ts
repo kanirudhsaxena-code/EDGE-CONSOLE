@@ -27,6 +27,8 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
   {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'RBI_HOME',category:'EVENT_SHOCK',url:'https://www.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',url:'https://m.rbi.org.in/home.aspx',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'EIA_CRUDE_SPOT',category:'EVENT_SHOCK',url:'https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
 
   {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
   {id:'NSE_OPTION_CHAIN_PAGE',category:'EXECUTION_RISK',url:'https://www.nseindia.com/option-chain',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
