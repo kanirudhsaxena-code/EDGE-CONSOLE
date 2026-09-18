@@ -1,3 +1,5 @@
+> **STATUS: SUPERSEDED / CORRECTIVE ACCEPTANCE REQUIRED.** The V1.2 transport/runtime acceptance below is retained as historical audit evidence only. It did not validate the later Efficacy V2 semantic ordering or meaningful component interpretation. New production acceptance is governed by `EDGE_STOCKS_V1_3 / EFFICACY_V2` and `docs/EDGE_STOCKS_V1_3_CORRECTIVE_PRODUCTION_ACCEPTANCE.md`.
+
 # EDGE Stocks Prompt-Driven Autonomous Invocation — Production Acceptance
 
 **Status:** PRODUCTION ACCEPTED / GO  
