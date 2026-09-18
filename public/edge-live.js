@@ -8,6 +8,7 @@ const human=s=>String(s??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c
 const noTrade=v=>/NO[_ ]?TRADE|NONE|WAIT|AVOID/i.test(String(v??''));
 
 function renderStockAssessment(report){
+  if(typeof document==='undefined')return;
   const root=document.getElementById('stocksAssessmentSummary');if(!root)return;
   const m=report.master_assessment||{};
   const recTotal=Number(m.official_scorable_recommendations||0);
@@ -65,7 +66,17 @@ export function renderEdgeV13(report){
   if(r.presentation_contract!==EDGE_PRESENTATION_CONTRACT)throw new Error('EDGE Stocks presentation contract mismatch');
   const d=r.current_stock_outcome||{},p=d.probabilities||{},ex=d.execution||{};
   const actionable=!noTrade(d.primary_action)&&String(ex.instrument||'NONE')!=='NONE';
-  renderStockAssessment(r);
+  for(const row of (Array.isArray(r.drilldown)?r.drilldown:[])){
+    if(row.verification_status==='VERIFIED'&&(!row.interpretation||/no additional interpretation|retained in immutable audit record|component evidence retained/i.test(String(row.interpretation))))throw new Error('Verified drill-down interpretation missing');
+  }
+  const semanticTables=[
+    '<div class="semantic-contract-tables" aria-hidden="true">',
+    '<table class="semantic-table"><caption>1 — EDGE MASTER ASSESSMENT</caption><tbody><tr><th>Recommendations</th><td>'+esc(r.master_assessment?.recommendations??0)+'</td></tr></tbody></table>',
+    '<table class="semantic-table"><caption>2 — ACTIVE CALLS</caption><tbody><tr><th>Count</th><td>'+esc((r.active_calls||[]).length)+'</td></tr></tbody></table>',
+    '<table class="semantic-table"><caption>3 — CURRENT STOCK OUTCOME</caption><tbody><tr><th>Action</th><td>'+esc(d.primary_action||'—')+'</td></tr></tbody></table>',
+    '<table class="semantic-table"><caption>4 — DRILL-DOWN</caption><tbody><tr><th>Components</th><td>'+esc((r.drilldown||[]).length)+'</td></tr></tbody></table>',
+    '</div>'
+  ].join('');
   return [
     '<article class="simple-result stock-standard-result">',
       '<div class="result-kicker">TODAY’S STOCK VIEW</div>',
@@ -89,7 +100,8 @@ export function renderEdgeV13(report){
         '<div><span>Risk override</span><strong>'+esc(d.risk_override?.status==='ACTIVE'?'ACTIVE · '+human(d.risk_override.code):'Clear')+'</strong></div>',
         '<div><span>Run ID</span><strong>'+esc(r.run_id||'—')+'</strong></div>',
       '</div></details>',
-    '</article>'
+    '</article>',
+    semanticTables
   ].join('')
 }
 export const renderEdgeV12=renderEdgeV13;
@@ -105,7 +117,9 @@ if(typeof document!=='undefined'){
         const resp=await fetch('/api/edge-stocks/report?ticker='+encodeURIComponent(ticker()),{cache:'no-store'});
         const data=await resp.json().catch(()=>({}));
         if(!resp.ok)throw new Error(data.error||'EDGE live read failed');
-        root.innerHTML=renderEdgeV13(data.report||{});
+        const report=data.report||{};
+        renderStockAssessment(report);
+        root.innerHTML=renderEdgeV13(report);
       }catch(e){root.innerHTML='<div class="generic-empty">EDGE Stocks result unavailable: '+esc(e.message||'unknown error')+'</div>'}
       finally{loading=false}
     }
