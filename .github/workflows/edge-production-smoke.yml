@@ -18,19 +18,19 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Wait for deployed V1.2 surface
+      - name: Wait for deployed V1.3 surface
         run: |
           set -euo pipefail
           for i in $(seq 1 12); do
             if curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Cache-Control: no-cache' \
               'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
-              && grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js; then
+              && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js; then
               exit 0
             fi
             sleep 10
           done
-          echo "Deployed EDGE V1.2 renderer was not observed"
+          echo "Deployed EDGE V1.3 renderer was not observed"
           echo "--- renderer response preview ---"
           head -c 500 /tmp/edge-live.js || true
           echo
@@ -64,49 +64,49 @@ jobs:
           assert data['trading_enabled'] is False, data
           PY
 
-      - name: Validate LTF report contract
+      - name: Validate TCS Efficacy V2 report contract
         run: |
           set -euo pipefail
           curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=LTF' \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=TCS' \
             -o /tmp/report.json
           python - <<'PY'
           import json, math
           d=json.load(open('/tmp/report.json'))
           r=d['report']
-          assert r['contract_version']=='EDGE_STOCKS_V1_2', r
+          assert r['contract_version']=='EDGE_STOCKS_V1_3', r
+          assert r['presentation_contract']=='EFFICACY_V2', r
           pres=r['presentation']
-          assert pres['standard_table_count']==2, pres
-          assert pres['table_1']=='EDGE_OUTCOME_DECISION', pres
-          assert pres['table_2']=='INSTITUTIONAL_DRILLDOWN', pres
-          probs=r['decision']['probabilities']
+          assert pres['standard_table_count']==4, pres
+          assert [pres[f'table_{i}'] for i in range(1,5)] == [
+            'EDGE_MASTER_ASSESSMENT','ACTIVE_CALLS','CURRENT_STOCK_OUTCOME','DRILLDOWN'
+          ], pres
+          m=r['master_assessment']
+          assert 'official_scorable_recommendations' in m, m
+          assert 'provisional_forecast_accuracy_pct' in m, m
+          probs=r['current_stock_outcome']['probabilities']
           total=sum(float(probs[k]) for k in ('bull','base','bear'))
           assert math.isclose(total,100.0,abs_tol=0.01), total
-          dec=r['decision']
-          for key in ('des','market_trust','directional_agreement','effective_conviction','definitive_forecast','expected_price_zone','forecast_horizon','risk_override','primary_action','decision_ladder','bot','execution'):
-              assert key in dec, (key, dec)
-          assert r['institutional_drilldown'], r
-          o=r['official_efficacy']
-          p=r['provisional_checkpoint_diagnostics']
-          assert o['label']=='OFFICIAL', o
-          assert p['label']=='PROVISIONAL', p
-          if int(o['sample_size'])==0:
-              assert o['recommendation_hit_rate_pct'] is None, o
-              assert o['directional_accuracy_pct'] is None, o
-          assert int(p['forecast_hits']) <= int(p['forecast_scorable']), p
-          assert int(p['zone_hits']) <= int(p['zone_scorable']), p
+          assert r['drilldown'], r
+          for row in r['drilldown']:
+              if row['verification_status']=='VERIFIED':
+                  text=(row.get('interpretation') or '').strip().lower()
+                  assert text, row
+                  assert 'no additional interpretation' not in text, row
+                  assert 'retained in immutable audit record' not in text, row
           PY
 
-
-      - name: Validate canonical V1.2 renderer asset
+      - name: Validate canonical V1.3 renderer asset
         run: |
           set -euo pipefail
           curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js' \
             -o /tmp/edge-live.js
-          grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js
-          grep -q 'Table 1 — EDGE Outcome / Decision' /tmp/edge-live.js
-          grep -q 'Table 2 — Institutional Drill-down' /tmp/edge-live.js
+          grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js
+          grep -q '1 — EDGE MASTER ASSESSMENT' /tmp/edge-live.js
+          grep -q '2 — ACTIVE CALLS' /tmp/edge-live.js
+          grep -q '3 — CURRENT STOCK OUTCOME' /tmp/edge-live.js
+          grep -q '4 — DRILL-DOWN' /tmp/edge-live.js
 
       - name: Validate master efficacy separation
         run: |
