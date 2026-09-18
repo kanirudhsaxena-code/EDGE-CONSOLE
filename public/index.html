@@ -6,15 +6,15 @@
   <meta name="theme-color" content="#0b1020" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=bb1e244" />
+  <link rel="stylesheet" href="/styles.css?v=simple-ui-20260918" />
 </head>
 <body>
   <main class="shell">
-    <header class="topbar"><div><div class="eyebrow">DECISION INTELLIGENCE</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
-    <section class="hero card"><div><div class="eyebrow">CONTROL PANEL</div><h2>One console. Three engines.</h2><p>5DR, EDGE Stocks and EDGE IPO with provenance, performance tracking and governed learning.</p></div><button id="runButton" class="primary">Run analysis</button></section>
-    <section id="enginesPanel"><div class="section-head"><h3>Engines</h3><span>Live integration status</span></div><div id="engines" class="grid"></div></section>
-    <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR INTEGRATION</div><h3>Production contract V2.1.2</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
-    <section><div class="section-head"><h3>Latest published runs</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
+    <header class="topbar"><div><div class="eyebrow">MARKET DECISION SUPPORT</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
+    <section class="hero card"><div><div class="eyebrow">HOME</div><h2>One place for your market decisions.</h2><p>Run 5DR, review stock signals and track IPO opportunities.</p></div><button id="runButton" class="primary">Run 5DR</button></section>
+    <section id="enginesPanel"><div class="section-head"><h3>Tools</h3><span>Current status</span></div><div id="engines" class="grid"></div></section>
+    <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR</div><h3>Latest market view</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
+    <section><div class="section-head"><h3>Recent results</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
   </main>
   <nav class="bottom-nav" aria-label="Primary"><button id="navHome" class="active" data-view="home" type="button">Home</button><button id="navRun" data-view="run" type="button">Run</button><button id="nav5dr" data-view="5dr" type="button">5DR</button><button id="navEdge" data-view="edge" type="button">EDGE</button><button id="navIpo" data-view="ipo" type="button">IPO</button></nav>
   <dialog id="runDialog">
@@ -22,14 +22,14 @@
       <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
       <input id="runEngine" type="hidden" value="5DR" />
       <input id="evidenceMode" type="hidden" value="HYBRID" />
-      <div class="run"><strong>1. NIFTY chart</strong><p class="muted">Upload one or more current NIFTY price / technical chart screenshots.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
-      <div class="run"><strong>2. Options / OI</strong><p class="muted">Upload one or more current option-chain, OI or derivatives screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div class="run"><strong>1. NIFTY charts</strong><p class="muted">Add your current NIFTY chart screenshots.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+      <div class="run"><strong>2. Options / OI</strong><p class="muted">Add your current options or open-interest screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
       <div id="fileSelection" class="file-selection muted">Select both screenshot groups to continue.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted">EDGE Console will secure the screenshots and create a governed request. Market Trust, event/shock and execution-risk evidence are system-owned. If the intelligence layer cannot verify required evidence, the run remains blocked rather than inventing values.</p>
-      <button id="uploadEvidenceButton" type="submit" class="primary">Prepare 5DR run</button>
+      <p class="muted">That is all you need to provide. EDGE Console will check the wider market context and run 5DR automatically.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=forecast-output-20260918"></script>
-  <script type="module" src="/resume.js?v=forecast-output-20260918"></script>
+  <script type="module" src="/app.js?v=simple-ui-20260918"></script>
+  <script type="module" src="/resume.js?v=simple-ui-20260918"></script>
 </body>
 </html>
