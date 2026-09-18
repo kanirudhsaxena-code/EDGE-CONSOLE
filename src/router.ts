@@ -129,8 +129,22 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const marketTrust = numberOrNull(active.resolved_market_trust_score);
   const directionalAgreement = numberOrNull(active.directional_agreement_score);
   const botScore = numberOrNull(active.resolved_bot_score);
-  if (des === null || marketTrust === null || directionalAgreement === null || botScore === null) {
+  const marketTrustBand = active.resolved_market_trust_band;
+  const botGrade = active.resolved_bot_grade;
+  const decisionLadder = active.resolved_decision_ladder;
+  const forecastHorizon = active.forecast_horizon;
+  const primaryAction = active.definitive_recommendation;
+  const definitiveForecast = active.definitive_forecast;
+  if (
+    des === null || marketTrust === null || directionalAgreement === null || botScore === null ||
+    !isNonEmptyString(marketTrustBand) || !isNonEmptyString(botGrade) ||
+    !isNonEmptyString(decisionLadder) || !isNonEmptyString(forecastHorizon) ||
+    !isNonEmptyString(primaryAction) || !isNonEmptyString(definitiveForecast)
+  ) {
     return json({ error: 'EDGE Stocks V1.2 publication blocked: governed decision fields missing', ticker: symbol }, 409);
+  }
+  if (!componentRows.length) {
+    return json({ error: 'EDGE Stocks V1.2 publication blocked: institutional drill-down is empty', ticker: symbol }, 409);
   }
   const effectiveConviction = Math.min(Math.abs(des) / 100, 1) * (marketTrust / 100);
   const sampleSize = integerOrZero(report.official_scorable_recommendations);
@@ -151,7 +165,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     },
     decision: {
       des,
-      market_trust: { score: marketTrust, band: String(active.resolved_market_trust_band) },
+      market_trust: { score: marketTrust, band: marketTrustBand },
       directional_agreement: directionalAgreement,
       effective_conviction: Number(effectiveConviction.toFixed(6)),
       probabilities: {
@@ -159,16 +173,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         base: numberOrNull(active.base_probability),
         bear: numberOrNull(active.bear_probability)
       },
-      definitive_forecast: String(active.definitive_forecast),
+      definitive_forecast: definitiveForecast,
       expected_price_zone: {
         low: numberOrNull(active.expected_price_zone_low),
         high: numberOrNull(active.expected_price_zone_high)
       },
-      forecast_horizon: String(active.forecast_horizon),
+      forecast_horizon: forecastHorizon,
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
-      primary_action: String(active.definitive_recommendation),
-      decision_ladder: String(active.resolved_decision_ladder),
-      bot: { score: botScore, grade: String(active.resolved_bot_grade) },
+      primary_action: primaryAction,
+      decision_ladder: decisionLadder,
+      bot: { score: botScore, grade: botGrade },
       execution: {
         instrument: active.instrument ?? 'NONE',
         entry_low: numberOrNull(active.entry_low),
