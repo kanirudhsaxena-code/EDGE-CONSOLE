@@ -55,12 +55,13 @@ async function shadowVision(env:Env,requestId:string):Promise<Response>{
 
   const missing=[...allowed].filter(category=>!observations.some(item=>item.category===category));
   const unavailable=observations.filter(item=>item.verification==='UNAVAILABLE');
-  const visionStatus=missing.length||unavailable.length?'VISION_BLOCKED':'VISION_READY';
+  const blockedCategories=[...allowed].filter(category=>!observations.some(item=>item.category===category&&item.verification!=='UNAVAILABLE'));
+  const visionStatus=missing.length||blockedCategories.length?'VISION_BLOCKED':'VISION_READY';
   const recordedAt=new Date().toISOString();
-  const nextMetadata={...requestMetadata,screenshot_intelligence:{status:visionStatus,producer:'EDGE_CONSOLE_WORKERS_AI_VISION',producer_version:'0.2-shadow',recorded_at:recordedAt,observations,blockers:{missing_categories:missing,unavailable:unavailable.map(item=>({upload_id:item.upload_id,category:item.category,limitations:item.limitations}))}}};
+  const nextMetadata={...requestMetadata,screenshot_intelligence:{status:visionStatus,producer:'EDGE_CONSOLE_WORKERS_AI_VISION',producer_version:'0.2-shadow',recorded_at:recordedAt,observations,blockers:{missing_categories:missing,blocked_categories:blockedCategories,unavailable:unavailable.map(item=>({upload_id:item.upload_id,category:item.category,limitations:item.limitations}))}}};
   await sql`update analysis_requests set metadata=${JSON.stringify(nextMetadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
-  if(missing.length)return json({error:'required screenshot category missing from shadow vision work',vision_status:visionStatus,missing_categories:missing,observations},409);
-  return json({ok:unavailable.length===0,mode:'SHADOW_NON_PUBLISHING',request_id:requestId,producer:'EDGE_CONSOLE_WORKERS_AI_VISION',producer_version:'0.2-shadow',adapter_stage:stage,vision_status:visionStatus,observations,blockers:unavailable.map(item=>({upload_id:item.upload_id,category:item.category,limitations:item.limitations})),next_step:unavailable.length?'FIX_OR_RETRY_SCREENSHOT_INTERPRETATION':'SYSTEM_WEB_RESEARCH'},unavailable.length?409:200);
+  if(missing.length||blockedCategories.length)return json({error:'required screenshot category lacks usable interpreted evidence',vision_status:visionStatus,missing_categories:missing,blocked_categories:blockedCategories,observations},409);
+  return json({ok:true,mode:'SHADOW_NON_PUBLISHING',request_id:requestId,producer:'EDGE_CONSOLE_WORKERS_AI_VISION',producer_version:'0.2-shadow',adapter_stage:stage,vision_status:visionStatus,observations,non_blocking_unavailable:unavailable.map(item=>({upload_id:item.upload_id,category:item.category,limitations:item.limitations})),next_step:'SYSTEM_WEB_RESEARCH'},200);
 }
 
 async function systemResearch(env:Env,requestId:string):Promise<Response>{
