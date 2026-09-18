@@ -127,24 +127,26 @@ runForm.addEventListener('submit',async event=>{event.preventDefault();saveDecis
 document.addEventListener('click',event=>{const toggle=event.target.closest&&event.target.closest('[data-analysis-toggle]');if(!toggle)return;const card=toggle.closest('.simple-result'),detail=card&&card.querySelector('[data-analysis-detail]');if(!detail)return;detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'View full analysis':'Hide full analysis';});
 document.addEventListener('click',async event=>{const button=event.target.closest&&event.target.closest('#resume5drRequest');if(!button)return;const requestId=button.dataset.requestId,status=document.getElementById('resume5drStatus');if(!requestId||!status)return;button.disabled=true;button.textContent='Processing…';try{status.textContent='Resuming from the last persisted governed stage…';const result=await runStage(requestId,'resume-processing','Resuming 5DR from its persisted governed stage…');status.textContent=result.status==='PROCESSING'?'Engine dispatched successfully. Refreshing…':'Pipeline advanced successfully. Refreshing…';setTimeout(()=>location.reload(),1200)}catch(error){status.textContent=friendlyFailureMessage(error&&error.message);const card=status.closest('.simple-result');if(card&&!card.querySelector('.diagnostic-details'))card.insertAdjacentHTML('beforeend',diagnosticSummary(error&&error.message,'Safe to retry'));button.disabled=false;button.textContent='Retry 5DR'}});
 function pct(v){return v==null?'—':Number(v).toFixed(Number(v)%1?1:0)+'%'}
-function renderAssessment(container,summary){
+function renderAssessment(container,payload){
   if(!container)return;
+  const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[];
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
   const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},matured=Number(summary.matured_runs||0);
+  const detailHtml=details.length?details.slice().reverse().map(row=>{const m=row.metrics||{},day=m.day_wise||m.daywise||null,zone=m.zone_wise||m.zonewise||null,retv=m.absolute_return_pct??m.return_pct;return '<div class="assessment-history-row"><strong>'+escapeHtml(new Date(row.assessed_at).toLocaleDateString())+'</strong><span>'+escapeHtml(row.outcome||'Assessed')+(retv!=null?' · '+pct(retv):'')+'</span>'+(day?'<small>Day-wise: '+escapeHtml(typeof day==='object'?JSON.stringify(day):day)+'</small>':'')+(zone?'<small>Zone-wise: '+escapeHtml(typeof zone==='object'?JSON.stringify(zone):zone)+'</small>':'')+'</div>'}).join(''):'<p>No matured outcome records are stored yet. Current forecasts will populate this section as their governed assessment horizons mature.</p>';
   container.innerHTML=[
     '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured run'+(matured===1?'':'s')+'</small></div>',
     '<div class="assessment-grid">',
       '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' assessed</small></div>',
       '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' hits / '+escapeHtml(r.total||0)+' assessed</small></div>',
-      '<div class="assessment-metric"><span>Absolute return</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Cumulative assessed return</small></div>',
+      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Absolute cumulative return</small></div>',
       '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Gain/loss from successful calls</small></div>',
       '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Gain/loss from unsuccessful calls</small></div>',
     '</div>',
-    '<details class="assessment-detail-row"><summary>Day-wise & zone-wise details</summary><p>'+(matured?'Detailed assessed-run history is retained below this roll-up. Day-wise and zone-wise fields display when present in matured outcome metrics.':'No matured outcome records are stored yet. Current forecasts will populate this section as their governed assessment horizons mature.')+'</p></details>'
+    '<details class="assessment-detail-row"><summary>Day-wise & zone-wise details</summary><div class="assessment-history">'+detailHtml+'</div></details>'
   ].join('')
 }
 async function loadAssessment(engine,container){
-  try{const d=await fetch('/api/assessment-summary?engine='+encodeURIComponent(engine),{cache:'no-store'}).then(r=>r.json());renderAssessment(container,d.summary||null)}catch(e){console.error(e);renderAssessment(container,null)}
+  try{const d=await fetch('/api/assessment-summary?engine='+encodeURIComponent(engine),{cache:'no-store'}).then(r=>r.json());renderAssessment(container,d)}catch(e){console.error(e);renderAssessment(container,null)}
 }
 function genericResultTitle(engine,result){if(!result)return'No published result';if(engine==='EDGE_STOCKS')return result.recommendation||result.decision||result.definitive_forecast||result.direction||'Stock result ready';return result.recommendation||result.decision||result.grade||result.ipo_grade||'IPO result ready'}
 function renderGenericModule(engine,target,runsData){
