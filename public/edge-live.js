@@ -1,3 +1,4 @@
+export const EDGE_RENDERER_CONTRACT = 'EDGE_STOCKS_V1_2';
 export const esc = v => String(v ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#039;");
 const pct = v => v === null || v === undefined ? 'N/A' : Number(v).toFixed(1) + '%';
 const num = (v, digits=2) => v === null || v === undefined || Number.isNaN(Number(v)) ? 'N/A' : Number(v).toFixed(digits);
