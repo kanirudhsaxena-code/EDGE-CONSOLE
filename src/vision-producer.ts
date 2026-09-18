@@ -20,11 +20,13 @@ For PRICE_TECHNICALS, capture whenever visibly supported:
 - longer-term direction when the screenshot clearly displays a multi-day/multi-week/multi-month chart. Label it "Visible Trend Structure" and state the visible timeframe in notes.
 
 For DERIVATIVES_OI, do NOT reduce an option-chain screenshot to aggregate Put/Call OI when strike rows are visible. Capture:
-- expiry and spot/underlying value when visible,
+- expiry ONLY when the exact expiry text is visibly legible; copy it character-for-character. If the expiry is blurred, cropped, ambiguous or absent, OMIT the Expiry finding entirely. NEVER infer or guess an expiry from memory, layout, strike spacing or context.
+- spot/underlying value ONLY when visibly legible; copy the displayed value exactly.
 - every clearly legible near-ATM strike row, up to 12 strikes,
 - for each visible strike and each CE/PE side: premium/LTP, OI, change in OI, volume and IV when shown,
 - use standardized labels such as "Strike 24300 CE LTP", "Strike 24300 CE OI", "Strike 24300 CE Change OI", "Strike 24300 CE Volume", and equivalent PE labels,
 - PCR or aggregate totals only as additional context, never as a substitute for visible strike-level facts.
+For all numeric derivatives fields, exact transcription is mandatory. Do not synthesize realistic-looking option-chain numbers. When any cell is unreadable, omit that field and describe the limitation instead.
 
 Do not claim a field is missing if it is visibly present elsewhere in the same screenshot. Keep limitations specific to what is genuinely unreadable or absent.`;
 
@@ -176,8 +178,12 @@ function applyCurrentEvidenceSanity(observation:VisionObservation,category:Scree
   if(Number.isNaN(parsed))return observation;
   const now=new Date();
   const today=Date.UTC(now.getUTCFullYear(),now.getUTCMonth(),now.getUTCDate());
-  if(parsed<today)return {...observation,verification:'UNAVAILABLE',limitations:[...observation.limitations,'Extracted option expiry is already past the current run date; current derivatives evidence cannot be trusted.']};
-  return observation;
+  if(parsed>=today)return observation;
+  const retained=observation.findings.filter(f=>String(f.label).toLowerCase()!=='expiry');
+  const strikeFacts=retained.filter(f=>/^Strike\s+[0-9.]+\s+(CE|PE)\s+/i.test(String(f.label))).length;
+  const limitations=[...observation.limitations,'An extracted expiry was already past the current run date, so that expiry field was rejected as unreliable.'];
+  if(strikeFacts>=4)return {...observation,verification:'DEGRADED',findings:retained,limitations};
+  return {...observation,verification:'UNAVAILABLE',findings:retained,limitations};
 }
 
 export async function probeVisionReadiness(ai:AiBinding):Promise<VisionReadiness>{
