@@ -1,11 +1,14 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edge-console",
-  "main": "src/worker.ts",
+  "main": "src/mobile-v1-entry.ts",
   "compatibility_date": "2026-09-11",
   "assets": {
     "directory": "./public",
     "binding": "ASSETS"
+  },
+  "ai": {
+    "binding": "AI"
   },
   "r2_buckets": [
     {
@@ -15,6 +18,7 @@
   ],
   "vars": {
     "APP_ENV": "development",
-    "OUTPUT_CONTRACT_VERSION": "1.0"
+    "OUTPUT_CONTRACT_VERSION": "1.0",
+    "FIVEDR_CALLBACK_URL": "https://sole.k-anirudhsaxena.workers.dev"
   }
 }
