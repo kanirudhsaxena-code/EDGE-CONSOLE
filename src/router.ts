@@ -192,7 +192,7 @@ async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw:
 async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const symbol = ticker.trim().toUpperCase();
-  if (!/^[A-Z0-9._-]{1,20}$/.test(symbol)) return json({ error: 'Invalid ticker' }, 422);
+  if (!/^[A-Z0-9._&-]{1,20}$/.test(symbol)) return json({ error: 'Invalid ticker' }, 422);
 
   const sql = neon(env.EDGE_DATABASE_URL);
   const reportRows = await sql`select * from v_edge_stock_report where ticker = ${symbol} limit 1`;
