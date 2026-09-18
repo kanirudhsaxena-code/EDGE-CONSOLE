@@ -3,20 +3,58 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-  <meta name="theme-color" content="#0b1020" />
+  <meta name="theme-color" content="#f4f7fb" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=current-run-fix-20260918" />
+  <link rel="stylesheet" href="/styles.css?v=adaptive-light-v1-20260918" />
 </head>
 <body>
   <main class="shell">
-    <header class="topbar"><div><div class="eyebrow">MARKET DECISION SUPPORT</div><h1>EDGE Console</h1></div><div id="health" class="pill">Checking…</div></header>
-    <section class="hero card"><div><div class="eyebrow">HOME</div><h2>One place for your market decisions.</h2><p>Run 5DR, review stock signals and track IPO opportunities.</p></div><button id="runButton" class="primary">Run 5DR</button></section>
-    <section id="enginesPanel"><div class="section-head"><h3>Tools</h3><span>Current status</span></div><div id="engines" class="grid"></div></section>
-    <section id="fiveDrPanel" class="integration card"><div class="section-head compact"><div><div class="eyebrow">5DR</div><h3>Latest market view</h3></div><span id="fiveDrState" class="badge">Checking</span></div><div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div></section>
-    <section><div class="section-head"><h3>Recent results</h3><span id="runsNote">Loading</span></div><div id="runs" class="stack"></div></section>
+    <header class="topbar">
+      <div><div class="eyebrow">MARKET DECISION SUPPORT</div><h1>EDGE Console</h1></div>
+      <div id="health" class="pill">Checking…</div>
+    </header>
+
+    <section class="module-selector" aria-label="Select decision module">
+      <button class="module-tile active" data-module="5DR" type="button">
+        <span class="module-name">5DR</span><span class="module-desc">5-day NIFTY market view</span><span class="module-status">Ready</span>
+      </button>
+      <button class="module-tile" data-module="EDGE_STOCKS" type="button">
+        <span class="module-name">EDGE Stocks</span><span class="module-desc">Stock decision support</span><span class="module-status">Ready</span>
+      </button>
+      <button class="module-tile" data-module="EDGE_IPO" type="button">
+        <span class="module-name">EDGE IPO</span><span class="module-desc">IPO decision support</span><span class="module-status">Ready</span>
+      </button>
+    </section>
+
+    <section class="module-action-row">
+      <div><div class="eyebrow" id="selectedModuleEyebrow">5DR</div><h2 id="selectedModuleTitle">Latest market view</h2></div>
+      <button id="runButton" class="primary">Run 5DR</button>
+    </section>
+
+    <section id="fiveDrPanel" class="module-panel active">
+      <div id="assessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card">
+        <div class="section-head compact"><div><div class="eyebrow">5DR</div><h3>Current result</h3></div><span id="fiveDrState" class="badge">Checking</span></div>
+        <div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div>
+      </div>
+    </section>
+
+    <section id="edgeStocksPanel" class="module-panel" hidden>
+      <div id="stocksAssessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><div id="stocksSummary" class="stack"></div></div>
+    </section>
+
+    <section id="edgeIpoPanel" class="module-panel" hidden>
+      <div id="ipoAssessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE IPO</div><h3>Latest IPO decision</h3></div><span class="badge">Ready</span></div><div id="ipoSummary" class="stack"></div></div>
+    </section>
+
+    <section class="recent-section">
+      <div class="section-head"><h3>Recent results</h3><span id="runsNote">Loading</span></div>
+      <div id="runs" class="stack"></div>
+    </section>
   </main>
-  <nav class="bottom-nav" aria-label="Primary"><button id="navHome" class="active" data-view="home" type="button">Home</button><button id="navRun" data-view="run" type="button">Run</button><button id="nav5dr" data-view="5dr" type="button">5DR</button><button id="navEdge" data-view="edge" type="button">EDGE</button><button id="navIpo" data-view="ipo" type="button">IPO</button></nav>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
       <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
@@ -58,7 +96,7 @@
       <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=current-run-fix-20260918"></script>
-  <script type="module" src="/resume.js?v=current-run-fix-20260918"></script>
+  <script type="module" src="/app.js?v=adaptive-light-v1-20260918"></script>
+  <script type="module" src="/resume.js?v=adaptive-light-v1-20260918"></script>
 </body>
 </html>
