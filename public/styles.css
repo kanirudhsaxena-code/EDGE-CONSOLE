@@ -25,3 +25,5 @@ body{background:linear-gradient(180deg,#08131f 0%,#0b1b2b 42%,#07111b 100%)}
 .run-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:-4px 0 2px}.run-steps span{padding:7px 6px;border-radius:10px;background:#0d2034;border:1px solid #27435f;color:#7f95ab;font-size:10px;text-align:center}.run-steps .active{color:#dff3ff;border-color:#4aaee8;background:#123250}
 .analysis-toggle{margin-top:2px;width:100%;padding:11px 12px}.analysis-detail[hidden]{display:none}.analysis-detail{margin-top:4px}
 @media(max-width:420px){.run-steps{grid-template-columns:1fr 1fr}.run-steps span{font-size:11px}}
+
+.assessment-card{margin:14px 0;padding:14px;border-radius:14px;background:#0d2034;border:1px solid #27435f}.assessment-card>div{display:flex;align-items:center;justify-content:space-between;gap:12px}.assessment-card span{font-size:11px;color:#7f95ab;text-transform:uppercase;letter-spacing:.08em}.assessment-card strong{color:#dff3ff}.assessment-card p{margin:8px 0 0;color:#9aadc3;font-size:12px;line-height:1.5}
