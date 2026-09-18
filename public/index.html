@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#0b1020" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=decision-ui-20260918" />
+  <link rel="stylesheet" href="/styles.css?v=ux-flow-20260918" />
 </head>
 <body>
   <main class="shell">
@@ -20,6 +20,9 @@
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
       <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
+      <div class="run-steps" aria-label="5DR run progress">
+        <span class="active">1 Decision setup</span><span>2 Evidence</span><span>3 Analysis</span><span>4 Result</span>
+      </div>
       <input id="runEngine" type="hidden" value="5DR" />
       <input id="evidenceMode" type="hidden" value="HYBRID" />
       <div class="run decision-setup">
@@ -55,7 +58,7 @@
       <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=decision-ui-20260918"></script>
-  <script type="module" src="/resume.js?v=decision-ui-20260918"></script>
+  <script type="module" src="/app.js?v=ux-flow-20260918"></script>
+  <script type="module" src="/resume.js?v=ux-flow-20260918"></script>
 </body>
 </html>
