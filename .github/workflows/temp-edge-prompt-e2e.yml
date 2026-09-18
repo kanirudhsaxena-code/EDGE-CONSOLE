@@ -1,0 +1,39 @@
+name: TEMP EDGE Prompt E2E
+
+on:
+  push:
+    branches: [test/edge-prompt-e2e]
+
+permissions:
+  contents: read
+
+jobs:
+  invoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Invoke live prompt path
+        run: |
+          set -euo pipefail
+          curl --location --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'content-type: application/json' \
+            -X POST \
+            --data '{"command":"EDGE JIOFIN"}' \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke' \
+            -o /tmp/invoke.json
+          cat /tmp/invoke.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/invoke.json'))
+          assert data['ok'] is True, data
+          assert data['engine']=='EDGE_STOCKS', data
+          assert data['contract_version']=='EDGE_STOCKS_V1_2', data
+          assert data['ticker']=='JIOFIN', data
+          assert data['trading_enabled'] is False, data
+          assert data['status'] in ('DISPATCHED','ALREADY_PUBLISHED_TODAY'), data
+          PY
