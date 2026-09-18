@@ -19,6 +19,6 @@
   "vars": {
     "APP_ENV": "development",
     "OUTPUT_CONTRACT_VERSION": "1.0",
-    "FIVEDR_CALLBACK_URL": "https://sole.k-anirudhsaxena.workers.dev"
+    "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev"
   }
 }
