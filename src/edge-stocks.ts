@@ -125,6 +125,6 @@ export function validateEdgeStocksResult(body: unknown): string[] {
 export function componentVerificationStatus(availability: unknown, quality: unknown): 'VERIFIED'|'NOT_VERIFIED'|'NOT_AVAILABLE'|'N/A' {
   if (availability === 'NOT_AVAILABLE') return 'NOT_AVAILABLE';
   if (availability === 'N/A') return 'N/A';
-  if (availability === 'NOT_VERIFIED' || quality === 'NOT_VERIFIED') return 'NOT_VERIFIED';
+  if (availability !== 'AVAILABLE' || quality === 'NOT_VERIFIED' || quality == null) return 'NOT_VERIFIED';
   return 'VERIFIED';
 }
