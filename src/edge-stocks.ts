@@ -105,6 +105,7 @@ export function validateEdgeStocksResult(body: unknown): string[] {
   }
 
   if (!Array.isArray(body.institutional_drilldown)) errors.push('institutional_drilldown must be an array');
+  else if (body.institutional_drilldown.length === 0) errors.push('institutional_drilldown must contain at least one component');
   else {
     body.institutional_drilldown.forEach((row, index) => {
       if (!isObject(row)) {
