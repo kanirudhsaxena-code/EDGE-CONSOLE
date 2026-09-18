@@ -11,3 +11,54 @@ normalizeForm.addEventListener('submit',async event=>{event.preventDefault();let
 function render5dr(run,request){if(!run){fiveDrState.textContent=request?request.status:'READY';const meta=request&&request.metadata?request.metadata:{},stage=meta.adapter_stage||'—',blockers=meta.normalization_assessment||{},readiness=meta.evidence_readiness||{},requestBlock=request?['<div class="metric"><span>Latest engine request</span><strong>'+escapeHtml(request.request_id)+'</strong></div>','<div class="metric"><span>Request status</span><strong>'+escapeHtml(request.status)+'</strong></div>','<div class="metric"><span>Adapter stage</span><strong>'+escapeHtml(stage)+'</strong></div>','<div class="metric"><span>Evidence readiness</span><strong>'+escapeHtml(readiness.status||'Legacy / not assessed')+'</strong></div>','<p class="muted">Evidence batch '+escapeHtml(request.batch_id)+' · '+escapeHtml(meta.evidence_file_count||'—')+' file(s)</p>',stage==='EVIDENCE_READY'||stage==='NORMALIZATION_BLOCKED'?'<button class="ghost normalize-latest" data-request="'+escapeHtml(request.request_id)+'">Supply normalized inputs</button>':'',Array.isArray(blockers.missing)&&blockers.missing.length?'<p class="muted">Blocked: '+escapeHtml(blockers.missing.length)+' required input(s) missing.</p>':''].join(''):'<p class="muted">No engine request has been created yet.</p>';fiveDrSummary.innerHTML=['<article class="run"><strong>5DR V2.1.2 integration</strong>',requestBlock,'<p class="muted">Evidence readiness is checked before normalization. Incomplete or conflicting normalized inputs remain blocked.</p><div class="check-grid"><span>✓ Private evidence intake</span><span>✓ Evidence readiness gate</span><span>✓ Fail-closed normalization</span><span>✓ Immutable publication path</span></div></article>'].join('');const b=fiveDrSummary.querySelector('.normalize-latest');if(b)b.addEventListener('click',()=>openNormalization(b.dataset.request));return}const result=run.result||{};fiveDrState.textContent=run.status||'PUBLISHED';fiveDrSummary.innerHTML=['<article class="run"><div class="engine-row"><strong>'+escapeHtml(run.run_id)+'</strong><span class="badge">'+escapeHtml(run.provenance_mode)+'</span></div><p class="muted">'+escapeHtml(new Date(run.generated_at).toLocaleString())+' · '+escapeHtml(run.framework_version)+'</p><div class="metric"><span>Forecast assessment</span><strong>'+escapeHtml(result.forecast_assessment||'Not available')+'</strong></div><div class="metric"><span>Recommendation assessment</span><strong>'+escapeHtml(result.recommendation_assessment||'Not available')+'</strong></div></article>'].join('')}
 function renderEdge(payload){if(!payload||!payload.report){edgeState.textContent='BLOCKED';edgeSummary.innerHTML='<div class="run muted">EDGE Stocks read model is not available.</div>';return}const r=payload.report,o=r.official_efficacy||{},p=r.provisional_checkpoint_diagnostics||{},d=r.decision||{};edgeState.textContent='READ MODEL READY';edgeSummary.innerHTML=['<article class="run"><div class="engine-row"><strong>'+escapeHtml(r.ticker)+' · '+escapeHtml(d.forecast)+'</strong><span class="badge">'+escapeHtml(p.label||'PROVISIONAL')+'</span></div>','<div class="metric"><span>Recommendation</span><strong>'+escapeHtml(d.recommendation)+'</strong></div>','<div class="metric"><span>OFFICIAL sample</span><strong>'+escapeHtml(o.sample_size??0)+' closed/scorable</strong></div>','<div class="metric"><span>OFFICIAL hit rate</span><strong>'+escapeHtml(pct(o.recommendation_hit_rate_pct))+'</strong></div>','<div class="metric"><span>OFFICIAL directional accuracy</span><strong>'+escapeHtml(pct(o.directional_accuracy_pct))+'</strong></div>','<div class="metric"><span>PROVISIONAL forecast accuracy</span><strong>'+escapeHtml(pct(p.forecast_accuracy_pct))+' · '+escapeHtml(p.forecast_hits??0)+'/'+escapeHtml(p.forecast_scorable??0)+'</strong></div>','<div class="metric"><span>PROVISIONAL zone accuracy</span><strong>'+escapeHtml(pct(p.zone_accuracy_pct))+' · '+escapeHtml(p.zone_hits??0)+'/'+escapeHtml(p.zone_scorable??0)+'</strong></div>','<p class="muted">Official efficacy remains horizon-finalized. D+1…D+5 diagnostics are always labelled provisional and never overwrite official outcomes.</p></article>'].join('')}
 async function loadDashboard(){try{const h=await fetch('/api/health').then(r=>r.json());health.textContent=h.ok?'System online':'Degraded';const ed=await fetch('/api/engines').then(r=>r.json());engines.innerHTML=ed.engines.map(e=>'<article class="engine"><div class="engine-row"><div><h4>'+escapeHtml(e.name)+'</h4><p>'+escapeHtml(e.mode)+' · v'+escapeHtml(e.version||'—')+'</p></div><span class="badge">'+escapeHtml(e.status)+'</span></div></article>').join('');const f=await fetch('/api/5dr/latest').then(r=>r.json()),q=await fetch('/api/5dr/run-requests/latest').then(r=>r.json());render5dr(f.run||null,q.request||null);const edgeResponse=await fetch('/api/edge-stocks/report?ticker=LTF'),edgePayload=await edgeResponse.json().catch(()=>({}));if(edgeResponse.ok)renderEdge(edgePayload);else{edgeState.textContent=edgePayload.code==='EDGE_DATABASE_NOT_CONFIGURED'?'CONFIG REQUIRED':'BLOCKED';edgeSummary.innerHTML='<div class="run muted">'+escapeHtml(edgePayload.error||'EDGE Stocks report unavailable.')+'</div>'}const l=await fetch('/api/runs/latest').then(r=>r.json());if(!l.runs||!l.runs.length){runs.innerHTML='<div class="run muted">No published runs yet.</div>';runsNote.textContent=l.note||'Ready for first run';return}runs.innerHTML=l.runs.map(r=>'<article class="run"><strong>'+escapeHtml(r.engine)+'</strong> · '+escapeHtml(r.status)+'<br><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+' · '+escapeHtml(r.provenance_mode)+'</span></article>').join('');runsNote.textContent=l.runs.length+' shown'}catch(e){console.error(e);health.textContent='Offline';engines.innerHTML='<div class="run muted">Unable to load engine status.</div>';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="run muted">Unable to load 5DR integration status.</div>';edgeState.textContent='ERROR';edgeSummary.innerHTML='<div class="run muted">Unable to load EDGE Stocks integration status.</div>'}}loadDashboard();
+const edgeCommandForm=document.getElementById('edgeCommandForm'),edgeCommandInput=document.getElementById('edgeCommandInput'),edgeCommandButton=document.getElementById('edgeCommandButton'),edgeCommandStatus=document.getElementById('edgeCommandStatus');
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function pollEdgeInvocation(nextUrl){
+  for(let i=0;i<24;i++){
+    const r=await fetch(nextUrl,{cache:'no-store'}),d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||'Could not check EDGE invocation status.');
+    if(d.status==='COMPLETE')return d;
+    edgeCommandStatus.className='upload-status working';
+    edgeCommandStatus.textContent='Governed EDGE run dispatched · waiting for a newly published V1.2 recommendation…';
+    await sleep(5000);
+  }
+  return null;
+}
+if(edgeCommandForm){
+  edgeCommandForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const command=String(edgeCommandInput.value||'').trim();
+    edgeCommandButton.disabled=true;
+    edgeCommandButton.textContent='Dispatching…';
+    edgeCommandStatus.className='upload-status working';
+    edgeCommandStatus.textContent='Dispatching to the governed EDGE autonomous publisher…';
+    try{
+      const r=await fetch('/api/edge-stocks/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({command})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
+      if(d.status==='ALREADY_PUBLISHED_TODAY'){
+        edgeCommandStatus.className='upload-status success';
+        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+d.run_id+' · loading canonical V1.2 result…';
+        window.location.reload();
+        return;
+      }
+      edgeCommandStatus.textContent='Dispatched '+d.ticker+' · monitoring for governed publication…';
+      const completed=await pollEdgeInvocation(d.next);
+      if(completed){
+        edgeCommandStatus.className='upload-status success';
+        edgeCommandStatus.textContent='EDGE '+completed.ticker+' complete · '+completed.run_id+' · loading canonical V1.2 result…';
+        window.location.reload();
+      }else{
+        edgeCommandStatus.className='upload-status ready';
+        edgeCommandStatus.textContent='Dispatch accepted, but no newer governed recommendation has published yet. The runner may have failed closed; check again after the governed run window.';
+      }
+    }catch(e){
+      console.error(e);
+      edgeCommandStatus.className='upload-status error';
+      edgeCommandStatus.textContent=e.message||'EDGE command failed.';
+    }finally{
+      edgeCommandButton.disabled=false;
+      edgeCommandButton.textContent='Run EDGE';
+    }
+  });
+}
