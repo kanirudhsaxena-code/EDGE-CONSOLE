@@ -88,6 +88,35 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
 
 
 
+async function mdosLearningStatus(env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Console database is not configured' }, 503);
+  const sql = neon(env.DATABASE_URL);
+  const rows = await sql`
+    select distinct on (engine)
+           engine,cycle_id,status,sample_size,candidate_count,source_ref,
+           occurred_at,automatic_adoption,methodology_changed,details
+      from learning_runtime_events
+     order by engine,occurred_at desc,id desc
+  `;
+  const byEngine = Object.fromEntries(rows.map((row: Record<string, unknown>) => [String(row.engine), row]));
+  return json({
+    schema: MDOS_LEARNING_RUNTIME_CONTRACT.schema,
+    contract: MDOS_LEARNING_RUNTIME_CONTRACT,
+    engines: MDOS_ENGINE_REGISTRY.map(registration => ({
+      ...registration,
+      runtime: byEngine[registration.engine] ?? {
+        engine: registration.engine,
+        status: 'DEFERRED',
+        sample_size: 0,
+        candidate_count: 0,
+        automatic_adoption: false,
+        methodology_changed: false,
+        note: 'No shared runtime event recorded yet',
+      },
+    })),
+  });
+}
+
 async function mdosBackboneStatus(env: Env): Promise<Response> {
   return json({
     schema: 'mdos-shared-backbone-v1',
@@ -529,6 +558,7 @@ async function edgeStocksMaster(env: Env): Promise<Response> {
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/api/mdos/backbone' && request.method === 'GET') return mdosBackboneStatus(env);
+  if (url.pathname === '/api/mdos/learning' && request.method === 'GET') return mdosLearningStatus(env);
   if (url.pathname === '/api/mdos/invoke' && request.method === 'POST') return invokeMdos(request, env);
   if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return readinessGate(request, env);
   const normalized = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
