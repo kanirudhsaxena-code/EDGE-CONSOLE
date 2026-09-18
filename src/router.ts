@@ -13,6 +13,13 @@ async function createScreenshotReadyRequest(request: Request, env: Env): Promise
   if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
   let body: unknown; try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   if (!isObject(body) || !isNonEmptyString(body.batch_id)) return json({ error: 'batch_id is mandatory' }, 422);
+  const assessment=isObject(body.assessment)?body.assessment:{};
+  const allowedObjectives=['MARKET_VIEW','OPTIONS_SETUP','BOTH'],allowedRisk=['CONSERVATIVE','BALANCED','OPPORTUNISTIC'],allowedPriority=['CAPITAL_PROTECTION','BALANCED','GROWTH'];
+  const objective=String(assessment.objective??'BOTH'),risk_posture=String(assessment.risk_posture??'CONSERVATIVE'),capital_priority=String(assessment.capital_priority??'CAPITAL_PROTECTION');
+  if(!allowedObjectives.includes(objective))return json({error:'Unknown decision objective'},422);
+  if(!allowedRisk.includes(risk_posture))return json({error:'Unknown risk posture'},422);
+  if(!allowedPriority.includes(capital_priority))return json({error:'Unknown capital priority'},422);
+  const decisionSetup={horizon:'D+1_TO_D+5',objective,risk_posture,capital_priority,assessed_at:new Date().toISOString()};
   const readiness = assessUserEvidenceReadiness(body.evidence_categories);
   if (readiness.invalid.length) return json({ error: 'Unknown user-owned 5DR evidence categories', invalid_categories: readiness.invalid, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES }, 422);
   if (!readiness.ready) return json({ error: '5DR screenshot readiness gate blocked', missing_categories: readiness.missing, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES }, 409);
@@ -32,7 +39,7 @@ async function createScreenshotReadyRequest(request: Request, env: Env): Promise
   const provenanceMode = String(evidence[0].provenance_mode);
   if (evidence.some(row => row.provenance_mode !== provenanceMode)) return json({ error: 'Evidence batch has mixed provenance modes' }, 422);
   const requestId = `5drreq_${crypto.randomUUID()}`;
-  const metadata = { evidence_file_count: evidence.length, user_evidence_readiness: { status: 'SCREENSHOTS_READY', declared_categories: readiness.declared, persisted_categories: storedReadiness.declared, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES, assessed_at: new Date().toISOString() }, autonomous_evidence: { status: 'PENDING', required_categories: SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES, items: initialAutonomousEvidenceState() }, adapter_stage: 'SCREENSHOTS_READY' };
+  const metadata = { decision_setup:decisionSetup, evidence_file_count: evidence.length, user_evidence_readiness: { status: 'SCREENSHOTS_READY', declared_categories: readiness.declared, persisted_categories: storedReadiness.declared, required_categories: REQUIRED_USER_5DR_EVIDENCE_CATEGORIES, assessed_at: new Date().toISOString() }, autonomous_evidence: { status: 'PENDING', required_categories: SYSTEM_OWNED_5DR_EVIDENCE_CATEGORIES, items: initialAutonomousEvidenceState() }, adapter_stage: 'SCREENSHOTS_READY' };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata) values (${requestId},'5DR',${batchId},${provenanceMode},'5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
   await sql`update evidence_uploads set request_id=${requestId},status='READY_FOR_ENGINE' where batch_id=${batchId}`;
   return json({ ok: true, request: { request_id: requestId, batch_id: batchId, status: 'READY_FOR_ENGINE', metadata }, next_step: 'SYSTEM_EVIDENCE_ACQUISITION' }, 201);
