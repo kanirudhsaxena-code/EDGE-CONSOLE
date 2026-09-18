@@ -49,6 +49,21 @@ jobs:
           assert d.get('edge_database_configured') is True, d
           PY
 
+      - name: Validate EDGE prompt dispatch credential
+        run: |
+          set -euo pipefail
+          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/dispatch-health' \
+            -o /tmp/dispatch-health.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/dispatch-health.json'))
+          assert data['ok'] is True, data
+          assert data['status']=='READY', data
+          assert data['workflow']=='autonomous-publish.yml', data
+          assert data['trading_enabled'] is False, data
+          PY
+
       - name: Validate LTF report contract
         run: |
           set -euo pipefail
