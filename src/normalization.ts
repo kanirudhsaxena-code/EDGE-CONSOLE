@@ -22,6 +22,15 @@ export const isObject = (value: unknown): value is JsonRecord =>
 export const isNonEmptyString = (value: unknown): value is string =>
   typeof value === 'string' && value.trim().length > 0;
 
+const canonicalize=(value:unknown):unknown=>{
+  if(Array.isArray(value))return value.map(canonicalize);
+  if(isObject(value))return Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonicalize(value[key])]));
+  return value;
+};
+
+export const jsonEquivalent=(a:unknown,b:unknown):boolean=>
+  JSON.stringify(canonicalize(a))===JSON.stringify(canonicalize(b));
+
 const isFiniteNumber=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
 const exactKeys=(value:JsonRecord,keys:readonly string[])=>Object.keys(value).length===keys.length&&keys.every(key=>key in value);
 const boundedObject=(value:unknown,keys:readonly string[],min:number,max:number):boolean=>isObject(value)&&exactKeys(value,keys)&&keys.every(key=>isFiniteNumber(value[key])&&Number(value[key])>=min&&Number(value[key])<=max);
