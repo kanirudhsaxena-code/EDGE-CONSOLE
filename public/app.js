@@ -288,15 +288,11 @@ async function loadDashboard(){
       render5dr(f.run,matchedRequest,oa)
     }else render5dr(null,latestReq,null);
 
-    const [stockRuns,ipoRuns]=await Promise.all([
-      fetch('/api/runs/latest?engine=EDGE_STOCKS',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]),
-      fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[])
-    ]);
-    renderGenericModule('EDGE_STOCKS',stocksSummary,stockRuns);
+    const ipoRuns=await fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]);
     renderGenericModule('EDGE_IPO',ipoSummary,ipoRuns);
     await loadRecentResults(activeModule);
   }catch(e){
-    console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderGenericModule('EDGE_STOCKS',stocksSummary,[]);renderGenericModule('EDGE_IPO',ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
+    console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderGenericModule('EDGE_IPO',ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
   }
 }
 setActiveModule('5DR');
