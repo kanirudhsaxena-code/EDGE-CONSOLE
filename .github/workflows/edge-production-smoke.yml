@@ -49,6 +49,36 @@ jobs:
           assert d.get('edge_database_configured') is True, d
           PY
 
+      - name: Validate adaptive Console shell and 5DR assessment
+        run: |
+          set -euo pipefail
+          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Cache-Control: no-cache'             'https://edge-console.k-anirudhsaxena.workers.dev/'             -o /tmp/index.html
+          grep -q 'data-module="5DR"' /tmp/index.html
+          grep -q 'data-module="EDGE_STOCKS"' /tmp/index.html
+          grep -q 'data-module="EDGE_IPO"' /tmp/index.html
+          grep -q 'adaptive-light-v1b-20260918' /tmp/index.html
+
+          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             'https://edge-console.k-anirudhsaxena.workers.dev/api/assessment-summary?engine=5DR'             -o /tmp/assessment.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/assessment.json'))
+          s=d['summary']
+          assert s['engine']=='5DR', s
+          assert s['forecast']['total'] >= 1, s
+          assert s['forecast']['hits'] <= s['forecast']['total'], s
+          assert s['recommendation']['hits'] <= s['recommendation']['total'], s
+          assert 'absolute_return_pct' in s['returns'], s
+          assert 'hits_return_pct' in s['returns'], s
+          assert 'misses_return_pct' in s['returns'], s
+          PY
+
+          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             'https://edge-console.k-anirudhsaxena.workers.dev/api/5dr/latest'             -o /tmp/5dr-latest.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/5dr-latest.json'))
+          assert 'run' in d, d
+          PY
+
       - name: Validate EDGE prompt dispatch credential
         run: |
           set -euo pipefail
