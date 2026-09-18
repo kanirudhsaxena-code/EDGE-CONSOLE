@@ -21,3 +21,7 @@ body{background:linear-gradient(180deg,#08131f 0%,#0b1b2b 42%,#07111b 100%)}
 .change-details{border-top:1px solid #27435f;margin-top:14px;padding-top:12px}.change-details summary{cursor:pointer;font-weight:800;color:#d7e9f8}
 .tech-details summary,.why-details summary{color:#d7e9f8}
 @media(min-width:620px){.why-grid{grid-template-columns:1fr 1fr}}
+
+.run-steps{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin:-4px 0 2px}.run-steps span{padding:7px 6px;border-radius:10px;background:#0d2034;border:1px solid #27435f;color:#7f95ab;font-size:10px;text-align:center}.run-steps .active{color:#dff3ff;border-color:#4aaee8;background:#123250}
+.analysis-toggle{margin-top:2px;width:100%;padding:11px 12px}.analysis-detail[hidden]{display:none}.analysis-detail{margin-top:4px}
+@media(max-width:420px){.run-steps{grid-template-columns:1fr 1fr}.run-steps span{font-size:11px}}
