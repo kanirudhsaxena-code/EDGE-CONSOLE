@@ -3,6 +3,7 @@ import router from './router';
 type Env = {
   EDGE_DATABASE_URL?: string;
   APP_ENV?: string;
+  EDGE_GITHUB_TOKEN?: string;
 };
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data, null, 2), {
@@ -26,7 +27,8 @@ export default {
         ok: true,
         service: 'EDGE Console',
         edge_database_configured: Boolean(env.EDGE_DATABASE_URL),
-        environment: env.APP_ENV ?? null
+        environment: env.APP_ENV ?? null,
+        prompt_dispatch_configured: Boolean(env.EDGE_GITHUB_TOKEN)
       });
     }
 
