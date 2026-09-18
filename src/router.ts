@@ -162,7 +162,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       ok: true,
       status: 'ALREADY_PUBLISHED_TODAY',
       engine: 'EDGE_STOCKS',
-      contract_version: 'EDGE_STOCKS_V1_2',
+      contract_version: 'EDGE_STOCKS_V1_3',
       ticker,
       command: command.raw,
       run_id: existingToday.id,
@@ -189,7 +189,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     ok: true,
     status: 'DISPATCHED',
     engine: 'EDGE_STOCKS',
-    contract_version: 'EDGE_STOCKS_V1_2',
+    contract_version: 'EDGE_STOCKS_V1_3',
     ticker,
     command: command.raw,
     baseline_run_id: baselineRunId,
@@ -239,11 +239,13 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   if (!/^[A-Z0-9._&-]{1,20}$/.test(symbol)) return json({ error: 'Invalid ticker' }, 422);
 
   const sql = neon(env.EDGE_DATABASE_URL);
-  const reportRows = await sql`select * from v_edge_stock_report where ticker = ${symbol} limit 1`;
-  if (!reportRows.length) return json({ error: 'Ticker not found in EDGE report view', ticker: symbol }, 404);
+  const masterRows = await sql`select * from v_edge_master_report limit 1`;
+  const stockRows = await sql`select * from v_edge_stock_report where ticker = ${symbol} limit 1`;
+  if (!masterRows.length) return json({ error: 'EDGE master assessment unavailable' }, 409);
+  if (!stockRows.length) return json({ error: 'Ticker not found in EDGE stock assessment', ticker: symbol }, 404);
 
   const activeRows = await sql`
-    select r.*, l.expiry_trading_date, p.current_price, p.outcome_verdict,
+    select r.*, l.expiry_trading_date, p.current_price, p.current_return_pct, p.outcome_verdict,
            mt.directional_agreement_score,
            coalesce(mt.market_trust_score, r.market_trust_score) as resolved_market_trust_score,
            coalesce(mt.market_trust_band, r.market_trust_band) as resolved_market_trust_band,
@@ -267,7 +269,17 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   `;
   if (!activeRows.length) return json({ error: 'No active EDGE call found', ticker: symbol }, 404);
 
-  const report = reportRows[0] as Record<string, unknown>;
+  const allActiveRows = await sql`
+    select ticker,recommendation_id,definitive_forecast,definitive_recommendation,
+           expected_price_zone_low,expected_price_zone_high,expiry_trading_date,
+           current_price,current_return_pct,outcome_verdict,open_recommendations,
+           bull_probability,base_probability,bear_probability
+      from v_edge_active_calls
+     order by ticker
+  `;
+
+  const master = masterRows[0] as Record<string, unknown>;
+  const stock = stockRows[0] as Record<string, unknown>;
   const active = activeRows[0] as Record<string, unknown>;
   const componentRows = await sql`
     select component, raw_score, evidence_quality, availability_status, conflict_flag, notes
@@ -292,29 +304,110 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     !isNonEmptyString(decisionLadder) || !isNonEmptyString(forecastHorizon) ||
     !isNonEmptyString(primaryAction) || !isNonEmptyString(definitiveForecast)
   ) {
-    return json({ error: 'EDGE Stocks V1.2 publication blocked: governed decision fields missing', ticker: symbol }, 409);
+    return json({ error: 'EDGE Stocks V1.3 publication blocked: governed decision fields missing', ticker: symbol }, 409);
   }
   if (!componentRows.length) {
-    return json({ error: 'EDGE Stocks V1.2 publication blocked: institutional drill-down is empty', ticker: symbol }, 409);
+    return json({ error: 'EDGE Stocks V1.3 publication blocked: drill-down is empty', ticker: symbol }, 409);
   }
+
+  const parseNotes = (value: unknown): { key_outcome?: string; interpretation?: string } => {
+    if (!isNonEmptyString(value)) return {};
+    try {
+      const parsed = JSON.parse(value);
+      return isObject(parsed) ? {
+        key_outcome: isNonEmptyString(parsed.key_outcome) ? String(parsed.key_outcome) : undefined,
+        interpretation: isNonEmptyString(parsed.interpretation) ? String(parsed.interpretation) : undefined,
+      } : {};
+    } catch {
+      return { interpretation: String(value) };
+    }
+  };
+
+  const drilldown = componentRows.map((row: Record<string, unknown>) => {
+    const verification = componentVerificationStatus(row.availability_status, row.evidence_quality);
+    const notes = parseNotes(row.notes);
+    const keyOutcome = notes.key_outcome ?? (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED'));
+    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? '' : 'Evidence not verified; no interpretation inferred.');
+    return {
+      component: String(row.component),
+      score_or_level: row.raw_score ?? 'N/A',
+      verification_status: verification,
+      key_outcome: keyOutcome,
+      interpretation,
+    };
+  });
+
   const effectiveConviction = Math.min(Math.abs(des) / 100, 1) * (marketTrust / 100);
-  const sampleSize = integerOrZero(report.official_scorable_recommendations);
   const overrideCode = active.active_override == null ? null : String(active.active_override);
 
   const payload = {
-    contract_version: 'EDGE_STOCKS_V1_2',
+    contract_version: 'EDGE_STOCKS_V1_3',
+    presentation_contract: 'EFFICACY_V2',
     engine: 'EDGE_STOCKS',
     framework_version: 'EDGE_V1',
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date().toISOString(),
     presentation: {
-      standard_table_count: 2,
-      table_1: 'EDGE_OUTCOME_DECISION',
-      table_2: 'INSTITUTIONAL_DRILLDOWN',
-      efficacy_position: 'SEPARATE_AFTER_STANDARD_TABLES'
+      standard_table_count: 4,
+      table_1: 'EDGE_MASTER_ASSESSMENT',
+      table_2: 'ACTIVE_CALLS',
+      table_3: 'CURRENT_STOCK_OUTCOME',
+      table_4: 'DRILLDOWN'
     },
-    decision: {
+    master_assessment: {
+      recommendations: integerOrZero(master.recommendations),
+      unique_stocks: integerOrZero(master.unique_stocks),
+      open_recommendations: integerOrZero(master.open_recommendations),
+      closed_recommendations: integerOrZero(master.closed_recommendations),
+      official_scorable_recommendations: integerOrZero(master.official_scorable_recommendations),
+      recommendation_hit_rate_pct: numberOrNull(master.recommendation_hit_rate_pct),
+      direction_hit_rate_pct: numberOrNull(master.direction_hit_rate_pct),
+      target_hit_rate_pct: numberOrNull(master.target_hit_rate_pct),
+      avg_gain_pct: numberOrNull(master.avg_gain_pct),
+      avg_loss_pct: numberOrNull(master.avg_loss_pct),
+      avg_mfe_pct: numberOrNull(master.avg_mfe_pct),
+      avg_mae_pct: numberOrNull(master.avg_mae_pct),
+      cumulative_model_pnl_units: numberOrNull(master.cumulative_model_pnl_units),
+      provisional_captured_checkpoints: integerOrZero(master.provisional_captured_checkpoints),
+      provisional_due_checkpoints: integerOrZero(master.provisional_due_checkpoints),
+      provisional_forecast_scorable: integerOrZero(master.provisional_forecast_scorable),
+      provisional_forecast_hits: integerOrZero(master.provisional_forecast_hits),
+      provisional_forecast_misses: integerOrZero(master.provisional_forecast_misses),
+      provisional_forecast_accuracy_pct: numberOrNull(master.provisional_forecast_accuracy_pct),
+      provisional_zone_scorable: integerOrZero(master.provisional_zone_scorable),
+      provisional_zone_hits: integerOrZero(master.provisional_zone_hits),
+      provisional_zone_misses: integerOrZero(master.provisional_zone_misses),
+      provisional_zone_accuracy_pct: numberOrNull(master.provisional_zone_accuracy_pct),
+      stock_assessment: {
+        ticker: symbol,
+        recommendations: integerOrZero(stock.recommendations),
+        open_recommendations: integerOrZero(stock.open_recommendations),
+        closed_recommendations: integerOrZero(stock.closed_recommendations),
+        official_scorable_recommendations: integerOrZero(stock.official_scorable_recommendations),
+        recommendation_hit_rate_pct: numberOrNull(stock.recommendation_hit_rate_pct),
+        direction_hit_rate_pct: numberOrNull(stock.direction_hit_rate_pct),
+        target_hit_rate_pct: numberOrNull(stock.target_hit_rate_pct),
+        provisional_captured_checkpoints: integerOrZero(stock.provisional_captured_checkpoints),
+        provisional_due_checkpoints: integerOrZero(stock.provisional_due_checkpoints),
+        provisional_forecast_accuracy_pct: numberOrNull(stock.provisional_forecast_accuracy_pct),
+        provisional_zone_accuracy_pct: numberOrNull(stock.provisional_zone_accuracy_pct),
+        latest_checkpoint_observed_at: stock.latest_checkpoint_observed_at ?? null,
+      }
+    },
+    active_calls: allActiveRows.map((row: Record<string, unknown>) => ({
+      ticker: String(row.ticker),
+      recommendation_id: String(row.recommendation_id),
+      definitive_forecast: row.definitive_forecast,
+      definitive_recommendation: row.definitive_recommendation,
+      expected_price_zone: { low: numberOrNull(row.expected_price_zone_low), high: numberOrNull(row.expected_price_zone_high) },
+      expiry_trading_date: row.expiry_trading_date ?? null,
+      current_price: numberOrNull(row.current_price),
+      current_return_pct: numberOrNull(row.current_return_pct),
+      outcome_verdict: row.outcome_verdict ?? 'OPEN',
+      probabilities: { bull: numberOrNull(row.bull_probability), base: numberOrNull(row.base_probability), bear: numberOrNull(row.bear_probability) }
+    })),
+    current_stock_outcome: {
       des,
       market_trust: { score: marketTrust, band: marketTrustBand },
       directional_agreement: directionalAgreement,
@@ -325,10 +418,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         bear: numberOrNull(active.bear_probability)
       },
       definitive_forecast: definitiveForecast,
-      expected_price_zone: {
-        low: numberOrNull(active.expected_price_zone_low),
-        high: numberOrNull(active.expected_price_zone_high)
-      },
+      expected_price_zone: { low: numberOrNull(active.expected_price_zone_low), high: numberOrNull(active.expected_price_zone_high) },
       forecast_horizon: forecastHorizon,
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
       primary_action: primaryAction,
@@ -350,40 +440,15 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         execution_quality_score: numberOrNull(active.execution_quality_score)
       },
       current_price: numberOrNull(active.current_price),
+      current_return_pct: numberOrNull(active.current_return_pct),
       expiry_trading_date: active.expiry_trading_date ?? null,
       outcome_status: active.outcome_verdict ?? 'OPEN'
     },
-    official_efficacy: {
-      label: 'OFFICIAL',
-      sample_size: sampleSize,
-      recommendation_hit_rate_pct: sampleSize === 0 ? null : numberOrNull(report.recommendation_hit_rate_pct),
-      directional_accuracy_pct: sampleSize === 0 ? null : numberOrNull(report.direction_hit_rate_pct),
-      forecast_accuracy_pct: sampleSize === 0 ? null : numberOrNull(report.forecast_accuracy_pct)
-    },
-    provisional_checkpoint_diagnostics: {
-      label: 'PROVISIONAL',
-      captured_checkpoints: integerOrZero(report.provisional_captured_checkpoints),
-      forecast_scorable: integerOrZero(report.provisional_forecast_scorable),
-      forecast_hits: integerOrZero(report.provisional_forecast_hits),
-      forecast_misses: integerOrZero(report.provisional_forecast_misses),
-      forecast_accuracy_pct: numberOrNull(report.provisional_forecast_accuracy_pct),
-      zone_scorable: integerOrZero(report.provisional_zone_scorable),
-      zone_hits: integerOrZero(report.provisional_zone_hits),
-      zone_misses: integerOrZero(report.provisional_zone_misses),
-      zone_accuracy_pct: numberOrNull(report.provisional_zone_accuracy_pct),
-      latest_checkpoint_observed_at: report.latest_checkpoint_observed_at ?? null
-    },
-    institutional_drilldown: componentRows.map((row: Record<string, unknown>) => ({
-      component: String(row.component),
-      score_or_level: row.raw_score ?? 'N/A',
-      verification_status: componentVerificationStatus(row.availability_status, row.evidence_quality),
-      key_outcome: row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED'),
-      interpretation: row.notes ? String(row.notes) : 'No additional interpretation recorded in the governed audit record.'
-    }))
+    drilldown
   };
 
   const errors = validateEdgeStocksResult(payload);
-  if (errors.length) return json({ error: 'EDGE Stocks V1.2 report contract validation failed', details: errors, ticker: symbol }, 409);
+  if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }
 
