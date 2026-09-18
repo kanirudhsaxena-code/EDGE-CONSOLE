@@ -5,7 +5,7 @@ type JsonRecord = Record<string, unknown>;
 const MAX_EVIDENCE_FILES=20,MAX_EVIDENCE_FILE_BYTES=10*1024*1024;
 const ALLOWED_EVIDENCE_TYPES=new Set(['image/jpeg','image/png','image/webp','application/pdf']);
 const REQUIRED_5DR_EVIDENCE_CATEGORIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
-const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8'}});
+const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const isObject=(value:unknown):value is JsonRecord=>typeof value==='object'&&value!==null&&!Array.isArray(value);
 const isNonEmptyString=(value:unknown):value is string=>typeof value==='string'&&value.trim().length>0;
 const sanitizeFilename=(name:string)=>name.replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/-+/g,'-').slice(0,120)||'evidence';
