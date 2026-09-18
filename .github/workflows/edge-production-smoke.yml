@@ -36,10 +36,18 @@ jobs:
           import json, math
           d=json.load(open('/tmp/report.json'))
           r=d['report']
-          assert r['contract_version']=='EDGE_STOCKS_V1_1', r
+          assert r['contract_version']=='EDGE_STOCKS_V1_2', r
+          pres=r['presentation']
+          assert pres['standard_table_count']==2, pres
+          assert pres['table_1']=='EDGE_OUTCOME_DECISION', pres
+          assert pres['table_2']=='INSTITUTIONAL_DRILLDOWN', pres
           probs=r['decision']['probabilities']
           total=sum(float(probs[k]) for k in ('bull','base','bear'))
-          assert math.isclose(total,100.0,abs_tol=0.2), total
+          assert math.isclose(total,100.0,abs_tol=0.01), total
+          dec=r['decision']
+          for key in ('des','market_trust','directional_agreement','effective_conviction','definitive_forecast','expected_price_zone','forecast_horizon','risk_override','primary_action','decision_ladder','bot','execution'):
+              assert key in dec, (key, dec)
+          assert r['institutional_drilldown'], r
           o=r['official_efficacy']
           p=r['provisional_checkpoint_diagnostics']
           assert o['label']=='OFFICIAL', o
@@ -50,6 +58,17 @@ jobs:
           assert int(p['forecast_hits']) <= int(p['forecast_scorable']), p
           assert int(p['zone_hits']) <= int(p['zone_scorable']), p
           PY
+
+
+      - name: Validate canonical V1.2 renderer asset
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error \
+            'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js' \
+            -o /tmp/edge-live.js
+          grep -q 'EDGE_STOCKS_V1_2' /tmp/edge-live.js
+          grep -q 'Table 1 — EDGE Outcome / Decision' /tmp/edge-live.js
+          grep -q 'Table 2 — Institutional Drill-down' /tmp/edge-live.js
 
       - name: Validate master efficacy separation
         run: |
