@@ -147,8 +147,16 @@ const prompt=(packet:unknown)=>`You are the governed intelligence reconciliation
 
 export async function produceIntelligence(ai:AiBinding,packet:unknown,allowedSourceRefs:Set<string>):Promise<{judgment:IntelligenceJudgment|null;normalized:JsonRecord|null;errors:string[];model:string}>{
   try{
-    const raw=await ai.run(INTELLIGENCE_MODEL,{messages:[{role:'system',content:'Reconcile evidence under frozen 5DR rules. Output governed JSON only.'},{role:'user',content:prompt(packet)}],max_tokens:2600,temperature:0,chat_template_kwargs:{enable_thinking:false}});
-    const parsed=parseJson(raw);const validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
+    const allowed=[...allowedSourceRefs];
+    const system='Reconcile evidence under frozen 5DR rules. Output governed JSON only.';
+    const userPrompt=prompt(packet)+'\n\nAllowed source_refs (copy EXACTLY, never rewrite):\n'+JSON.stringify(allowed);
+    const raw=await ai.run(INTELLIGENCE_MODEL,{messages:[{role:'system',content:system},{role:'user',content:userPrompt}],max_tokens:2600,temperature:0,chat_template_kwargs:{enable_thinking:false}});
+    let parsed=parseJson(raw);let validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
+    if(!validation.judgment&&validation.errors.length===1&&validation.errors[0]==='source_refs must only contain supplied evidence references'&&isObject(parsed)){
+      const repairPrompt='Your prior JSON was rejected ONLY because source_refs contained a value that was not supplied. Do not change any evidence interpretation, scores, regime, limitations or horizon fields. Return the same JSON with source_refs corrected to use ONLY exact strings from this allowed list. If a family cannot be cited from this list, remove the unsupported claim by degrading verification/data_adequate rather than inventing a ref. Allowed source_refs: '+JSON.stringify(allowed)+'\nPrior JSON:\n'+JSON.stringify(parsed);
+      const repairedRaw=await ai.run(INTELLIGENCE_MODEL,{messages:[{role:'system',content:system},{role:'user',content:repairPrompt}],max_tokens:2600,temperature:0,chat_template_kwargs:{enable_thinking:false}});
+      parsed=parseJson(repairedRaw);validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
+    }
     if(!validation.judgment)return {judgment:null,normalized:null,errors:validation.errors.length?validation.errors:['intelligence model returned invalid JSON'],model:INTELLIGENCE_MODEL};
     return {judgment:validation.judgment,normalized:normalizeIntelligenceJudgment(validation.judgment),errors:[],model:INTELLIGENCE_MODEL};
   }catch{return {judgment:null,normalized:null,errors:['intelligence inference unavailable'],model:INTELLIGENCE_MODEL}}
