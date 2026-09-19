@@ -506,6 +506,25 @@ async function ipoEdgeSnapshot(request: Request, env: Env): Promise<Response> {
   return json({ snapshot: rows[0] ?? null, source: 'CONSOLE_FALLBACK' });
 }
 
+async function edgeStocksHistory(env: Env, tickerRaw: string): Promise<Response> {
+  if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
+  const ticker = normalizeTickerCandidate(tickerRaw);
+  if (!ticker) return json({ error: 'Invalid ticker' }, 422);
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select r.recommendation_id,r.run_timestamp,r.definitive_forecast,r.definitive_recommendation,
+           r.expected_price_zone_low,r.expected_price_zone_high,r.bull_probability,r.base_probability,r.bear_probability,
+           p.current_return_pct,p.outcome_verdict,l.status,l.expiry_trading_date
+      from recommendations r
+      left join recommendation_performance p using(recommendation_id)
+      left join recommendation_lifecycle l using(recommendation_id)
+     where r.ticker=${ticker}
+     order by r.run_timestamp desc
+     limit 8
+  `;
+  return json({ ticker, recommendations: rows });
+}
+
 async function edgeStocksMaster(env: Env): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -526,6 +545,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
+  if (url.pathname === '/api/edge-stocks/history' && request.method === 'GET') return edgeStocksHistory(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
   if (url.pathname === '/api/ipo-edge/snapshot' && request.method === 'GET') return ipoEdgeSnapshot(request, env);
   return app.fetch(request, env);
