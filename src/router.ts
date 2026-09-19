@@ -146,6 +146,20 @@ async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
+function indiaMarketCloseStatus(now = new Date()): { blocked: boolean; india_time: string } {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Asia/Kolkata', hour12: false,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    weekday: 'short'
+  }).formatToParts(now);
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
+  const hour = Number(get('hour')), minute = Number(get('minute'));
+  const weekday = get('weekday');
+  const blocked = ['Mon','Tue','Wed','Thu','Fri'].includes(weekday) && (hour < 15 || (hour === 15 && minute < 40));
+  return { blocked, india_time: `${get('year')}-${get('month')}-${get('day')}T${String(hour).padStart(2,'0')}:${String(minute).padStart(2,'0')}:${get('second')}+05:30` };
+}
+
 async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   let body: unknown;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
@@ -156,6 +170,21 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const resolved = await resolveEdgeTicker(env, command.target);
   if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
   const ticker = resolved.ticker;
+  const marketClose = indiaMarketCloseStatus();
+  if (marketClose.blocked) {
+    return json({
+      ok: true,
+      status: 'BEFORE_MARKET_CLOSE',
+      engine: 'EDGE_STOCKS',
+      contract_version: 'EDGE_STOCKS_V1_3',
+      ticker,
+      command: command.raw,
+      india_time: marketClose.india_time,
+      publish_after_ist: '15:40',
+      trading_enabled: false,
+      note: 'Governed EDGE autonomous publication is blocked until after the market-close validation window.'
+    });
+  }
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
   if (existingToday) {
     return json({
