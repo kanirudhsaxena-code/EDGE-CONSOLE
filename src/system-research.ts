@@ -50,8 +50,19 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
   try{
     if(source.id==='NSE_ALL_INDICES'){
       const parsed=JSON.parse(body),rows=Array.isArray(parsed?.data)?parsed.data:[];
-      const n=rows.find((x:any)=>x&&x.index==='NIFTY 50');
-      if(n)return {nifty50:{last:n.last,percent_change:n.percentChange,open:n.open,high:n.high,low:n.low,previous_close:n.previousClose,advances:Number(n.advances),declines:Number(n.declines),unchanged:Number(n.unchanged),change_30d:n.perChange30d,change_365d:n.perChange365d,one_week_ago:n.oneWeekAgoVal,one_month_ago:n.oneMonthAgoVal,one_year_ago:n.oneYearAgoVal}};
+      const pick=(name:string)=>rows.find((x:any)=>x&&x.index===name);
+      const slim=(x:any)=>x?{last:x.last,percent_change:x.percentChange,open:x.open,high:x.high,low:x.low,previous_close:x.previousClose,advances:Number(x.advances),declines:Number(x.declines),unchanged:Number(x.unchanged),change_30d:x.perChange30d,change_365d:x.perChange365d}:undefined;
+      const n=pick('NIFTY 50');
+      if(n)return {
+        nifty50:{...slim(n),one_week_ago:n.oneWeekAgoVal,one_month_ago:n.oneMonthAgoVal,one_year_ago:n.oneYearAgoVal},
+        india_vix:slim(pick('INDIA VIX')),
+        nifty_bank:slim(pick('NIFTY BANK')),
+        nifty_financial_services:slim(pick('NIFTY FINANCIAL SERVICES')),
+        nifty_it:slim(pick('NIFTY IT')),
+        nifty_auto:slim(pick('NIFTY AUTO')),
+        nifty_midcap_100:slim(pick('NIFTY MIDCAP 100')),
+        nifty_smallcap_100:slim(pick('NIFTY SMALLCAP 100'))
+      };
     }
     if(source.id==='NSE_MARKET_STATUS'){
       const parsed=JSON.parse(body),rows=Array.isArray(parsed?.marketState)?parsed.marketState:[];
