@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f7fb" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=frozen-ui-v6-stocks-20260919" />
+  <link rel="stylesheet" href="/styles.css?v=automated-5dr-v1-20260919" />
 </head>
 <body>
   <main class="shell">
@@ -89,15 +89,26 @@
         </label>
         <p class="muted">5DR horizon is fixed at the next 5 market days. These choices define the decision context; they do not change the frozen 5DR methodology.</p>
       </div>
-      <div class="run"><div class="step-label">2 · Evidence</div><strong>NIFTY charts</strong><p class="muted">Add your current NIFTY chart screenshots.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
-      <div class="run"><strong>Options / OI</strong><p class="muted">Add your current options or open-interest screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
-      <div id="fileSelection" class="file-selection muted">Select both screenshot groups to continue.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted">Next: EDGE Console reads the screenshots, checks wider market conditions and runs 5DR automatically.</p>
+      <div class="run">
+        <div class="step-label">2 · Evidence</div>
+        <strong>Automated market data</strong>
+        <p class="muted">5DR now uses authenticated Upstox market data plus governed official/web research automatically. No screenshots are required in the normal flow.</p>
+        <div class="file-selection"><span>● Upstox structured market data</span><span>● Official/web research</span><span>● Frozen 5DR engine</span></div>
+      </div>
+      <details class="run tech-details" id="manualBackup">
+        <summary>Having a data issue? Use screenshot backup</summary>
+        <div class="tech-body">
+          <div class="full"><strong>NIFTY charts</strong><p class="muted">Use only when automated market data is unavailable.</p><label class="upload">Choose NIFTY chart screenshot(s)<input id="priceEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+          <div class="full"><strong>Options / OI</strong><p class="muted">Add matching current options or open-interest screenshots.</p><label class="upload">Choose options / OI screenshot(s)<input id="derivativesEvidenceFiles" type="file" accept="image/jpeg,image/png,image/webp,application/pdf" multiple /></label></div>
+        </div>
+      </details>
+      <div id="fileSelection" class="file-selection muted">No screenshots selected · automated evidence will be used.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
+      <p class="muted">Next: EDGE Console acquires market evidence, checks wider conditions and runs the governed 5DR engine automatically.</p>
       <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=frozen-ui-v6-stocks-20260919"></script>
-  <script type="module" src="/resume.js?v=frozen-ui-v6-stocks-20260919"></script>
-  <script type="module" src="/edge-live.js?v=frozen-ui-v6-stocks-20260919"></script>
+  <script type="module" src="/app.js?v=automated-5dr-v1-20260919"></script>
+  <script type="module" src="/resume.js?v=automated-5dr-v1-20260919"></script>
+  <script type="module" src="/edge-live.js?v=automated-5dr-v1-20260919"></script>
 </body>
 </html>
