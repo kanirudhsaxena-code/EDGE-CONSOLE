@@ -4,6 +4,7 @@ import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvide
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
+import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 
 type Env = {
   ASSETS: Fetcher;
@@ -29,6 +30,58 @@ const integerOrZero = (value: unknown): number => {
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 ? n : 0;
 };
+
+const sha256Hex = async (text: string): Promise<string> => {
+  const bytes = new TextEncoder().encode(text);
+  const hash = await crypto.subtle.digest('SHA-256', bytes);
+  return [...new Uint8Array(hash)].map(v => v.toString(16).padStart(2, '0')).join('');
+};
+
+async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number }> {
+  if (!env.EDGE_DATABASE_URL) return { error: 'EDGE database is not configured', status: 503 };
+  const assessment = researchBundleCanPublish(body);
+  if (!assessment.ready || !isObject(body)) return { error: 'EDGE research bundle validation failed: ' + assessment.errors.join('; '), status: 422 };
+  const ticker = String(body.ticker).toUpperCase();
+  if (expectedTicker && ticker !== expectedTicker.toUpperCase()) return { error: 'research bundle ticker does not match resolved EDGE ticker', status: 422 };
+  const bundleId = String(body.bundle_id);
+  const payloadText = JSON.stringify(body);
+  const payloadHash = await sha256Hex(payloadText);
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const existing = await sql`select payload_hash from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+  if (existing.length) {
+    if (String(existing[0].payload_hash) !== payloadHash) return { error: 'research bundle_id already exists with different immutable content', status: 409 };
+    return { bundleId };
+  }
+  await sql`
+    insert into edge_research_bundles(
+      bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload,payload_hash,status
+    ) values(
+      ${bundleId},${ticker},${EDGE_RESEARCH_BUNDLE_VERSION},'CHATGPT',
+      ${String(body.research_fresh_at)},${String(body.created_at)},
+      ${payloadText}::jsonb,${payloadHash},'READY'
+    )
+  `;
+  return { bundleId };
+}
+
+async function saveEdgeResearchBundle(request: Request, env: Env): Promise<Response> {
+  let body: unknown;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  const errors = validateEdgeResearchBundle(body);
+  if (errors.length) return json({ error: 'EDGE research bundle validation failed', details: errors }, 422);
+  const saved = await persistEdgeResearchBundle(env, body);
+  if (!saved.bundleId) return json({ error: saved.error }, saved.status ?? 422);
+  return json({ ok: true, status: 'READY', contract_version: EDGE_RESEARCH_BUNDLE_VERSION, bundle_id: saved.bundleId });
+}
+
+async function getEdgeResearchBundle(env: Env, bundleId: string): Promise<Response> {
+  if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
+  if (!/^[A-Za-z0-9._:-]{3,160}$/.test(bundleId)) return json({ error: 'Invalid research bundle id' }, 422);
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload_hash,status,payload,inserted_at from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+  if (!rows.length) return json({ error: 'Research bundle not found' }, 404);
+  return json({ research_bundle: rows[0] });
+}
 
 async function readinessGate(request: Request, env: Env): Promise<Response> {
   let body: unknown;
@@ -156,31 +209,29 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const resolved = await resolveEdgeTicker(env, command.target);
   if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
   const ticker = resolved.ticker;
-  const existingToday = await todaysAutonomousRecommendation(env, ticker);
-  if (existingToday) {
+
+  if (!isObject(body.research_bundle)) {
     return json({
-      ok: true,
-      status: 'ALREADY_PUBLISHED_TODAY',
-      engine: 'EDGE_STOCKS',
-      contract_version: 'EDGE_STOCKS_V1_3',
-      ticker,
-      command: command.raw,
-      run_id: existingToday.id,
-      run_timestamp: existingToday.runTimestamp,
-      report_url: `/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
-      trading_enabled: false,
-    });
+      error: 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch',
+      code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
+      contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+      ticker
+    }, 409);
   }
+  const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
+  if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
+
   const baseline = await latestEdgeRecommendation(env, ticker);
   const baselineRunId = baseline?.id ?? null;
   const dispatchedAt = new Date().toISOString();
 
-  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN');
+  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', saved.bundleId);
   if (!dispatch.ok) {
     return json({
       error: 'EDGE autonomous dispatch failed',
       detail: dispatch.error,
       ticker,
+      research_bundle_id: saved.bundleId,
       code: dispatch.status === 503 ? 'EDGE_DISPATCH_NOT_CONFIGURED' : 'EDGE_DISPATCH_FAILED',
     }, dispatch.status === 401 || dispatch.status === 403 ? 502 : dispatch.status);
   }
@@ -190,8 +241,10 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     status: 'DISPATCHED',
     engine: 'EDGE_STOCKS',
     contract_version: 'EDGE_STOCKS_V1_3',
+    research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
     ticker,
     command: command.raw,
+    research_bundle_id: saved.bundleId,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     trading_enabled: false,
@@ -541,6 +594,9 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/edge-stocks/research-bundles' && request.method === 'POST') return saveEdgeResearchBundle(request, env);
+  const researchBundle = url.pathname.match(/^\\/api\\/edge-stocks\\/research-bundles\\/([^/]+)$/);
+  if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
   if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
