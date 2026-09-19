@@ -172,15 +172,15 @@ body{font-size:var(--fs-body);line-height:var(--lh-body)}
 .scorecard-context strong{display:block;font-size:var(--fs-md);margin:3px 0}
 .scorecard-context p{margin:4px 0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5}
 .scorecard-days{display:grid;grid-template-columns:1fr;gap:10px;margin-top:10px}
-.scorecard-day{display:grid;grid-template-columns:64px 1fr 1fr;gap:8px;align-items:start;padding:12px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface-soft)}
-.scorecard-day>strong{font-size:var(--fs-md);color:var(--ink)}
-.scorecard-day>div{display:grid;gap:2px}
+.scorecard-day{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-items:start;padding:12px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface-soft)}
+.scorecard-day>strong{grid-column:1/-1;font-size:var(--fs-md);color:var(--ink);padding-bottom:4px;border-bottom:1px solid var(--border-light)}
+.scorecard-day>div{display:grid;gap:2px;min-width:0}
 .scorecard-day>div span{font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.06em;color:var(--text-soft)}
 .scorecard-day>div b{font-size:var(--fs-md);color:var(--ink)}
 .scorecard-day>div small{font-size:var(--fs-xs);color:var(--text-soft)}
-.scorecard-day.pending{grid-template-columns:64px 1fr}
-.scorecard-day.pending span{font-size:var(--fs-sm);color:var(--text-soft);font-weight:700}
-.scorecard-day.pending small{grid-column:2;font-size:var(--fs-xs);color:var(--text-soft)}
+.scorecard-pending{grid-column:1/-1}
+.scorecard-pending span{font-size:var(--fs-xs);color:var(--text-soft)}
+.scorecard-context small{display:block;margin-top:6px;color:var(--text-soft);font-size:var(--fs-xs);line-height:1.45}
 .assessment-history-row{display:none}
 .assessment-empty-copy{font-size:var(--fs-sm);color:var(--text-soft)}
 .evidence-chip{display:inline-flex;width:max-content;margin-top:6px;padding:3px 8px;border-radius:999px;font-size:var(--fs-xs);font-weight:800}
@@ -219,9 +219,9 @@ body{font-size:var(--fs-body);line-height:var(--lh-body)}
   .assessment-metric:last-child{grid-column:auto}
   .scorecard-days{grid-template-columns:repeat(5,minmax(0,1fr))}
   .scorecard-day{grid-template-columns:1fr}
+  .scorecard-day>strong{grid-column:1}
   .scorecard-day>div{border-top:1px solid var(--border-light);padding-top:6px}
-  .scorecard-day.pending{grid-template-columns:1fr}
-  .scorecard-day.pending small{grid-column:1}
+  .scorecard-pending{grid-column:1}
   .active-call-grid,.ipo-issue-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 
