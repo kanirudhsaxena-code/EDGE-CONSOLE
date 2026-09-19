@@ -321,7 +321,16 @@ function renderGenericModule(engine,target,runsData){
 }
 async function loadRecentResults(module){
   if(!runs||!runsNote)return;
-  try{const d=await fetch('/api/runs/latest?engine='+encodeURIComponent(module),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.runs)?d.runs:[];if(!list.length){runs.innerHTML='<div class="generic-empty">No published results for this module yet.</div>';runsNote.textContent='0 recent';return}runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'5DR result':module==='EDGE_STOCKS'?'EDGE Stocks result':'EDGE IPO result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'}catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
+  try{
+    if(module==='EDGE_IPO'){
+      const d=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()),snap=d.snapshot||null;
+      if(!snap){runs.innerHTML='<div class="generic-empty">No IPO EDGE snapshot available.</div>';runsNote.textContent='0 recent';return}
+      runs.innerHTML='<article class="run history-row"><strong>IPO EDGE snapshot</strong><span class="muted">'+escapeHtml(new Date(snap.captured_at).toLocaleString())+'</span></article>';runsNote.textContent='1 current snapshot';return
+    }
+    const d=await fetch('/api/runs/latest?engine='+encodeURIComponent(module),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.runs)?d.runs:[];
+    if(!list.length){runs.innerHTML='<div class="generic-empty">No published results for this module yet.</div>';runsNote.textContent='0 recent';return}
+    runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'5DR result':'EDGE Stocks result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'
+  }catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
 }
 function render5dr(run,request,outcomeAssessment){
   if(!run){
@@ -404,8 +413,9 @@ async function loadDashboard(){
       render5dr(f.run,matchedRequest,oa)
     }else render5dr(null,latestReq,null);
 
-    const ipoRuns=await fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]);
-    renderIpoSnapshot(ipoSummary,ipoRuns);
+    const ipoData=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()).catch(()=>({snapshot:null}));
+    const ipoSnap=ipoData.snapshot||null,ipoPayload=ipoSnap&&ipoSnap.payload?ipoSnap.payload:null;
+    renderIpoSnapshot(ipoSummary,ipoPayload?[{run_id:'IPO-SNAPSHOT-'+String(ipoSnap.captured_at||''),generated_at:ipoSnap.captured_at,framework_version:ipoPayload.framework_version||'1.1',result:{...ipoPayload,current_issues:ipoPayload.issues||[]}}]:[]);
     await loadRecentResults(activeModule);
   }catch(e){
     console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderIpoSnapshot(ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
