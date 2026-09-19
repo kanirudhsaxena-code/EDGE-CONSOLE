@@ -167,25 +167,32 @@ runForm.addEventListener('submit',async event=>{event.preventDefault();saveDecis
 document.addEventListener('click',event=>{const toggle=event.target.closest&&event.target.closest('[data-analysis-toggle]');if(!toggle)return;const card=toggle.closest('.simple-result'),detail=card&&card.querySelector('[data-analysis-detail]');if(!detail)return;detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'View full analysis':'Hide full analysis';});
 document.addEventListener('click',async event=>{const button=event.target.closest&&event.target.closest('#resume5drRequest');if(!button)return;const requestId=button.dataset.requestId,status=document.getElementById('resume5drStatus');if(!requestId||!status)return;button.disabled=true;button.textContent='Processing…';try{status.textContent='Resuming from the last persisted governed stage…';const result=await runStage(requestId,'resume-processing','Resuming 5DR from its persisted governed stage…');status.textContent=result.status==='PROCESSING'?'Engine dispatched successfully. Refreshing…':'Pipeline advanced successfully. Refreshing…';setTimeout(()=>location.reload(),1200)}catch(error){status.textContent=friendlyFailureMessage(error&&error.message);const card=status.closest('.simple-result');if(card&&!card.querySelector('.diagnostic-details'))card.insertAdjacentHTML('beforeend',diagnosticSummary(error&&error.message,'Safe to retry'));button.disabled=false;button.textContent='Retry 5DR'}});
 function pct(v){return v==null?'—':Number(v).toFixed(Number(v)%1?1:0)+'%'}
-function assessmentDayCell(label,day,zone){
-  const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{};
+function assessmentDayCell(label,day,zone,rec){
+  const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{},r=rec&&typeof rec==='object'?rec:{};
   const status=String(d.status||'').toUpperCase();
-  if(status==='NOT DUE'||Number(d.scorable||0)===0){
-    return '<div class="scorecard-day pending"><strong>'+escapeHtml(label)+'</strong><span>Not due</span><small>Awaiting governed checkpoint</small></div>'
-  }
+  const forecastDue=status!=='NOT DUE'&&Number(d.scorable||0)>0;
   const hits=Number(d.hits||0),scorable=Number(d.scorable||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
   const dirPct=d.hit_rate_pct!=null?Number(d.hit_rate_pct):scorable?hits/scorable*100:null;
   const zonePct=z.zone_hit_rate_pct!=null?Number(z.zone_hit_rate_pct):(d.zone_hit_rate_pct!=null?Number(d.zone_hit_rate_pct):(zoneScorable?zoneHits/zoneScorable*100:null));
-  return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong><div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits</small></div></div>'
+  const resolved=Number(r.resolved||0),recHits=Number(r.hits||0),recMisses=Number(r.misses||0);
+  const recPct=r.hit_rate_pct!=null?Number(r.hit_rate_pct):(resolved?recHits/resolved*100:null);
+  const pnl=r.overall_pnl_pct!=null?Number(r.overall_pnl_pct):null,hitPnl=r.hit_pnl_pct!=null?Number(r.hit_pnl_pct):null,missPnl=r.miss_pnl_pct!=null?Number(r.miss_pnl_pct):null;
+  const forecastHtml=forecastDue
+    ? '<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits</small></div>'
+    : '<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
+  const recHtml=resolved
+    ? '<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(pnl)+'</b><small>Hits '+pct(hitPnl)+' · Misses '+pct(missPnl)+'</small></div>'
+    : '<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
+  return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
 function renderAssessmentDetails(details){
   if(!details.length)return '<p class="assessment-empty-copy">No matured outcome records yet. The current forecast will enter this scorecard only as governed checkpoints mature.</p>';
   const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{};
-  const m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{};
+  const m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
   const labels=['D+1','D+2','D+3','D+4','D+5'];
   return [
-    '<div class="scorecard-context"><span>Last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString():'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p></div>',
-    '<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label])).join('')+'</div>'
+    '<div class="scorecard-context"><span>Last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString():'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>Recommendation hit/P&L is attributed once, to the D+n horizon on which the call first resolves. This avoids double-counting later days.</small></div>',
+    '<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'
   ].join('')
 }
 function renderAssessment(container,payload){
