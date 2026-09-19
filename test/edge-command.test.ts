@@ -35,13 +35,14 @@ test('dispatch uses existing governed autonomous workflow and no trading endpoin
     return new Response(null, { status: 204 });
   };
   try {
-    const result = await dispatchEdgeWorkflow('secret-token', 'LTF');
+    const result = await dispatchEdgeWorkflow('secret-token', 'LTF', 'UNKNOWN', 'EDGE-RESEARCH-LTF-20260919-TEST');
     assert.equal(result.ok, true);
     assert.match(capturedUrl, /EDGE---V1\/actions\/workflows\/autonomous-publish\.yml\/dispatches$/);
     const body = JSON.parse(String(capturedInit?.body));
     assert.equal(body.ref, 'main');
     assert.equal(body.inputs.ticker, 'LTF');
     assert.equal(body.inputs.holding_state, 'UNKNOWN');
+    assert.equal(body.inputs.research_bundle_id, 'EDGE-RESEARCH-LTF-20260919-TEST');
     assert.equal(capturedInit?.method, 'POST');
   } finally {
     globalThis.fetch = original;
