@@ -1,0 +1,204 @@
+{
+  "command": "EDGE TITAN",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-TITAN-20260919T113700Z",
+    "ticker": "TITAN",
+    "command": "EDGE TITAN",
+    "created_at": "2026-09-19T11:37:00Z",
+    "research_fresh_at": "2026-09-19T11:37:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB",
+      "EXA"
+    ],
+    "sources": [
+      {
+        "source_id": "titan_s1_corp_announcements",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/investors/corporate-announcements",
+        "title": "Titan Company Corporate Announcements",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s2_psu_grant",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/Grant%20of%20PSUs_0.pdf",
+        "title": "Grant of Performance Stock Units under Titan Company Limited Performance Based Stock Unit Scheme 2026",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-09-18T00:00:00+05:30",
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s3_postal_ballot",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/Voting%20Results-Final_0.pdf",
+        "title": "Voting Results of Postal Ballot through remote e-voting",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-09-17T00:00:00+05:30",
+        "event_date": "2026-09-17T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s4_care_rating",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/SE%20Intimation%20credit%20rating.pdf",
+        "title": "Ratings update from CARE Ratings Ltd.",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-09-11T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s5_cp_redemption",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/SECPRedemption10092026.pdf",
+        "title": "Redemption of Commercial Paper",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-09-10T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s6_q1_kotakneo",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.kotakneo.com/news/stocks/titan-q1-fy-2026-27-results-net-profit-rises/",
+        "title": "Titan Q1 FY 2026-27 Results: Net Profit Rises 63% To Rs 1,777 Cr",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-08-07T11:22:41Z",
+        "event_date": "2026-08-07T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s7_q1_fortune",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.fortuneindia.com/business-news/titans-q1-profit-jumps-63-to-1777-crore-as-jewellery-business-shines-despite-overseas-drag/152748",
+        "title": "Titan Q1 FY27 Profit Surges 63% to Rs 1,777 Crore on Robust Jewellery Sales Despite Overseas Drag",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-08-07T00:00:00+05:30",
+        "event_date": "2026-08-07T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s8_nse_shareholding",
+        "provider": "CHATGPT_WEB",
+        "authority": "EXCHANGE",
+        "url": "https://www.nseindia.com/companies-listing/corporate-filings-shareholding-pattern?symbol=TITAN&tabIndex=equity",
+        "title": "NSE Corporate Filing - Shareholding Pattern - Titan Company",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-07-16T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s9_trendlyne_shareholding",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/1403/TITAN/latest/titan-company-ltd/",
+        "title": "Titan Company Ltd. Latest Shareholding Pattern",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan_s10_valueresearch",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.valueresearchonline.com/stocks/44883/titan-company-ltd/shareholding/",
+        "title": "Titan Company Ltd. Valuation and Shareholding",
+        "retrieved_at": "2026-09-19T11:37:00Z",
+        "publication_date": "2026-09-11T00:00:00+05:30",
+        "event_date": "2026-09-11T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "titan_c1_business_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Q1 FY27 showed broad-based operating growth: consolidated net profit rose 63% year on year to Rs 1,777 crore and total income excluding bullion and digi-gold rose about 40% to Rs 20,753 crore; jewellery grew 43%, while Damas remained loss-making and reported profitability included a Rs 407 crore customs-duty gain.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "titan_s6_q1_kotakneo",
+          "titan_s7_q1_fortune"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan_c2_valuation",
+        "evidence_category": "VALUATION",
+        "statement": "A fresh independent valuation reference dated 11 September 2026 showed Titan at about 77.1x P/E and 25.6x P/B, so valuation remains a meaningful compression-risk input; live Upstox ratios at execution should determine the frozen engine's raw valuation score.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "titan_s10_valueresearch"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan_c3_institutional_behaviour",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "The latest filed June 2026 ownership snapshot shows promoter ownership unchanged at 52.90%; FII/FPI ownership eased from 15.65% to 15.39% while mutual-fund ownership rose from 8.45% to 8.73%, indicating mixed rather than one-directional institutional behaviour.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "titan_s8_nse_shareholding",
+          "titan_s9_trendlyne_shareholding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan_c4_news_events_catalysts",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Fresh official disclosures through 18 September 2026 include shareholder approval and subsequent grant under the 2026 performance-stock-unit scheme, reaffirmed CARE AAA Stable/A1+ ratings with the commercial-paper programme enhanced to Rs 15,000 crore, and full redemption of Rs 1,000 crore of commercial paper. These are current corporate/governance/credit events and are not recycled Q1 catalysts.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "titan_s1_corp_announcements",
+          "titan_s2_psu_grant",
+          "titan_s3_postal_ballot",
+          "titan_s4_care_rating",
+          "titan_s5_cp_redemption"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan_c5_event_shock",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Within the reviewed high-authority company and exchange disclosures through 18 September 2026, no independently verified adverse company-specific event shock was identified; live price, volatility and macro evidence from the structured market provider remains necessary for engine-side event-shock scoring.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "titan_s1_corp_announcements",
+          "titan_s2_psu_grant",
+          "titan_s3_postal_ballot",
+          "titan_s4_care_rating",
+          "titan_s5_cp_redemption"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      }
+    ],
+    "conflicts": [],
+    "limitations": [
+      "Q1 FY27 results are event-dated 7 August 2026 and are used as the latest reported business-fundamentals evidence, not as a fresh September catalyst.",
+      "The institutional claim uses the latest filed quarterly shareholding snapshot for 30 June 2026; it is not a live fund-flow measure.",
+      "The 11 September valuation reference may differ from live provider ratios because the share price changes; the frozen engine must use live/latest available Upstox structured evidence for the raw valuation calculation.",
+      "The postal-ballot result was retrieved through Exa from Titan Company's official PDF after native web retrieval was unreliable; the underlying source remains the issuer's primary disclosure.",
+      "This ChatGPT research bundle validates research claims and provenance only. It does not manually create component scores, probabilities, DES, Market Trust, BOT, Decision Ladder, price zones, or recommendations.",
+      "Any material conflict discovered when Upstox structured evidence is reconciled with this bundle must remain surfaced and fail closed under existing governance."
+    ]
+  }
+}
