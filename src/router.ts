@@ -323,17 +323,40 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     }
   };
 
+  const scoreLabel = (value: unknown): string => {
+    const n = Number(value);
+    return n === 2 ? 'STRONGLY POSITIVE' : n === 1 ? 'POSITIVE' : n === 0 ? 'NEUTRAL' : n === -1 ? 'NEGATIVE' : n === -2 ? 'STRONGLY NEGATIVE' : 'NOT VERIFIED';
+  };
+  const legacyInterpretation = (componentRaw: unknown, scoreRaw: unknown): string => {
+    const component = String(componentRaw || '').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
+    const score = Number(scoreRaw);
+    const tone = scoreLabel(scoreRaw).toLowerCase();
+    const consequence =
+      component.includes('PRICE_STRUCTURE') ? 'Near-term price structure is therefore a material input to the D+5 direction.' :
+      component.includes('PV') ? 'Price/volume/options confirmation is therefore influencing directional conviction.' :
+      component.includes('RELATIVE_STRENGTH') ? 'Relative performance versus the benchmark is therefore influencing directional conviction.' :
+      component.includes('BUSINESS_FUNDAMENTALS') ? 'Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.' :
+      component.includes('VALUATION') ? 'Valuation is therefore acting as a supporting or limiting factor rather than a standalone trigger.' :
+      component.includes('INSTITUTIONAL') ? 'Institutional ownership/behaviour evidence is therefore contributing to confirmation quality.' :
+      component.includes('NEWS') || component.includes('CATALYST') ? 'Recent catalysts are therefore contributing to the risk/reward balance.' :
+      component.includes('EVENT_SHOCK') ? 'Event-risk evidence is therefore affecting the risk overlay rather than creating direction by itself.' :
+      component.includes('CHART_PATTERN') ? 'The active chart-pattern signal is therefore contributing to the near-term setup.' :
+      'This governed component is contributing to the overall EDGE direction and conviction.';
+    return `Legacy active run: the original narrative field was not persisted. The immutable verified component score is ${Number.isFinite(score) ? score.toFixed(0) : 'N/A'} (${tone}); ${consequence}`;
+  };
   const drilldown = componentRows.map((row: Record<string, unknown>) => {
     const verification = componentVerificationStatus(row.availability_status, row.evidence_quality);
     const notes = parseNotes(row.notes);
-    const keyOutcome = notes.key_outcome ?? (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED'));
-    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? '' : 'Evidence not verified; no interpretation inferred.');
+    const reconstructed = verification === 'VERIFIED' && !isNonEmptyString(notes.interpretation);
+    const keyOutcome = notes.key_outcome ?? (reconstructed ? scoreLabel(row.raw_score) : (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED')));
+    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? legacyInterpretation(row.component,row.raw_score) : 'Evidence not verified; no interpretation inferred.');
     return {
       component: String(row.component),
       score_or_level: row.raw_score ?? 'N/A',
       verification_status: verification,
       key_outcome: keyOutcome,
       interpretation,
+      narrative_source: reconstructed ? 'LEGACY_SCORE_RECONSTRUCTION' : 'PERSISTED_EVIDENCE_NARRATIVE',
     };
   });
 
@@ -388,9 +411,20 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         recommendation_hit_rate_pct: numberOrNull(stock.recommendation_hit_rate_pct),
         direction_hit_rate_pct: numberOrNull(stock.direction_hit_rate_pct),
         target_hit_rate_pct: numberOrNull(stock.target_hit_rate_pct),
+        avg_gain_pct: numberOrNull(stock.avg_gain_pct),
+        avg_loss_pct: numberOrNull(stock.avg_loss_pct),
+        avg_mfe_pct: numberOrNull(stock.avg_mfe_pct),
+        avg_mae_pct: numberOrNull(stock.avg_mae_pct),
+        cumulative_model_pnl_units: numberOrNull(stock.cumulative_model_pnl_units),
         provisional_captured_checkpoints: integerOrZero(stock.provisional_captured_checkpoints),
         provisional_due_checkpoints: integerOrZero(stock.provisional_due_checkpoints),
+        provisional_forecast_scorable: integerOrZero(stock.provisional_forecast_scorable),
+        provisional_forecast_hits: integerOrZero(stock.provisional_forecast_hits),
+        provisional_forecast_misses: integerOrZero(stock.provisional_forecast_misses),
         provisional_forecast_accuracy_pct: numberOrNull(stock.provisional_forecast_accuracy_pct),
+        provisional_zone_scorable: integerOrZero(stock.provisional_zone_scorable),
+        provisional_zone_hits: integerOrZero(stock.provisional_zone_hits),
+        provisional_zone_misses: integerOrZero(stock.provisional_zone_misses),
         provisional_zone_accuracy_pct: numberOrNull(stock.provisional_zone_accuracy_pct),
         latest_checkpoint_observed_at: stock.latest_checkpoint_observed_at ?? null,
       }
