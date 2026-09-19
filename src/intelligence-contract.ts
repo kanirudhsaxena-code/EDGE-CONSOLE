@@ -3,7 +3,7 @@ import { REQUIRED_5DR_INPUTS, isNonEmptyString, isObject, type JsonRecord } from
 export const USER_SCREENSHOT_CATEGORIES = ['PRICE_TECHNICALS', 'DERIVATIVES_OI'] as const;
 export const SYSTEM_RESEARCH_CATEGORIES = ['MARKET_TRUST', 'EVENT_SHOCK', 'EXECUTION_RISK'] as const;
 
-export type IntelligenceSourceKind = 'SCREENSHOT' | 'WEB_RESEARCH';
+export type IntelligenceSourceKind = 'SCREENSHOT' | 'UPSTOX_STRUCTURED' | 'WEB_RESEARCH';
 export type IntelligenceVerification = 'VERIFIED' | 'DEGRADED' | 'UNAVAILABLE';
 
 export interface IntelligenceObservation {
@@ -41,7 +41,7 @@ export function validateIntelligenceHandoff(body: unknown): string[] {
       if (!isObject(item)) { errors.push(`observations[${index}] must be an object`); return; }
       if (!isNonEmptyString(item.category)) errors.push(`observations[${index}].category is mandatory`);
       else seenCategories.add(item.category);
-      if (item.source_kind !== 'SCREENSHOT' && item.source_kind !== 'WEB_RESEARCH') {
+      if (item.source_kind !== 'SCREENSHOT' && item.source_kind !== 'UPSTOX_STRUCTURED' && item.source_kind !== 'WEB_RESEARCH') {
         errors.push(`observations[${index}].source_kind is invalid`);
       }
       if (!isNonEmptyString(item.source_ref)) errors.push(`observations[${index}].source_ref is mandatory`);
