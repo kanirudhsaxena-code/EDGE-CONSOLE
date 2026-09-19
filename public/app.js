@@ -247,8 +247,8 @@ function probabilityCards(result,engine){
 function ipoIssueCard(issue){
   const band=issue.price_band_low!=null||issue.price_band_high!=null?('₹'+(issue.price_band_low??'—')+' – ₹'+(issue.price_band_high??'—')):'Price band pending';
   const dateText=[issue.issue_open_date,issue.issue_close_date].filter(Boolean).map(x=>new Date(x).toLocaleDateString()).join(' → ');
-  const blocker=issue.hard_blocker==='CRITICAL_EVIDENCE_NOT_VERIFIED'?'Critical evidence not verified':humanText(issue.hard_blocker||'');
-  return '<div class="ipo-issue-card"><div class="ipo-issue-head"><strong>'+escapeHtml(issue.company_name||'—')+'</strong><span class="evidence-chip '+(issue.grade==='NV'?'limited':'verified')+'">'+escapeHtml(issue.grade||'—')+'</span></div><p>'+escapeHtml(issue.segment||'—')+(issue.exchange?' · '+escapeHtml(issue.exchange):'')+' · '+escapeHtml(band)+'</p><small>'+escapeHtml(dateText||'Dates pending')+' · '+escapeHtml(humanText(issue.decision||'NO_ACTION'))+'</small>'+(blocker?'<small class="ipo-blocker">'+escapeHtml(blocker)+'</small>':'')+'</div>'
+  const pending=issue.grade==='NV'||issue.hard_blocker==='CRITICAL_EVIDENCE_NOT_VERIFIED',blocker=pending?'Autonomous research is still resolving critical evidence':humanText(issue.hard_blocker||'');
+  return '<div class="ipo-issue-card"><div class="ipo-issue-head"><strong>'+escapeHtml(issue.company_name||'—')+'</strong><span class="evidence-chip '+(pending?'limited':'verified')+'">'+escapeHtml(pending?'Research pending':(issue.grade||'—'))+'</span></div><p>'+escapeHtml(issue.segment||'—')+(issue.exchange?' · '+escapeHtml(issue.exchange):'')+' · '+escapeHtml(band)+'</p><small>'+escapeHtml(dateText||'Dates pending')+' · '+escapeHtml(pending?'Decision withheld until evidence recovery completes':humanText(issue.decision||'NO_ACTION'))+'</small>'+(blocker?'<small class="ipo-blocker">'+escapeHtml(blocker)+'</small>':'')+'</div>'
 }
 function humanText(v){return String(v??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}
 function renderIpoAssessment(result){
@@ -275,21 +275,21 @@ function renderIpoSnapshot(target,runsData){
   const list=Array.isArray(runsData)?runsData:[],latest=list[0]||null;
   if(!target)return;
   if(!latest){target.innerHTML='<div class="generic-empty">No IPO EDGE snapshot is available.</div>';return}
-  const r=latest.result||{},issues=Array.isArray(r.current_issues)?r.current_issues:[],ready=issues.filter(x=>x&&x.grade&&x.grade!=='NV'),nv=issues.filter(x=>x&&x.grade==='NV'),focus=issues[0]||null,validated=r.latest_validated||null;
+  const r=latest.result||{},issues=Array.isArray(r.current_issues)?r.current_issues:[],ready=issues.filter(x=>x&&x.grade&&x.grade!=='NV'),pending=issues.filter(x=>x&&x.grade==='NV'),focus=issues[0]||null,validated=r.latest_validated||null;
   renderIpoAssessment(r);
-  const headline=ready.length?ready.length+' current issue'+(ready.length===1?' is':'s are')+' decision-ready':'No current IPO is decision-ready';
+  const headline=ready.length?ready.length+' current issue'+(ready.length===1?' is':'s are')+' decision-ready':(pending.length?'Current IPO research is still being completed':'No current IPO is decision-ready');
   const why=[
-    '<div class="why-card"><strong>Current coverage</strong><p><b>What we saw:</b> '+escapeHtml(issues.length)+' open/upcoming issues are in the current snapshot; '+escapeHtml(nv.length)+' are NV because critical evidence is not yet verified.</p><p><b>What it means:</b> NV is an evidence state, not a negative investment score. The system is refusing to grade issues that do not yet meet the evidence gates.</p></div>',
-    '<div class="why-card"><strong>Decision quality</strong><p><b>What we saw:</b> '+escapeHtml(ready.length)+' current issues have a validated non-NV grade.</p><p><b>What it means:</b> The Console should show “wait/no action” rather than manufacture an apply/reject call when R2/R3/R4/R6/R7 evidence is incomplete.</p></div>',
+    '<div class="why-card"><strong>Current coverage</strong><p>'+escapeHtml(issues.length)+' open/upcoming issues are in the current snapshot; '+escapeHtml(pending.length)+' are still in autonomous evidence recovery. They are not treated as finished recommendations.</p></div>',
+    '<div class="why-card"><strong>Decision quality</strong><p>'+escapeHtml(ready.length)+' current issues have a governed grade. Any issue still missing critical R2/R3/R4/R6/R7 evidence remains Research pending until recovery completes or the engine records an explicit exhausted-source exception.</p></div>',
     validated?'<div class="why-card"><strong>Latest validated checkpoint</strong><p><b>What we saw:</b> '+escapeHtml(validated.company_name)+' scored '+escapeHtml(validated.score)+' with grade '+escapeHtml(validated.grade)+' and decision '+escapeHtml(humanText(validated.decision))+'.</p><p><b>What it means:</b> The IPO engine is capable of producing a governed grade once the evidence gates are complete; current NVs are a data-readiness issue, not an empty engine.</p></div>':''
   ].join('');
   target.innerHTML=[
     '<article class="simple-result ipo-standard-result">',
       '<div class="result-kicker">CURRENT IPO VIEW</div>',
       '<h2>'+escapeHtml(headline)+'</h2>',
-      '<p class="result-copy">'+escapeHtml(issues.length)+' current issues monitored · '+escapeHtml(nv.length)+' awaiting critical evidence verification.</p>',
-      '<div class="decision-grid"><div class="decision-card"><span>Decision status</span><strong>'+(ready.length?'Review graded issues':'Wait')+'</strong><small>Do not act on NV issues</small></div><div class="decision-card"><span>Framework</span><strong>V'+escapeHtml(r.framework_version||latest.framework_version||'1.1')+'</strong><small>IPO EDGE governed snapshot</small></div></div>',
-      '<div class="action-box"><span>Suggested action</span><strong>'+(ready.length?'Review the graded current issues below.':'Wait for critical evidence to be verified before any apply/reject decision.')+'</strong></div>',
+      '<p class="result-copy">'+escapeHtml(issues.length)+' current issues monitored · '+escapeHtml(pending.length)+' still in autonomous research recovery.</p>',
+      '<div class="decision-grid"><div class="decision-card"><span>Decision status</span><strong>'+(ready.length?'Review graded issues':'Research pending')+'</strong><small>Unresolved evidence is withheld from recommendation output</small></div><div class="decision-card"><span>Framework</span><strong>V'+escapeHtml(r.framework_version||latest.framework_version||'1.1')+'</strong><small>IPO EDGE governed snapshot</small></div></div>',
+      '<div class="action-box"><span>Suggested action</span><strong>'+(ready.length?'Review the governed graded issues below.':'No apply/reject call until autonomous evidence recovery completes.')+'</strong></div>',
       '<details class="why-details" open><summary>Why this view?</summary><div class="why-grid">'+why+'</div></details>',
       '<details class="change-details" open><summary>What could change the view?</summary><ul><li>Critical R2/R3/R4/R6/R7 evidence must move from unresolved to verified.</li><li>Subscription/QIB/NII/retail demand and GMP should be incorporated when available and governed.</li><li>The final-day checkpoint can upgrade, retain or reject the issue once evidence coverage is sufficient.</li><li>A hard blocker keeps the issue at NV/No Action regardless of superficial market enthusiasm.</li></ul></details>',
       '<details class="active-details" open><summary>Current IPO queue</summary><div class="ipo-issue-grid">'+(issues.length?issues.map(ipoIssueCard).join(''):'<p class="muted">No current issues.</p>')+'</div></details>',
