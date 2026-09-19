@@ -2,10 +2,12 @@ import { neon } from '@neondatabase/serverless';
 import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
-import { dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { dispatch5drAcquisition, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
 import { sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
+import { assessAutomatedMarketEvidence } from './automated-market-evidence';
+import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -15,6 +17,91 @@ const REQUIRED_FAMILIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVE
 const SYSTEM_FAMILIES=['MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
 const isObject=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const responseJson=async(response:Response):Promise<Record<string,unknown>>=>{try{const body=await response.clone().json();return isObject(body)?body:{}}catch{return {}}};
+
+function decisionSetup(body:unknown):{value?:Record<string,unknown>;error?:string}{
+  const assessment=isObject(body)&&isObject(body.assessment)?body.assessment:{};
+  const allowedObjectives=['MARKET_VIEW','OPTIONS_SETUP','BOTH'];
+  const allowedRisk=['CONSERVATIVE','BALANCED','OPPORTUNISTIC'];
+  const allowedPriority=['CAPITAL_PROTECTION','BALANCED','GROWTH'];
+  const objective=String(assessment.objective??'BOTH');
+  const risk_posture=String(assessment.risk_posture??'CONSERVATIVE');
+  const capital_priority=String(assessment.capital_priority??'CAPITAL_PROTECTION');
+  if(!allowedObjectives.includes(objective))return {error:'Unknown decision objective'};
+  if(!allowedRisk.includes(risk_posture))return {error:'Unknown risk posture'};
+  if(!allowedPriority.includes(capital_priority))return {error:'Unknown capital priority'};
+  return {value:{horizon:'D+1_TO_D+5',objective,risk_posture,capital_priority,assessed_at:new Date().toISOString()}};
+}
+
+function automatedMarketObservations(metadata:Record<string,unknown>):Record<string,unknown>[]{
+  const automated=isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence:{};
+  return automated.status==='AUTOMATED_MARKET_DATA_READY'&&Array.isArray(automated.observations)
+    ?automated.observations.filter(isObject):[];
+}
+
+function governedMarketObservations(metadata:Record<string,unknown>):Record<string,unknown>[]{
+  const automated=automatedMarketObservations(metadata);
+  if(automated.length)return automated;
+  const screenshot=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
+  return screenshot.status==='VISION_READY'&&Array.isArray(screenshot.observations)
+    ?screenshot.observations.filter(isObject):[];
+}
+
+async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  let body:unknown={};try{body=await request.json()}catch{}
+  const setup=decisionSetup(body);
+  if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
+  const sql=neon(env.DATABASE_URL);
+  const requestId=`5drreq_${crypto.randomUUID()}`;
+  const batchId=`auto_${crypto.randomUUID()}`;
+  let metadata:Record<string,unknown>={
+    decision_setup:setup.value,
+    evidence_file_count:0,
+    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
+    automated_market_evidence:{status:'PENDING'},
+    adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
+  };
+  await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
+    values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
+  const dispatch=await dispatch5drAcquisition(env,requestId,request.url,fetch);
+  const acquisitionDispatch={...dispatch,attempted_at:new Date().toISOString()};
+  metadata={...metadata,acquisition_dispatch:acquisitionDispatch};
+  if(!dispatch.ok){
+    const blocked={...metadata,adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED'};
+    await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify(blocked)}::jsonb,error=${JSON.stringify({stage:'AUTOMATED_ACQUISITION_DISPATCH',detail:dispatch.detail??dispatch.status})}::jsonb,updated_at=now() where request_id=${requestId}`;
+    return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
+  }
+  await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+  return json({ok:true,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
+}
+
+async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  let body:unknown;try{body=await request.json()}catch{return json({error:'Invalid JSON body'},400)}
+  const gate=assessAutomatedMarketEvidence(body,requestId);
+  if(gate.errors.length)return json({error:'Automated market evidence validation failed',details:gate.errors},422);
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  if(!rows.length)return json({error:'request_id not found'},404);
+  if(['COMPLETED','CANCELLED'].includes(String(rows[0].status)))return json({error:'request is not eligible for automated evidence callback'},409);
+  const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  const envelope=isObject(body)?{...body,received_at:new Date().toISOString()}:body;
+  if(gate.blocked){
+    const next={...metadata,automated_market_evidence:envelope,adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED'};
+    await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(next)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',blockers:isObject(body)&&Array.isArray(body.blockers)?body.blockers:[],next_step:'USE_SCREENSHOT_BACKUP'});
+  }
+  if(!gate.ready)return json({error:'Automated market evidence is not ready'},409);
+  const next={...metadata,automated_market_evidence:envelope,freshness_at:isObject(body)?body.captured_at:null,adapter_stage:'AUTOMATED_MARKET_DATA_READY'};
+  await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(next)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+  const research=await systemResearch(env,requestId);
+  const researchBody=await responseJson(research);
+  if(!research.ok)return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_READY',research:researchBody,next_step:'RETRY_SYSTEM_RESEARCH'});
+  const reconciled=await reconcileIntelligence(request,env,requestId);
+  const reconciledBody=await responseJson(reconciled);
+  return json({...reconciledBody,callback_accepted:true,request_id:requestId},200);
+}
+
 
 async function visionReadiness(env:Env):Promise<Response>{
   if(!env.AI||typeof env.AI.run!=='function')return json({ok:false,status:'UNAVAILABLE',error:'Workers AI binding is not configured'},503);
@@ -71,11 +158,13 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   const rows=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if(!rows.length)return json({error:'request_id not found'},404);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  const automated=automatedMarketObservations(metadata);
   const screenshotIntelligence=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
-  if(screenshotIntelligence.status!=='VISION_READY')return json({error:'system research requires VISION_READY screenshot intelligence',vision_status:screenshotIntelligence.status??null},409);
+  const screenshotReady=screenshotIntelligence.status==='VISION_READY';
+  if(!automated.length&&!screenshotReady)return json({error:'system research requires ready automated market evidence or screenshot fallback evidence',automated_status:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence.status??null:null,vision_status:screenshotIntelligence.status??null},409);
   const acquisition=await acquireSystemResearch();
   const allReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
-  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),...acquisition};
+  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',...acquisition};
   await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record})}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ok:allReady,request_id:requestId,system_research:record,next_step:allReady?'RESEARCH_INTERPRETATION':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
 }
@@ -90,8 +179,7 @@ function median(values:number[]):number|null{
   return a.length%2?a[m]:(a[m-1]+a[m])/2;
 }
 function detectCurrentMarketLevelConflict(metadata:Record<string,unknown>):{conflict:boolean;detail?:string;screenshot_level?:number;official_level?:number;difference_pct?:number}{
-  const screenshot=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
-  const observations=Array.isArray(screenshot.observations)?screenshot.observations.filter(isObject):[];
+  const observations=governedMarketObservations(metadata);
   const prices:number[]=[];
   for(const o of observations){
     const findings=Array.isArray(o.findings)?o.findings.filter(isObject):[];
@@ -127,10 +215,9 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
   const rows=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if(!rows.length)return json({error:'request_id not found'},404);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
-  const screenshot=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
+  const marketObservations=governedMarketObservations(metadata);
   const research=isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:{};
-  if(screenshot.status!=='VISION_READY'||research.status!=='RESEARCH_RETRIEVED')return json({error:'intelligence reconciliation prerequisites are not ready',vision_status:screenshot.status??null,research_status:research.status??null},409);
-  const screenshotObservations=Array.isArray(screenshot.observations)?screenshot.observations.filter(isObject):[];
+  if(!marketObservations.length||research.status!=='RESEARCH_RETRIEVED')return json({error:'intelligence reconciliation prerequisites are not ready',market_evidence_ready:marketObservations.length>0,research_status:research.status??null},409);
   const snapshots=Array.isArray(research.snapshots)?research.snapshots.filter(isObject):[];
   const marketConflict=detectCurrentMarketLevelConflict(metadata);
   if(marketConflict.conflict){
@@ -138,9 +225,9 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
     await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify({...metadata,intelligence_reconciliation:record})}::jsonb,error=${JSON.stringify({stage:'EVIDENCE_CONFLICT',detail:marketConflict.detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
     return json({ok:false,request_id:requestId,error:'current market evidence conflicts with official NSE data',evidence_conflict:marketConflict,next_step:'REUPLOAD_CURRENT_SCREENSHOTS'},409);
   }
-  const packet={screenshots:screenshotObservations,research:snapshots.map(item=>({...item,excerpt:typeof item.excerpt==='string'?item.excerpt.slice(0,4000):undefined}))};
+  const packet={market_observations:marketObservations,research:snapshots.map(item=>({...item,excerpt:typeof item.excerpt==='string'?item.excerpt.slice(0,4000):undefined}))};
   const sourceCategory=new Map<string,string>();
-  for(const item of screenshotObservations)if(typeof item.source_ref==='string'&&typeof item.category==='string')sourceCategory.set(item.source_ref,item.category);
+  for(const item of marketObservations)if(typeof item.source_ref==='string'&&typeof item.category==='string')sourceCategory.set(item.source_ref,item.category);
   for(const item of snapshots)if(item.status==='RETRIEVED'&&typeof item.source_ref==='string'&&typeof item.category==='string')sourceCategory.set(item.source_ref,item.category);
   const produced=await produceIntelligence(env.AI,packet,new Set(sourceCategory.keys()));
   if(!produced.judgment||!produced.normalized){
@@ -154,22 +241,19 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
     await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,intelligence_reconciliation:record})}::jsonb,updated_at=now() where request_id=${requestId}`;
     return json({ok:false,request_id:requestId,intelligence_reconciliation:record},409);
   }
-  const autonomousItems=SYSTEM_FAMILIES.map(category=>({category,status:produced.judgment!.verification==='VERIFIED'?'VERIFIED':'DEGRADED',source_refs:produced.judgment!.source_refs.filter(ref=>sourceCategory.get(ref)===category),retrieved_at:new Date().toISOString(),detail:`Governed intelligence reconciliation ${produced.judgment!.verification}`}));
   const origin=new URL(request.url).origin;
-  const adapterStage=String(metadata.adapter_stage??'');
-  if(!['AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED'].includes(adapterStage)){
-    const autonomousReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/autonomous-evidence`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({items:autonomousItems})});
-    const autonomousResponse=await router.fetch(autonomousReq as any,env as any);
-    if(!autonomousResponse.ok)return json({error:'autonomous evidence gate blocked after reconciliation',gate:await responseJson(autonomousResponse)},409);
-  }
   const observations=[
-    ...screenshotObservations.filter(item=>produced.judgment!.source_refs.includes(String(item.source_ref))).map(item=>({category:String(item.category),source_kind:'SCREENSHOT',source_ref:String(item.source_ref),observed_at:String(item.observed_at),retrieved_at:String(item.retrieved_at),verification:produced.judgment!.verification,notes:Array.isArray(item.limitations)?item.limitations.join('; '):undefined})),
+    ...marketObservations.filter(item=>produced.judgment!.source_refs.includes(String(item.source_ref))).map(item=>({category:String(item.category),source_kind:String(item.source_kind||'SCREENSHOT'),source_ref:String(item.source_ref),observed_at:String(item.observed_at),retrieved_at:String(item.retrieved_at),verification:produced.judgment!.verification,notes:Array.isArray(item.limitations)?item.limitations.join('; '):undefined})),
     ...snapshots.filter(item=>item.status==='RETRIEVED'&&produced.judgment!.source_refs.includes(String(item.source_ref))).map(item=>({category:String(item.category),source_kind:'WEB_RESEARCH',source_ref:String(item.source_ref),observed_at:String(item.retrieved_at),retrieved_at:String(item.retrieved_at),verification:produced.judgment!.verification,notes:typeof item.limitation==='string'?item.limitation:undefined}))
   ];
-  const handoff={producer:'EDGE_CONSOLE_GOVERNED_INTELLIGENCE',producer_version:'0.2-shadow',request_id:requestId,observations,normalized:produced.normalized};
-  const intelligenceReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/intelligence`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(handoff)});
-  const intelligenceResponse=await router.fetch(intelligenceReq as any,env as any);
-  if(!intelligenceResponse.ok)return json({error:'intelligence handoff gate blocked',gate:await responseJson(intelligenceResponse)},409);
+  const handoff={producer:'EDGE_CONSOLE_GOVERNED_INTELLIGENCE',producer_version:'0.3-automated-primary',request_id:requestId,observations,normalized:produced.normalized};
+  const handoffGate=canAdvanceIntelligenceHandoff(handoff);
+  if(!handoffGate.ready){
+    const record={status:'INTELLIGENCE_BLOCKED',attempted_at:new Date().toISOString(),model:produced.model,errors:handoffGate.errors};
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,intelligence_reconciliation:record})}::jsonb,updated_at=now() where request_id=${requestId}`;
+    return json({ok:false,request_id:requestId,error:'intelligence handoff gate blocked',intelligence_reconciliation:record},409);
+  }
+  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,intelligence_handoff:handoff,adapter_stage:'INTELLIGENCE_READY'})}::jsonb,updated_at=now() where request_id=${requestId}`;
   const evidence=[{evidence_type:'INTELLIGENCE_RECONCILIATION',source_ref:`5dr-intelligence://${requestId}`,captured_at:new Date().toISOString(),normalized:produced.normalized}];
   const normalizedReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/normalized`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({evidence})});
   const normalizedResponse=await normalizedAndDispatch(normalizedReq,env,requestId);
@@ -261,6 +345,14 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
     return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
   }
 
+  if(stage==='AUTOMATED_MARKET_DATA_PENDING')return json({ok:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,next_step:'WAIT_FOR_AUTOMATED_MARKET_DATA'},202);
+  if(stage==='AUTOMATED_MARKET_DATA_BLOCKED')return json({ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,next_step:'USE_SCREENSHOT_BACKUP'},409);
+  if(stage==='AUTOMATED_MARKET_DATA_READY'){
+    const research=await systemResearch(env,requestId);
+    if(!research.ok)return research;
+    return reconcileIntelligence(request,env,requestId);
+  }
+
   if(stage==='NORMALIZED_READY')return dispatchNormalizedReady(env,requestId,request.url);
 
   if(stage==='INTELLIGENCE_READY'||stage==='NORMALIZATION_BLOCKED'){
@@ -290,7 +382,10 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true});
+  if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
+  const automatedMarket=url.pathname.match(/^\\/api\\/5dr\\/run-requests\\/([^/]+)\\/automated-market-evidence$/);
+  if(automatedMarket&&request.method==='POST')return receiveAutomatedMarketEvidence(request,env,decodeURIComponent(automatedMarket[1]));
   if(url.pathname==='/api/5dr/vision-readiness'&&request.method==='GET')return visionReadiness(env);
   const vision=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/shadow-vision$/);
   if(vision&&request.method==='POST')return shadowVision(env,decodeURIComponent(vision[1]));
