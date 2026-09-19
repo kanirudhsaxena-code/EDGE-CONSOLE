@@ -76,8 +76,8 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
       return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='EIA_CRUDE_SPOT'){
-      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+)/i);
-      const brent=excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+)/i);
+      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
+      const brent=excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
       const wf=wti?nums(wti[1]).slice(0,10):[],bf=brent?nums(brent[1]).slice(0,10):[];
       const facts:Record<string,unknown>={};
       if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf,change_from_first:Math.round(((wf.at(-1)!-wf[0])*100))/100};
