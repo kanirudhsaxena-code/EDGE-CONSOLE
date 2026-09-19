@@ -595,7 +595,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
   if (url.pathname === '/api/edge-stocks/research-bundles' && request.method === 'POST') return saveEdgeResearchBundle(request, env);
-  const researchBundle = url.pathname.match(/^\\/api\\/edge-stocks\\/research-bundles\\/([^/]+)$/);
+  const researchBundle = url.pathname.match(/^\/api\/edge-stocks\/research-bundles\/([^/]+)$/);
   if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
   if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
