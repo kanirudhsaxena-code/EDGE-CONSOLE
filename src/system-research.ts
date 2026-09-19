@@ -67,15 +67,43 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
     if(source.id==='NSE_MARKET_STATUS'){
       const parsed=JSON.parse(body),rows=Array.isArray(parsed?.marketState)?parsed.marketState:[];
       const cash=rows.find((x:any)=>x&&x.market==='Capital Market');
-      if(cash)return {capital_market:{status:cash.marketStatus,trade_date:cash.tradeDate,index:cash.index,last:cash.last,variation:cash.variation,percent_change:cash.percentChange,message:cash.marketStatusMessage}};
+      const fx=rows.find((x:any)=>x&&String(x.underlying||'').toUpperCase()==='USDINR');
+      const gift=parsed?.giftnifty;
+      const facts:Record<string,unknown>={};
+      if(cash)facts.capital_market={status:cash.marketStatus,trade_date:cash.tradeDate,index:cash.index,last:cash.last,variation:cash.variation,percent_change:cash.percentChange,message:cash.marketStatusMessage};
+      if(fx)facts.usdinr_futures={last:Number(fx.last),expiry:fx.expiryDate,updated_time:fx.updated_time,status:fx.marketStatus};
+      if(gift)facts.gift_nifty={last:Number(gift.LASTPRICE),percent_change:Number(gift.PERCHANGE),day_change:Number(gift.DAYCHANGE),expiry:gift.EXPIRYDATE,timestamp:gift.TIMESTMP};
+      return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='EIA_CRUDE_SPOT'){
-      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
-      const brent=excerpt.match(/Brent\s*-\s*Europe\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
-      const wf=wti?nums(wti[1]):[],bf=brent?nums(brent[1]):[];
+      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+)/i);
+      const brent=excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+)/i);
+      const wf=wti?nums(wti[1]).slice(0,10):[],bf=brent?nums(brent[1]).slice(0,10):[];
       const facts:Record<string,unknown>={};
-      if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf};
-      if(bf.length)facts.brent_usd_per_barrel={latest:bf.at(-1),recent:bf};
+      if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf,change_from_first:Math.round(((wf.at(-1)!-wf[0])*100))/100};
+      if(bf.length)facts.brent_usd_per_barrel={latest:bf.at(-1),recent:bf,change_from_first:Math.round(((bf.at(-1)!-bf[0])*100))/100};
+      const release=excerpt.match(/Release Date:\s*([0-9/]+)/i),next=excerpt.match(/Next Release Date:\s*([0-9/]+)/i);
+      if(release)facts.release_date=release[1];
+      if(next)facts.next_release_date=next[1];
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='FED_MONETARY_POLICY'){
+      const facts:Record<string,unknown>={};
+      const release=excerpt.match(/FOMC Statement:[\s\S]{0,120}?Released\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i);
+      const press=excerpt.match(/Press Conference\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i);
+      const nextMeeting=excerpt.match(/Upcoming Dates[\s\S]{0,500}?([A-Z][a-z]{2}\.?\s+\d{1,2}-\d{1,2})\s+FOMC Meeting/i);
+      const nextMinutes=excerpt.match(/Upcoming Dates[\s\S]{0,300}?([A-Z][a-z]{2}\.?\s+\d{1,2})\s+FOMC Minutes/i);
+      if(release)facts.latest_fomc_statement_release=release[1];
+      if(press)facts.latest_press_conference=press[1];
+      if(nextMeeting)facts.next_fomc_meeting=nextMeeting[1];
+      if(nextMinutes)facts.next_fomc_minutes=nextMinutes[1];
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='FED_FOMC_CALENDAR'){
+      const facts:Record<string,unknown>={};
+      const section=excerpt.match(/2026 FOMC Meetings([\s\S]*?)2025 FOMC Meetings/i)?.[1]||excerpt;
+      const meetings=[...section.matchAll(/(?:January|March|April|May|June|July|September|October|December)\s+\d{1,2}(?:-\d{1,2})?\*?/g)].map(m=>m[0].replace('*',''));
+      if(meetings.length)facts.meeting_dates_2026=meetings;
       return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='RBI_CURRENT_RATES'){
