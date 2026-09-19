@@ -113,7 +113,7 @@ function governedWhy(meta,normalized,result){
   const supportNum=medianNumber(supportVals),resistanceNum=medianNumber(resistanceVals);
   const support=supportNum?supportNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null,resistance=resistanceNum?resistanceNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null;
   const rows=optionRows(df),strikeText=rows.length?compactStrikeText(rows,spot):null,biases=rows.map(strikeBias).filter(x=>x!=='unclear'),mixedBias=new Set(biases).size>1||biases.includes('mixed');
-  let breadth=null,sectorMoves=[],vix=null,repoRate=null,crude=null;
+  let breadth=null,sectorMoves=[],vix=null,repoRate=null,crude=null,usdInr=null,giftNifty=null,fed=null,rbiReference=null;
   for(const snap of research){
     if(!snap)continue;
     if(snap.source_id==='NSE_ALL_INDICES'){
@@ -127,10 +127,37 @@ function governedWhy(meta,normalized,result){
         try{const data=JSON.parse(snap.excerpt),rows=Array.isArray(data.data)?data.data:[],pick=name=>rows.find(x=>x&&x.index===name),n=pick('NIFTY 50');if(n){breadth={change:Number(n.percentChange),advances:Number(n.advances),declines:Number(n.declines),month:Number(n.perChange30d),year:Number(n.perChange365d)};const pairs=[['Bank',pick('NIFTY BANK')],['Financials',pick('NIFTY FINANCIAL SERVICES')],['IT',pick('NIFTY IT')],['Auto',pick('NIFTY AUTO')],['Midcap',pick('NIFTY MIDCAP 100')],['Smallcap',pick('NIFTY SMALLCAP 100')]];sectorMoves=pairs.filter(([,x])=>x&&Number.isFinite(Number(x.percentChange))).map(([name,x])=>({name,change:Number(x.percentChange)}));const iv=pick('INDIA VIX');if(iv)vix={last:Number(iv.last),change:Number(iv.percentChange)}}}catch{}
       }
     }
-    if(snap.source_id==='RBI_CURRENT_RATES'&&snap.facts&&Number.isFinite(Number(snap.facts.policy_repo_rate_pct)))repoRate=Number(snap.facts.policy_repo_rate_pct);
-    if(snap.source_id==='EIA_CRUDE_SPOT'&&snap.facts&&snap.facts.wti_usd_per_barrel){
-      const w=snap.facts.wti_usd_per_barrel,recent=Array.isArray(w.recent)?w.recent.map(Number).filter(Number.isFinite):[];
-      if(recent.length)crude={latest:Number(w.latest),first:recent[0],trend:Number(w.latest)-recent[0]};
+    if(snap.source_id==='NSE_MARKET_STATUS'){
+      if(snap.facts&&snap.facts.usdinr_futures&&Number.isFinite(Number(snap.facts.usdinr_futures.last)))usdInr={value:Number(snap.facts.usdinr_futures.last),source:'NSE futures',asof:snap.facts.usdinr_futures.updated_time||null};
+      if(snap.facts&&snap.facts.gift_nifty&&Number.isFinite(Number(snap.facts.gift_nifty.percent_change)))giftNifty={change:Number(snap.facts.gift_nifty.percent_change),last:Number(snap.facts.gift_nifty.last)};
+      if((!usdInr||!giftNifty)&&typeof snap.excerpt==='string'){try{const d=JSON.parse(snap.excerpt),rows=Array.isArray(d.marketState)?d.marketState:[],fx=rows.find(x=>x&&String(x.underlying||'').toUpperCase()==='USDINR');if(!usdInr&&fx&&Number.isFinite(Number(fx.last)))usdInr={value:Number(fx.last),source:'NSE futures',asof:fx.updated_time||null};if(!giftNifty&&d.giftnifty&&Number.isFinite(Number(d.giftnifty.PERCHANGE)))giftNifty={change:Number(d.giftnifty.PERCHANGE),last:Number(d.giftnifty.LASTPRICE)}}catch{}}
+    }
+    if(snap.source_id==='RBI_CURRENT_RATES'){
+      if(snap.facts&&Number.isFinite(Number(snap.facts.policy_repo_rate_pct)))repoRate=Number(snap.facts.policy_repo_rate_pct);
+      if(snap.facts&&Number.isFinite(Number(snap.facts.usdinr_reference)))rbiReference={value:Number(snap.facts.usdinr_reference),asof:snap.facts.rates_as_of||null};
+      if(typeof snap.excerpt==='string'){
+        const rr=snap.excerpt.match(/Policy\s*Repo Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i),fx=snap.excerpt.match(/INR\s*\/\s*1 USD\s*:?\s*(\d+(?:\.\d+)?)/i);
+        if(repoRate==null&&rr)repoRate=Number(rr[1]);if(!rbiReference&&fx)rbiReference={value:Number(fx[1]),asof:null};
+      }
+    }
+    if(snap.source_id==='EIA_CRUDE_SPOT'){
+      if(snap.facts&&snap.facts.wti_usd_per_barrel){const w=snap.facts.wti_usd_per_barrel,recent=Array.isArray(w.recent)?w.recent.map(Number).filter(Number.isFinite):[];if(recent.length)crude={latest:Number(w.latest),first:recent[0],trend:Number(w.latest)-recent[0],brent:null};}
+      if(typeof snap.excerpt==='string'){
+        const wm=snap.excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+)/i),bm=snap.excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+)/i),wv=wm?[...wm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[],bv=bm?[...bm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[];
+        if(wv.length)crude={latest:wv.at(-1),first:wv[0],trend:wv.at(-1)-wv[0],brent:bv.length?{latest:bv.at(-1),first:bv[0],trend:bv.at(-1)-bv[0]}:null};
+      }
+    }
+    if(snap.source_id==='FED_LATEST_FOMC_STATEMENT'){
+      const ff=snap.facts&&typeof snap.facts==='object'?snap.facts:{};
+      fed={action:ff.policy_action||null,range:ff.target_range_text||null,inflation:ff.inflation_assessment||null,activity:ff.activity_assessment||null,geopolitical:ff.geopolitical_assessment||null};
+      if(typeof snap.excerpt==='string'){
+        const action=snap.excerpt.match(/Committee decided to\s+(raise|lower|maintain|keep)/i),range=snap.excerpt.match(/target range for the federal funds rate[^.]{0,100}?to\s+([^.;]+?)\s+percent/i);
+        if(!fed.action&&action)fed.action=action[1].toLowerCase();if(!fed.range&&range)fed.range=range[1].trim();
+      }
+    }
+    if(!fed&&snap.source_id==='FED_MONETARY_POLICY'&&typeof snap.excerpt==='string'){
+      const rel=snap.excerpt.match(/FOMC Statement:[\s\S]{0,160}?Released\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i),next=snap.excerpt.match(/Upcoming Dates[\s\S]{0,500}?([A-Z][a-z]{2}\.?\s+\d{1,2}-\d{1,2})\s+FOMC Meeting/i);
+      if(rel||next)fed={action:null,range:null,statementRelease:rel?rel[1]:null,nextMeeting:next?next[1]:null};
     }
   }
   const priceFacts=['NIFTY around '+(spot?spot.toLocaleString('en-IN',{maximumFractionDigits:2}):'—'),trend.detail];
@@ -153,12 +180,41 @@ function governedWhy(meta,normalized,result){
     else if(vix&&vix.change<-5)marketMeaning+=' Falling India VIX is supportive, but it does not override mixed directional evidence.';
   }
   const macro=raw.MACRO_CATALYSTS||{};
-  let crudeText='crude trend not cleanly verified';
-  if(crude&&Number.isFinite(crude.latest)&&Number.isFinite(crude.trend))crudeText='WTI '+crude.latest.toFixed(2)+' with recent change '+(crude.trend>=0?'+':'')+crude.trend.toFixed(2)+' USD/bbl';
-  const rateText=repoRate!=null?'RBI repo '+repoRate.toFixed(2)+'%':'RBI policy rate not cleanly extracted';
-  const macroObserved=rateText+'; '+crudeText+'; global-risk signal '+signedSignal(macro.global_risk_environment)+'; India macro/INR signal '+signedSignal(macro.india_macro_rbi_inr_rates)+'; scheduled-event risk '+signedSignal(macro.scheduled_high_impact_catalysts)+'.';
-  const adverseCrude=crude&&crude.trend>1;
-  const macroMeaning=(adverseCrude?'Crude is moving higher, which is an adverse input for India through inflation/current-account sensitivity. ':'Crude is not adding a strong adverse impulse in the verified sample. ')+(repoRate!=null?'The RBI policy rate anchors the domestic rate backdrop, but the directional call still depends on whether INR/rates and event risk are reinforcing or conflicting. ':'Domestic rate confirmation is incomplete. ')+'Macro therefore acts as a conviction filter: it can strengthen or veto a trade, but it does not manufacture direction when price, options and breadth disagree.';
+  const macroFacts=[];
+  if(fed){
+    if(fed.action)macroFacts.push('Fed '+fed.action+(fed.range?' the funds-rate target to '+fed.range+'%':''));
+    else if(fed.statementRelease)macroFacts.push('latest FOMC statement released '+fed.statementRelease);
+    if(fed.nextMeeting)macroFacts.push('next FOMC meeting '+fed.nextMeeting);
+  }
+  if(repoRate!=null)macroFacts.push('RBI repo '+repoRate.toFixed(2)+'%');
+  if(usdInr&&Number.isFinite(usdInr.value))macroFacts.push('USD/INR futures '+usdInr.value.toFixed(2)+(usdInr.asof?' as of '+usdInr.asof:''));
+  else if(rbiReference&&Number.isFinite(rbiReference.value))macroFacts.push('RBI/FBIL USD/INR reference '+rbiReference.value.toFixed(4));
+  if(crude&&Number.isFinite(crude.latest)&&Number.isFinite(crude.trend)){
+    macroFacts.push('WTI '+crude.latest.toFixed(2)+' ('+(crude.trend>=0?'+':'')+crude.trend.toFixed(2)+' vs first point)');
+    if(crude.brent&&Number.isFinite(crude.brent.latest))macroFacts.push('Brent '+crude.brent.latest.toFixed(2)+' ('+(crude.brent.trend>=0?'+':'')+crude.brent.trend.toFixed(2)+')');
+  }
+  if(giftNifty&&Number.isFinite(giftNifty.change))macroFacts.push('GIFT Nifty '+(giftNifty.change>=0?'+':'')+giftNifty.change.toFixed(2)+'%');
+  const macroObserved=(macroFacts.length?macroFacts.join(' · '):'Material macro facts were not cleanly extracted')+'.';
+  const adverseCrude=Boolean(crude&&Number.isFinite(crude.trend)&&crude.trend>5);
+  const fedTightening=Boolean(fed&&/raise|hike/i.test(String(fed.action||'')));
+  const fedEasing=Boolean(fed&&/lower|cut/i.test(String(fed.action||'')));
+  const fxStress=Boolean(usdInr&&rbiReference&&Number.isFinite(usdInr.value)&&Number.isFinite(rbiReference.value)&&usdInr.value>rbiReference.value*1.005);
+  const supportiveGift=Boolean(giftNifty&&giftNifty.change>0.25),adverseGift=Boolean(giftNifty&&giftNifty.change<-0.25);
+  const implications=[];
+  if(fedTightening)implications.push('The Fed has just tightened policy, which is a negative global-liquidity/risk input for equities and can increase pressure on EM currencies and valuations.');
+  else if(fedEasing)implications.push('The Fed has eased policy, which is generally supportive for global liquidity, subject to the reason for the cut.');
+  else if(fed&&fed.statementRelease)implications.push('A fresh FOMC decision is inside the 5-day horizon, so post-policy repricing remains an active event risk even where the directional tone is not fully extracted.');
+  if(adverseCrude)implications.push('Crude has risen sharply across the verified EIA sequence; for India this is adverse through inflation, import-bill and current-account channels.');
+  else if(crude)implications.push('Crude is not showing a large adverse rise in the verified sequence.');
+  if(fxStress)implications.push('USD/INR futures are above the RBI/FBIL reference level, adding currency-pressure risk.');
+  else if(usdInr)implications.push('USD/INR is elevated in absolute terms, but without a clean same-window baseline it is treated as risk context rather than a standalone directional signal.');
+  if(adverseGift)implications.push('GIFT Nifty is mildly negative, adding near-term external-market pressure.');
+  else if(supportiveGift)implications.push('GIFT Nifty is positive, giving a modest external-market tailwind.');
+  if(repoRate!=null)implications.push('The RBI repo rate defines the domestic policy backdrop; it does not offset a fresh Fed tightening/crude shock by itself.');
+  const rawConflict=(fedTightening||adverseCrude||fxStress)&&Number(macro.crude_commodities_geopolitics||0)>0;
+  if(rawConflict)implications.push('This retrieved evidence conflicts with the older scalar macro label, so the evidence-level interpretation takes precedence in the explanation and future runs are required to reconcile it before scoring.');
+  implications.push('Net effect: macro is a conviction modifier for the 5-day view; when several adverse channels align, bullish conviction must be reduced unless price, breadth and derivatives provide unusually strong confirmation.');
+  const macroMeaning=implications.join(' ');
   const rr=Number(normalized.expected_rr??0),edge=Number(result.execution_edge??0),trust=Number(result.market_trust??0);
   const tradeObserved='Market Trust '+(Number.isFinite(trust)?trust.toFixed(1):'—')+'/100; execution edge '+(Number.isFinite(edge)?edge.toFixed(0):'—')+'/100; expected reward/risk '+(Number.isFinite(rr)?rr.toFixed(1):'—')+'.';
   const tradeMeaning=result.tradeable===true?'The directional view and execution gates both passed, so the setup is actionable.':'The forecast can still be valid while the trade is rejected. Here the evidence quality, execution setup and reward/risk are not strong enough to justify a position.';
