@@ -113,25 +113,52 @@ function governedWhy(meta,normalized,result){
   const supportNum=medianNumber(supportVals),resistanceNum=medianNumber(resistanceVals);
   const support=supportNum?supportNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null,resistance=resistanceNum?resistanceNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null;
   const rows=optionRows(df),strikeText=rows.length?compactStrikeText(rows,spot):null,biases=rows.map(strikeBias).filter(x=>x!=='unclear'),mixedBias=new Set(biases).size>1||biases.includes('mixed');
-  let breadth=null;
-  for(const snap of research){if(snap&&snap.source_id==='NSE_ALL_INDICES'&&typeof snap.excerpt==='string'){try{const data=JSON.parse(snap.excerpt);const n50=Array.isArray(data.data)?data.data.find(x=>x&&x.index==='NIFTY 50'):null;if(n50){breadth={change:Number(n50.percentChange),advances:Number(n50.advances),declines:Number(n50.declines),month:Number(n50.perChange30d),year:Number(n50.perChange365d)};break}}catch{}}}
+  let breadth=null,sectorMoves=[],vix=null,repoRate=null,crude=null;
+  for(const snap of research){
+    if(!snap)continue;
+    if(snap.source_id==='NSE_ALL_INDICES'){
+      const facts=snap.facts&&typeof snap.facts==='object'?snap.facts:null;
+      if(facts&&facts.nifty50){
+        const n=facts.nifty50;breadth={change:Number(n.percent_change),advances:Number(n.advances),declines:Number(n.declines),month:Number(n.change_30d),year:Number(n.change_365d)};
+        const pairs=[['Bank',facts.nifty_bank],['Financials',facts.nifty_financial_services],['IT',facts.nifty_it],['Auto',facts.nifty_auto],['Midcap',facts.nifty_midcap_100],['Smallcap',facts.nifty_smallcap_100]];
+        sectorMoves=pairs.filter(([,x])=>x&&Number.isFinite(Number(x.percent_change))).map(([name,x])=>({name,change:Number(x.percent_change)}));
+        if(facts.india_vix&&Number.isFinite(Number(facts.india_vix.percent_change)))vix={last:Number(facts.india_vix.last),change:Number(facts.india_vix.percent_change)};
+      }else if(typeof snap.excerpt==='string'){
+        try{const data=JSON.parse(snap.excerpt),rows=Array.isArray(data.data)?data.data:[],pick=name=>rows.find(x=>x&&x.index===name),n=pick('NIFTY 50');if(n){breadth={change:Number(n.percentChange),advances:Number(n.advances),declines:Number(n.declines),month:Number(n.perChange30d),year:Number(n.perChange365d)};const pairs=[['Bank',pick('NIFTY BANK')],['Financials',pick('NIFTY FINANCIAL SERVICES')],['IT',pick('NIFTY IT')],['Auto',pick('NIFTY AUTO')],['Midcap',pick('NIFTY MIDCAP 100')],['Smallcap',pick('NIFTY SMALLCAP 100')]];sectorMoves=pairs.filter(([,x])=>x&&Number.isFinite(Number(x.percentChange))).map(([name,x])=>({name,change:Number(x.percentChange)}));const iv=pick('INDIA VIX');if(iv)vix={last:Number(iv.last),change:Number(iv.percentChange)}}}catch{}
+      }
+    }
+    if(snap.source_id==='RBI_CURRENT_RATES'&&snap.facts&&Number.isFinite(Number(snap.facts.policy_repo_rate_pct)))repoRate=Number(snap.facts.policy_repo_rate_pct);
+    if(snap.source_id==='EIA_CRUDE_SPOT'&&snap.facts&&snap.facts.wti_usd_per_barrel){
+      const w=snap.facts.wti_usd_per_barrel,recent=Array.isArray(w.recent)?w.recent.map(Number).filter(Number.isFinite):[];
+      if(recent.length)crude={latest:Number(w.latest),first:recent[0],trend:Number(w.latest)-recent[0]};
+    }
+  }
   const priceFacts=['NIFTY around '+(spot?spot.toLocaleString('en-IN',{maximumFractionDigits:2}):'—'),trend.detail];
   if(emaVals.some(v=>/above/i.test(v)))priceFacts.push('price is above the visible EMA');
   if(vwapVals.some(v=>/above/i.test(v)))priceFacts.push('price is above VWAP on at least one intraday view');
   if(support)priceFacts.push('support near '+support);if(resistance)priceFacts.push('resistance near '+resistance);
   const priceMeaning=result.directional_label==='RANGE'
-    ? 'The underlying chart structure is constructive, but price is still close to an immediate resistance zone and the shorter-term views are not uniformly trending. That supports a range/transition call unless derivatives and participation confirm a breakout.'
-    : 'The price structure supports the published direction only to the extent that it is confirmed by derivatives, participation and execution quality.';
+    ? 'That is constructive underneath, but not a clean breakout: price structure is firmer than the headline range call, so the range view is being driven by missing confirmation from positioning, participation and execution rather than by outright bearish price action.'
+    : 'The price structure supports the published direction only if derivatives, participation and macro risk confirm it; otherwise the system deliberately reduces conviction.';
   const optionsObserved=strikeText?('Near-ATM strikes show '+strikeText+'.'):'The stored derivatives extraction does not contain enough strike-level premium/OI/volume fields for a reliable directional read.';
-  const optionsMeaning=rows.length?(mixedBias?'Adjacent strikes are not aligned: some are call-heavy while others are put-heavy/mixed. That is a real reason directional conviction stays low even though the chart itself looks constructive.':'Nearby strikes are broadly aligned, which provides directional confirmation.'):'No directional conclusion should be inferred from aggregate OI alone.';
-  const marketObserved=breadth?('Official NSE breadth: NIFTY '+(breadth.change>=0?'+':'')+breadth.change.toFixed(2)+'%; '+breadth.advances+' advances vs '+breadth.declines+' declines. The index is '+breadth.month.toFixed(2)+'% over 30 days and '+breadth.year.toFixed(2)+'% over one year.'):'A structured breadth reading was not available.';
-  const marketMeaning=breadth?(breadth.advances>breadth.declines?'Breadth is mildly positive, but 26 vs 24 is not strong enough to validate a high-conviction directional move by itself.':'Breadth is weak or negative, so the headline price move lacks broad confirmation.'):'Without breadth, the system should not claim broad market confirmation.';
+  const optionsMeaning=rows.length?(mixedBias?'The strike surface is internally conflicted, so options are not confirming the constructive chart structure. That conflict is a direct reason the 5-day probability stays closer to range than to a directional breakout.':'Nearby strikes are broadly aligned, so options are reinforcing rather than contradicting the chart structure.'):'Without reliable strike-level alignment, aggregate OI is not allowed to create a directional call.';
+  const sectorText=sectorMoves.length?sectorMoves.map(x=>x.name+' '+(x.change>=0?'+':'')+x.change.toFixed(2)+'%').join(', '):'sector participation unavailable';
+  const vixText=vix&&Number.isFinite(vix.change)?('India VIX '+(vix.change>=0?'+':'')+vix.change.toFixed(2)+'%'):'India VIX unavailable';
+  const marketObserved=breadth?('Official NSE breadth is '+breadth.advances+' advances vs '+breadth.declines+' declines with NIFTY '+(breadth.change>=0?'+':'')+breadth.change.toFixed(2)+'%. '+vixText+'. Sector tape: '+sectorText+'.'):'A structured NSE breadth reading was not available.';
+  let marketMeaning='Participation cannot be used as confirmation because the breadth evidence is incomplete.';
+  if(breadth){
+    const spread=breadth.advances-breadth.declines,sectorPos=sectorMoves.filter(x=>x.change>0).length,sectorNeg=sectorMoves.filter(x=>x.change<0).length;
+    marketMeaning=spread>=10&&sectorPos>sectorNeg?'Breadth is genuinely broad and supportive; this would strengthen a bullish interpretation if derivatives also align.':spread<=-10&&sectorNeg>sectorPos?'Breadth is broadly weak, so a bullish price move would be suspect until participation improves.':'Participation is mixed rather than decisive: the index move is not being confirmed strongly enough across breadth and sectors to justify high conviction.';
+    if(vix&&vix.change>5)marketMeaning+=' Rising India VIX adds risk premium and argues for lower conviction.';
+    else if(vix&&vix.change<-5)marketMeaning+=' Falling India VIX is supportive, but it does not override mixed directional evidence.';
+  }
   const macro=raw.MACRO_CATALYSTS||{};
-  let crudeText='Crude context was retrieved but not converted into a clean governed numeric signal.';
-  const eia=research.find(x=>x&&x.source_id==='EIA_CRUDE_SPOT'&&typeof x.excerpt==='string');
-  if(eia){const m=String(eia.excerpt).match(/WTI[^0-9]+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)/i);if(m)crudeText='WTI rose from '+m[1]+' to '+m[6]+' over the visible EIA sequence, so crude was an adverse inflation/risk input rather than a bullish confirmation.'}
-  const macroObserved='Global risk '+signedSignal(macro.global_risk_environment)+'; India rates/INR '+signedSignal(macro.india_macro_rbi_inr_rates)+'; crude/geopolitics '+signedSignal(macro.crude_commodities_geopolitics)+'; scheduled catalysts '+signedSignal(macro.scheduled_high_impact_catalysts)+'. '+crudeText;
-  const macroMeaning='Macro was not strong enough to rescue an otherwise mixed setup. Any unavailable or degraded macro input is treated as lack of confirmation, not as a neutral positive.';
+  let crudeText='crude trend not cleanly verified';
+  if(crude&&Number.isFinite(crude.latest)&&Number.isFinite(crude.trend))crudeText='WTI '+crude.latest.toFixed(2)+' with recent change '+(crude.trend>=0?'+':'')+crude.trend.toFixed(2)+' USD/bbl';
+  const rateText=repoRate!=null?'RBI repo '+repoRate.toFixed(2)+'%':'RBI policy rate not cleanly extracted';
+  const macroObserved=rateText+'; '+crudeText+'; global-risk signal '+signedSignal(macro.global_risk_environment)+'; India macro/INR signal '+signedSignal(macro.india_macro_rbi_inr_rates)+'; scheduled-event risk '+signedSignal(macro.scheduled_high_impact_catalysts)+'.';
+  const adverseCrude=crude&&crude.trend>1;
+  const macroMeaning=(adverseCrude?'Crude is moving higher, which is an adverse input for India through inflation/current-account sensitivity. ':'Crude is not adding a strong adverse impulse in the verified sample. ')+(repoRate!=null?'The RBI policy rate anchors the domestic rate backdrop, but the directional call still depends on whether INR/rates and event risk are reinforcing or conflicting. ':'Domestic rate confirmation is incomplete. ')+'Macro therefore acts as a conviction filter: it can strengthen or veto a trade, but it does not manufacture direction when price, options and breadth disagree.';
   const rr=Number(normalized.expected_rr??0),edge=Number(result.execution_edge??0),trust=Number(result.market_trust??0);
   const tradeObserved='Market Trust '+(Number.isFinite(trust)?trust.toFixed(1):'—')+'/100; execution edge '+(Number.isFinite(edge)?edge.toFixed(0):'—')+'/100; expected reward/risk '+(Number.isFinite(rr)?rr.toFixed(1):'—')+'.';
   const tradeMeaning=result.tradeable===true?'The directional view and execution gates both passed, so the setup is actionable.':'The forecast can still be valid while the trade is rejected. Here the evidence quality, execution setup and reward/risk are not strong enough to justify a position.';
@@ -220,45 +247,49 @@ function probabilityCards(result,engine){
 function ipoIssueCard(issue){
   const band=issue.price_band_low!=null||issue.price_band_high!=null?('₹'+(issue.price_band_low??'—')+' – ₹'+(issue.price_band_high??'—')):'Price band pending';
   const dateText=[issue.issue_open_date,issue.issue_close_date].filter(Boolean).map(x=>new Date(x).toLocaleDateString()).join(' → ');
-  const blocker=issue.hard_blocker==='CRITICAL_EVIDENCE_NOT_VERIFIED'?'Critical evidence not verified':humanText(issue.hard_blocker||'');
-  return '<div class="ipo-issue-card"><div class="ipo-issue-head"><strong>'+escapeHtml(issue.company_name||'—')+'</strong><span class="evidence-chip '+(issue.grade==='NV'?'limited':'verified')+'">'+escapeHtml(issue.grade||'—')+'</span></div><p>'+escapeHtml(issue.segment||'—')+(issue.exchange?' · '+escapeHtml(issue.exchange):'')+' · '+escapeHtml(band)+'</p><small>'+escapeHtml(dateText||'Dates pending')+' · '+escapeHtml(humanText(issue.decision||'NO_ACTION'))+'</small>'+(blocker?'<small class="ipo-blocker">'+escapeHtml(blocker)+'</small>':'')+'</div>'
+  const pending=issue.grade==='NV'||issue.hard_blocker==='CRITICAL_EVIDENCE_NOT_VERIFIED',blocker=pending?'Autonomous research is still resolving critical evidence':humanText(issue.hard_blocker||'');
+  return '<div class="ipo-issue-card"><div class="ipo-issue-head"><strong>'+escapeHtml(issue.company_name||'—')+'</strong><span class="evidence-chip '+(pending?'limited':'verified')+'">'+escapeHtml(pending?'Research pending':(issue.grade||'—'))+'</span></div><p>'+escapeHtml(issue.segment||'—')+(issue.exchange?' · '+escapeHtml(issue.exchange):'')+' · '+escapeHtml(band)+'</p><small>'+escapeHtml(dateText||'Dates pending')+' · '+escapeHtml(pending?'Decision withheld until evidence recovery completes':humanText(issue.decision||'NO_ACTION'))+'</small>'+(blocker?'<small class="ipo-blocker">'+escapeHtml(blocker)+'</small>':'')+'</div>'
 }
 function humanText(v){return String(v??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}
 function renderIpoAssessment(result){
   if(!ipoAssessmentSummary)return;
-  const e=result.efficacy||{},counts=result.counts||{};
-  const recs=Number(e.recommendation_count||0);
+  const e=result.historical_efficacy||{},counts=result.counts||{},assessed=Number(e.assessed||0),actionable=Number(e.actionable_recommendation_count||0);
   ipoAssessmentSummary.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+escapeHtml(counts.assessments??0)+' assessments</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · HISTORICAL</div><h3>IPO EDGE efficacy</h3></div><small>'+escapeHtml(assessed)+' assessed IPOs</small></div>',
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>—</strong><small>No matured forecast-accuracy sample in latest efficacy snapshot</small></div>',
-      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(e.positive_hit_rate==null?null:Number(e.positive_hit_rate)*100)+'</strong><small>'+recs+' recommendations in efficacy sample</small></div>',
-      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(e.avg_recommended_gain==null?null:Number(e.avg_recommended_gain)*100)+'</strong><small>Average recommended gain where available</small></div>',
-      '<div class="assessment-metric"><span>Correct avoidance</span><strong>'+pct(e.correct_avoidance_rate==null?null:Number(e.correct_avoidance_rate)*100)+'</strong><small>Rejected/avoided issues correctly filtered</small></div>',
-      '<div class="assessment-metric"><span>Opportunity capture</span><strong>'+pct(e.opportunity_capture_rate==null?null:Number(e.opportunity_capture_rate)*100)+'</strong><small>Latest governed efficacy snapshot</small></div>',
+      '<div class="assessment-metric"><span>Decision accuracy</span><strong>'+pct(e.decision_accuracy_pct)+'</strong><small>'+escapeHtml(e.correct_avoidance||0)+' correct avoidances / '+escapeHtml(assessed)+' assessed</small></div>',
+      '<div class="assessment-metric"><span>High-grade signal hit rate</span><strong>'+pct(e.high_grade_hit_rate_pct)+'</strong><small>'+escapeHtml(e.high_grade_20pct_count||0)+' / '+escapeHtml(e.high_grade_track_count||0)+' A-grade TRACK cases delivered ≥20% listing gain</small></div>',
+      '<div class="assessment-metric"><span>Actionable recommendation accuracy</span><strong>'+(actionable?pct(e.actionable_recommendation_accuracy_pct):'Not scorable')+'</strong><small>'+escapeHtml(actionable)+' APPLY / SUBSCRIBE recommendations in stored history</small></div>',
+      '<div class="assessment-metric"><span>A-grade avg listing gain</span><strong>'+pct(e.high_grade_avg_listing_gain_pct)+'</strong><small>Observed listing gain across '+escapeHtml(e.high_grade_track_count||0)+' high-grade TRACK cases</small></div>',
+      '<div class="assessment-metric"><span>Missed opportunity rate</span><strong>'+pct(e.miss_rate_pct)+'</strong><small>'+escapeHtml(e.missed_opportunity||0)+' / '+escapeHtml(assessed)+' historical assessments</small></div>',
     '</div>',
-    '<details class="assessment-detail-row"><summary>Assessment details</summary><div class="scorecard-context"><span>Coverage</span><strong>'+escapeHtml(counts.ipos??0)+' IPOs · '+escapeHtml(counts.listing_outcomes??0)+' listing outcomes</strong><p>'+escapeHtml(counts.checkpoints??0)+' checkpoints · '+escapeHtml(counts.evidence??0)+' evidence records · '+escapeHtml(counts.runs??0)+' autonomous runs.</p></div></details>'
+    '<details class="assessment-detail-row"><summary>Gain/loss & backtest detail</summary><div class="scorecard-days">',
+      '<div class="scorecard-day"><strong>All assessed IPOs</strong><div><span>Average listing gain</span><b>'+pct(e.all_outcomes_avg_listing_gain_pct)+'</b><small>'+escapeHtml(assessed)+' historical outcomes</small></div><div><span>Framework accuracy</span><b>'+pct(e.decision_accuracy_pct)+'</b><small>Correct avoidance vs missed opportunity</small></div></div>',
+      '<div class="scorecard-day"><strong>Correct avoidances</strong><div><span>Count</span><b>'+escapeHtml(e.correct_avoidance||0)+'</b><small>Issues correctly filtered</small></div><div><span>Avg listing gain</span><b>'+pct(e.correct_avoidance_avg_listing_gain_pct)+'</b><small>Low average gain validates most avoidances</small></div></div>',
+      '<div class="scorecard-day"><strong>Missed opportunities</strong><div><span>Count</span><b>'+escapeHtml(e.missed_opportunity||0)+'</b><small>Historical misses</small></div><div><span>Avg listing gain</span><b>'+pct(e.missed_opportunity_avg_listing_gain_pct)+'</b><small>Magnitude of opportunities the framework failed to capture</small></div></div>',
+      '<div class="scorecard-day"><strong>A-grade TRACK signals</strong><div><span>Positive / ≥20%</span><b>'+escapeHtml(e.high_grade_positive_count||0)+' / '+escapeHtml(e.high_grade_20pct_count||0)+'</b><small>Out of '+escapeHtml(e.high_grade_track_count||0)+' signals</small></div><div><span>Avg listing gain</span><b>'+pct(e.high_grade_avg_listing_gain_pct)+'</b><small>Strong historical signal quality, but TRACK was not an APPLY recommendation</small></div></div>',
+    '</div><div class="scorecard-context"><p>These are historical efficacy statistics from stored IPO outcomes. Listing gains are observed market outcomes, not portfolio returns. Actionable recommendation accuracy remains unscorable until the framework produces APPLY/SUBSCRIBE calls.</p></div></details>'
   ].join('')
 }
 function renderIpoSnapshot(target,runsData){
   const list=Array.isArray(runsData)?runsData:[],latest=list[0]||null;
   if(!target)return;
   if(!latest){target.innerHTML='<div class="generic-empty">No IPO EDGE snapshot is available.</div>';return}
-  const r=latest.result||{},issues=Array.isArray(r.current_issues)?r.current_issues:[],ready=issues.filter(x=>x&&x.grade&&x.grade!=='NV'),nv=issues.filter(x=>x&&x.grade==='NV'),focus=issues[0]||null,validated=r.latest_validated||null;
+  const r=latest.result||{},issues=Array.isArray(r.current_issues)?r.current_issues:[],ready=issues.filter(x=>x&&x.grade&&x.grade!=='NV'),pending=issues.filter(x=>x&&x.grade==='NV'),focus=issues[0]||null,validated=r.latest_validated||null;
   renderIpoAssessment(r);
-  const headline=ready.length?ready.length+' current issue'+(ready.length===1?' is':'s are')+' decision-ready':'No current IPO is decision-ready';
+  const headline=ready.length?ready.length+' current issue'+(ready.length===1?' is':'s are')+' decision-ready':(pending.length?'Current IPO research is still being completed':'No current IPO is decision-ready');
   const why=[
-    '<div class="why-card"><strong>Current coverage</strong><p><b>What we saw:</b> '+escapeHtml(issues.length)+' open/upcoming issues are in the current snapshot; '+escapeHtml(nv.length)+' are NV because critical evidence is not yet verified.</p><p><b>What it means:</b> NV is an evidence state, not a negative investment score. The system is refusing to grade issues that do not yet meet the evidence gates.</p></div>',
-    '<div class="why-card"><strong>Decision quality</strong><p><b>What we saw:</b> '+escapeHtml(ready.length)+' current issues have a validated non-NV grade.</p><p><b>What it means:</b> The Console should show “wait/no action” rather than manufacture an apply/reject call when R2/R3/R4/R6/R7 evidence is incomplete.</p></div>',
+    '<div class="why-card"><strong>Current coverage</strong><p>'+escapeHtml(issues.length)+' open/upcoming issues are in the current snapshot; '+escapeHtml(pending.length)+' are still in autonomous evidence recovery. They are not treated as finished recommendations.</p></div>',
+    '<div class="why-card"><strong>Decision quality</strong><p>'+escapeHtml(ready.length)+' current issues have a governed grade. Any issue still missing critical R2/R3/R4/R6/R7 evidence remains Research pending until recovery completes or the engine records an explicit exhausted-source exception.</p></div>',
     validated?'<div class="why-card"><strong>Latest validated checkpoint</strong><p><b>What we saw:</b> '+escapeHtml(validated.company_name)+' scored '+escapeHtml(validated.score)+' with grade '+escapeHtml(validated.grade)+' and decision '+escapeHtml(humanText(validated.decision))+'.</p><p><b>What it means:</b> The IPO engine is capable of producing a governed grade once the evidence gates are complete; current NVs are a data-readiness issue, not an empty engine.</p></div>':''
   ].join('');
   target.innerHTML=[
     '<article class="simple-result ipo-standard-result">',
       '<div class="result-kicker">CURRENT IPO VIEW</div>',
       '<h2>'+escapeHtml(headline)+'</h2>',
-      '<p class="result-copy">'+escapeHtml(issues.length)+' current issues monitored · '+escapeHtml(nv.length)+' awaiting critical evidence verification.</p>',
-      '<div class="decision-grid"><div class="decision-card"><span>Decision status</span><strong>'+(ready.length?'Review graded issues':'Wait')+'</strong><small>Do not act on NV issues</small></div><div class="decision-card"><span>Framework</span><strong>V'+escapeHtml(r.framework_version||latest.framework_version||'1.1')+'</strong><small>IPO EDGE governed snapshot</small></div></div>',
-      '<div class="action-box"><span>Suggested action</span><strong>'+(ready.length?'Review the graded current issues below.':'Wait for critical evidence to be verified before any apply/reject decision.')+'</strong></div>',
+      '<p class="result-copy">'+escapeHtml(issues.length)+' current issues monitored · '+escapeHtml(pending.length)+' still in autonomous research recovery.</p>',
+      '<div class="decision-grid"><div class="decision-card"><span>Decision status</span><strong>'+(ready.length?'Review graded issues':'Research pending')+'</strong><small>Unresolved evidence is withheld from recommendation output</small></div><div class="decision-card"><span>Framework</span><strong>V'+escapeHtml(r.framework_version||latest.framework_version||'1.1')+'</strong><small>IPO EDGE governed snapshot</small></div></div>',
+      '<div class="action-box"><span>Suggested action</span><strong>'+(ready.length?'Review the governed graded issues below.':'No apply/reject call until autonomous evidence recovery completes.')+'</strong></div>',
       '<details class="why-details" open><summary>Why this view?</summary><div class="why-grid">'+why+'</div></details>',
       '<details class="change-details" open><summary>What could change the view?</summary><ul><li>Critical R2/R3/R4/R6/R7 evidence must move from unresolved to verified.</li><li>Subscription/QIB/NII/retail demand and GMP should be incorporated when available and governed.</li><li>The final-day checkpoint can upgrade, retain or reject the issue once evidence coverage is sufficient.</li><li>A hard blocker keeps the issue at NV/No Action regardless of superficial market enthusiasm.</li></ul></details>',
       '<details class="active-details" open><summary>Current IPO queue</summary><div class="ipo-issue-grid">'+(issues.length?issues.map(ipoIssueCard).join(''):'<p class="muted">No current issues.</p>')+'</div></details>',
@@ -350,11 +381,11 @@ function render5dr(run,request,outcomeAssessment){
       '<div class="analysis-detail" data-analysis-detail hidden>',
       '<details class="why-details" open><summary>Why this view?</summary>',
         '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p><b>What we saw:</b> '+escapeHtml(why.price.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p><b>What we saw:</b> '+escapeHtml(why.options.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Market participation</strong><p><b>What we saw:</b> '+escapeHtml(why.market.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
-          '<div class="why-card"><strong>Macro & events</strong><p><b>What we saw:</b> '+escapeHtml(why.macro.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p><b>What we saw:</b> '+escapeHtml(why.trade.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
+          '<div class="why-card"><strong>Price & structure</strong><p>'+escapeHtml(why.price.observed+' '+why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
+          '<div class="why-card"><strong>Options & positioning</strong><p>'+escapeHtml(why.options.observed+' '+why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
+          '<div class="why-card"><strong>Market participation</strong><p>'+escapeHtml(why.market.observed+' '+why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
+          '<div class="why-card"><strong>Macro & events</strong><p>'+escapeHtml(why.macro.observed+' '+why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
+          '<div class="why-card"><strong>Trade quality</strong><p>'+escapeHtml(why.trade.observed+' '+why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',

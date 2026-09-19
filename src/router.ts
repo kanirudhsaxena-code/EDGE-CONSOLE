@@ -453,13 +453,23 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
 }
 
 async function ipoEdgeSnapshot(request: Request, env: Env): Promise<Response> {
-  if (!env.DATABASE_URL) return json({ error: 'Console database is not configured' }, 503);
+  if (request.method !== 'GET') return json({ error: 'Method not allowed' }, 405);
+  try {
+    const live = await fetch('https://raw.githubusercontent.com/kanirudhsaxena-code/IPO-EDGE/main/runtime/console_snapshot.json', {
+      headers: { 'accept': 'application/json', 'user-agent': 'EDGE-CONSOLE-IPO-SNAPSHOT/1.0' },
+      cf: { cacheTtl: 60, cacheEverything: true }
+    } as RequestInit);
+    if (live.ok) {
+      const payload = await live.json();
+      if (isObject(payload) && Array.isArray(payload.issues)) {
+        return json({ snapshot: { captured_at: payload.captured_at ?? null, payload }, source: 'IPO_EDGE_REPO' });
+      }
+    }
+  } catch {}
+  if (!env.DATABASE_URL) return json({ error: 'IPO snapshot unavailable' }, 503);
   const sql = neon(env.DATABASE_URL);
-  if (request.method === 'GET') {
-    const rows = await sql`select captured_at,payload from ipo_console_snapshots order by captured_at desc,id desc limit 1`;
-    return json({ snapshot: rows[0] ?? null });
-  }
-  return json({ error: 'Method not allowed' }, 405);
+  const rows = await sql`select captured_at,payload from ipo_console_snapshots order by captured_at desc,id desc limit 1`;
+  return json({ snapshot: rows[0] ?? null, source: 'CONSOLE_FALLBACK' });
 }
 
 async function edgeStocksMaster(env: Env): Promise<Response> {
