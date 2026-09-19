@@ -23,7 +23,7 @@ jobs:
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
             -H 'content-type: application/json' \
             -X POST \
-            --data '{"command":"EDGE TCS"}' \
+            --data '{"command":"EDGE TITAN"}' \
             'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke' \
             -o /tmp/invoke.json
           cat /tmp/invoke.json
@@ -33,7 +33,7 @@ jobs:
           assert data['ok'] is True, data
           assert data['engine']=='EDGE_STOCKS', data
           assert data['contract_version']=='EDGE_STOCKS_V1_2', data
-          assert data['ticker']=='TCS', data
+          assert data['ticker']=='TITAN', data
           assert data['trading_enabled'] is False, data
           assert data['status'] in ('DISPATCHED','ALREADY_PUBLISHED_TODAY'), data
           PY
