@@ -8,9 +8,10 @@ import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
 import { assessAutomatedMarketEvidence } from './automated-market-evidence';
 import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
+import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
-type Env=EngineDispatchEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
+type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const allowed=new Set<ScreenshotCategory>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const REQUIRED_FAMILIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
@@ -46,15 +47,45 @@ function governedMarketObservations(metadata:Record<string,unknown>):Record<stri
     ?screenshot.observations.filter(isObject):[];
 }
 
+async function requestOwnershipGate(request:Request,env:Env,requestId:string):Promise<Response|null>{
+  if(!isAccessIdentityEnforced(env))return null;
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  if(!rows.length)return json({error:'request_id not found'},404);
+  const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  if(!actorCanAccessStored(actor,metadata.actor,env))return json({error:'This run belongs to a different Console user'},403);
+  return null;
+}
+
+async function sessionInfo(request:Request,env:Env):Promise<Response>{
+  const actor=await resolveAccessActor(request,env);
+  return json({
+    identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT',
+    authenticated:actor.authenticated,
+    actor_id:actor.id,
+    role:actor.role
+  });
+}
+
 async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
   let body:unknown={};try{body=await request.json()}catch{}
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
   const sql=neon(env.DATABASE_URL);
+  if(isAccessIdentityEnforced(env)&&actor.role==='TESTER'){
+    const recent=await sql`select count(*)::int as count from analysis_requests where engine='5DR' and created_at>now()-interval '60 seconds' and metadata->'actor'->>'id'=${actor.id}`;
+    if(Number(recent[0]?.count??0)>=3)return json({error:'Run limit reached. Try again after the current minute.'},429);
+  }
   const requestId=`5drreq_${crypto.randomUUID()}`;
   const batchId=`auto_${crypto.randomUUID()}`;
   let metadata:Record<string,unknown>={
+    actor:actorMetadata(actor),
     decision_setup:setup.value,
     evidence_file_count:0,
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
@@ -381,21 +412,22 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
 
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
-  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true});
+  if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
+  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
   const automatedMarket=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/automated-market-evidence$/);
   if(automatedMarket&&request.method==='POST')return receiveAutomatedMarketEvidence(request,env,decodeURIComponent(automatedMarket[1]));
   if(url.pathname==='/api/5dr/vision-readiness'&&request.method==='GET')return visionReadiness(env);
   const vision=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/shadow-vision$/);
-  if(vision&&request.method==='POST')return shadowVision(env,decodeURIComponent(vision[1]));
+  if(vision&&request.method==='POST'){const id=decodeURIComponent(vision[1]);const denied=await requestOwnershipGate(request,env,id);return denied??shadowVision(env,id)}
   const research=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/system-research$/);
-  if(research&&request.method==='POST')return systemResearch(env,decodeURIComponent(research[1]));
+  if(research&&request.method==='POST'){const id=decodeURIComponent(research[1]);const denied=await requestOwnershipGate(request,env,id);return denied??systemResearch(env,id)}
   const reconcile=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/reconcile-intelligence$/);
-  if(reconcile&&request.method==='POST')return reconcileIntelligence(request,env,decodeURIComponent(reconcile[1]));
+  if(reconcile&&request.method==='POST'){const id=decodeURIComponent(reconcile[1]);const denied=await requestOwnershipGate(request,env,id);return denied??reconcileIntelligence(request,env,id)}
   const resume=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/resume-processing$/);
-  if(resume&&request.method==='POST')return resumeProcessing(request,env,decodeURIComponent(resume[1]));
+  if(resume&&request.method==='POST'){const id=decodeURIComponent(resume[1]);const denied=await requestOwnershipGate(request,env,id);return denied??resumeProcessing(request,env,id)}
   const normalized=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/normalized$/);
-  if(normalized&&request.method==='POST')return normalizedAndDispatch(request,env,decodeURIComponent(normalized[1]));
+  if(normalized&&request.method==='POST'){const id=decodeURIComponent(normalized[1]);const denied=await requestOwnershipGate(request,env,id);return denied??normalizedAndDispatch(request,env,id)}
   return router.fetch(request,env as any);
 }};
