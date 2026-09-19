@@ -323,17 +323,40 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     }
   };
 
+  const scoreLabel = (value: unknown): string => {
+    const n = Number(value);
+    return n === 2 ? 'STRONGLY POSITIVE' : n === 1 ? 'POSITIVE' : n === 0 ? 'NEUTRAL' : n === -1 ? 'NEGATIVE' : n === -2 ? 'STRONGLY NEGATIVE' : 'NOT VERIFIED';
+  };
+  const legacyInterpretation = (componentRaw: unknown, scoreRaw: unknown): string => {
+    const component = String(componentRaw || '').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
+    const score = Number(scoreRaw);
+    const tone = scoreLabel(scoreRaw).toLowerCase();
+    const consequence =
+      component.includes('PRICE_STRUCTURE') ? 'Near-term price structure is therefore a material input to the D+5 direction.' :
+      component.includes('PV') ? 'Price/volume/options confirmation is therefore influencing directional conviction.' :
+      component.includes('RELATIVE_STRENGTH') ? 'Relative performance versus the benchmark is therefore influencing directional conviction.' :
+      component.includes('BUSINESS_FUNDAMENTALS') ? 'Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.' :
+      component.includes('VALUATION') ? 'Valuation is therefore acting as a supporting or limiting factor rather than a standalone trigger.' :
+      component.includes('INSTITUTIONAL') ? 'Institutional ownership/behaviour evidence is therefore contributing to confirmation quality.' :
+      component.includes('NEWS') || component.includes('CATALYST') ? 'Recent catalysts are therefore contributing to the risk/reward balance.' :
+      component.includes('EVENT_SHOCK') ? 'Event-risk evidence is therefore affecting the risk overlay rather than creating direction by itself.' :
+      component.includes('CHART_PATTERN') ? 'The active chart-pattern signal is therefore contributing to the near-term setup.' :
+      'This governed component is contributing to the overall EDGE direction and conviction.';
+    return `Legacy active run: the original narrative field was not persisted. The immutable verified component score is ${Number.isFinite(score) ? score.toFixed(0) : 'N/A'} (${tone}); ${consequence}`;
+  };
   const drilldown = componentRows.map((row: Record<string, unknown>) => {
     const verification = componentVerificationStatus(row.availability_status, row.evidence_quality);
     const notes = parseNotes(row.notes);
-    const keyOutcome = notes.key_outcome ?? (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED'));
-    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? '' : 'Evidence not verified; no interpretation inferred.');
+    const reconstructed = verification === 'VERIFIED' && !isNonEmptyString(notes.interpretation);
+    const keyOutcome = notes.key_outcome ?? (reconstructed ? scoreLabel(row.raw_score) : (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED')));
+    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? legacyInterpretation(row.component,row.raw_score) : 'Evidence not verified; no interpretation inferred.');
     return {
       component: String(row.component),
       score_or_level: row.raw_score ?? 'N/A',
       verification_status: verification,
       key_outcome: keyOutcome,
       interpretation,
+      narrative_source: reconstructed ? 'LEGACY_SCORE_RECONSTRUCTION' : 'PERSISTED_EVIDENCE_NARRATIVE',
     };
   });
 
@@ -388,9 +411,20 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         recommendation_hit_rate_pct: numberOrNull(stock.recommendation_hit_rate_pct),
         direction_hit_rate_pct: numberOrNull(stock.direction_hit_rate_pct),
         target_hit_rate_pct: numberOrNull(stock.target_hit_rate_pct),
+        avg_gain_pct: numberOrNull(stock.avg_gain_pct),
+        avg_loss_pct: numberOrNull(stock.avg_loss_pct),
+        avg_mfe_pct: numberOrNull(stock.avg_mfe_pct),
+        avg_mae_pct: numberOrNull(stock.avg_mae_pct),
+        cumulative_model_pnl_units: numberOrNull(stock.cumulative_model_pnl_units),
         provisional_captured_checkpoints: integerOrZero(stock.provisional_captured_checkpoints),
         provisional_due_checkpoints: integerOrZero(stock.provisional_due_checkpoints),
+        provisional_forecast_scorable: integerOrZero(stock.provisional_forecast_scorable),
+        provisional_forecast_hits: integerOrZero(stock.provisional_forecast_hits),
+        provisional_forecast_misses: integerOrZero(stock.provisional_forecast_misses),
         provisional_forecast_accuracy_pct: numberOrNull(stock.provisional_forecast_accuracy_pct),
+        provisional_zone_scorable: integerOrZero(stock.provisional_zone_scorable),
+        provisional_zone_hits: integerOrZero(stock.provisional_zone_hits),
+        provisional_zone_misses: integerOrZero(stock.provisional_zone_misses),
         provisional_zone_accuracy_pct: numberOrNull(stock.provisional_zone_accuracy_pct),
         latest_checkpoint_observed_at: stock.latest_checkpoint_observed_at ?? null,
       }
@@ -472,6 +506,25 @@ async function ipoEdgeSnapshot(request: Request, env: Env): Promise<Response> {
   return json({ snapshot: rows[0] ?? null, source: 'CONSOLE_FALLBACK' });
 }
 
+async function edgeStocksHistory(env: Env, tickerRaw: string): Promise<Response> {
+  if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
+  const ticker = normalizeTickerCandidate(tickerRaw);
+  if (!ticker) return json({ error: 'Invalid ticker' }, 422);
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select r.recommendation_id,r.run_timestamp,r.definitive_forecast,r.definitive_recommendation,
+           r.expected_price_zone_low,r.expected_price_zone_high,r.bull_probability,r.base_probability,r.bear_probability,
+           p.current_return_pct,p.outcome_verdict,l.status,l.expiry_trading_date
+      from recommendations r
+      left join recommendation_performance p using(recommendation_id)
+      left join recommendation_lifecycle l using(recommendation_id)
+     where r.ticker=${ticker}
+     order by r.run_timestamp desc
+     limit 8
+  `;
+  return json({ ticker, recommendations: rows });
+}
+
 async function edgeStocksMaster(env: Env): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -492,6 +545,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
+  if (url.pathname === '/api/edge-stocks/history' && request.method === 'GET') return edgeStocksHistory(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
   if (url.pathname === '/api/ipo-edge/snapshot' && request.method === 'GET') return ipoEdgeSnapshot(request, env);
   return app.fetch(request, env);

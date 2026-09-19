@@ -226,3 +226,45 @@ body{font-size:var(--fs-body);line-height:var(--lh-body)}
 }
 
 .semantic-contract-tables{display:none!important}
+
+
+/* EDGE Stocks full frozen-standard mobile layout */
+.stock-standard-result{display:grid;gap:14px}
+.stock-hero{display:grid;gap:12px}
+.stock-hero-line{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.stock-hero-line h2{margin:4px 0 6px}
+.stock-hero-line p{margin:0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5}
+.status-chip{display:inline-flex;align-items:center;justify-content:center;padding:5px 9px;border-radius:999px;font-size:var(--fs-xs);font-weight:800;white-space:nowrap}
+.status-chip.positive{background:#e9f7ef;color:#2f7a4e}.status-chip.neutral{background:#eef4f8;color:#5e7285}.status-chip.negative{background:#fff0ef;color:#a94c47}
+.stock-section{padding:14px;border:1px solid var(--border-light);border-radius:16px;background:var(--surface-soft);display:grid;gap:12px}
+.stock-section-title{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.stock-section-title span{font-size:var(--fs-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--accent-2);font-weight:800}
+.stock-section-title h3{margin:2px 0 0;font-size:var(--fs-lg);line-height:1.2;color:var(--ink)}
+.stock-section-copy{margin:0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.55}
+.stock-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.stock-detail-grid>div{padding:11px;border:1px solid var(--border-light);border-radius:13px;background:#fff;min-width:0}
+.stock-detail-grid span{display:block;font-size:var(--fs-xs);text-transform:uppercase;letter-spacing:.055em;color:var(--text-soft)}
+.stock-detail-grid strong{display:block;margin-top:4px;font-size:var(--fs-sm);line-height:1.35;color:var(--ink);word-break:break-word}
+.stock-details-block{margin-top:0;padding-top:12px;border-top:1px solid var(--border-light)}
+.stock-factor-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.score-pill{display:inline-flex;padding:3px 7px;border-radius:999px;font-size:10px;font-weight:800;white-space:nowrap}
+.score-pill.positive{background:#e9f7ef;color:#2f7a4e}.score-pill.negative{background:#fff0ef;color:#a94c47}.score-pill.neutral{background:#eef4f8;color:#61768a}
+.stock-factor-foot{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
+.stock-factor-foot small{color:var(--text-soft);font-size:10px;line-height:1.4}
+.stock-assessment-details{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:10px}
+.stock-assessment-details>div{padding:10px;border:1px solid var(--border-light);border-radius:12px;background:var(--surface-soft)}
+.stock-assessment-details span{display:block;font-size:var(--fs-xs);color:var(--text-soft);text-transform:uppercase;letter-spacing:.05em}
+.stock-assessment-details strong{display:block;margin-top:3px;font-size:var(--fs-sm);color:var(--ink)}
+.active-call-card.selected{border-color:#8eb5d2;background:#eef7fd;box-shadow:0 5px 16px rgba(35,85,125,.08)}
+@media(max-width:560px){
+  .stock-hero-line{display:grid;grid-template-columns:1fr}
+  .stock-hero-line .status-chip{justify-self:start}
+  .stock-detail-grid{grid-template-columns:1fr}
+  .stock-assessment-details{grid-template-columns:1fr 1fr}
+  .stock-factor-head{display:grid;grid-template-columns:1fr}
+  .score-pill{justify-self:start}
+}
+@media(min-width:800px){
+  .stock-detail-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .stock-assessment-details{grid-template-columns:repeat(6,minmax(0,1fr))}
+}
