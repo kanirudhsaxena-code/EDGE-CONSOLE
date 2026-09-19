@@ -143,7 +143,7 @@ function governedWhy(meta,normalized,result){
     if(snap.source_id==='EIA_CRUDE_SPOT'){
       if(snap.facts&&snap.facts.wti_usd_per_barrel){const w=snap.facts.wti_usd_per_barrel,recent=Array.isArray(w.recent)?w.recent.map(Number).filter(Number.isFinite):[];if(recent.length)crude={latest:Number(w.latest),first:recent[0],trend:Number(w.latest)-recent[0],brent:null};}
       if(typeof snap.excerpt==='string'){
-        const wm=snap.excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+)/i),bm=snap.excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+)/i),wv=wm?[...wm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[],bv=bm?[...bm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[];
+        const wm=snap.excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i),bm=snap.excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i),wv=wm?[...wm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[],bv=bm?[...bm[1].matchAll(/\d+(?:\.\d+)?/g)].map(x=>Number(x[0])).slice(0,10):[];
         if(wv.length)crude={latest:wv.at(-1),first:wv[0],trend:wv.at(-1)-wv[0],brent:bv.length?{latest:bv.at(-1),first:bv[0],trend:bv.at(-1)-bv[0]}:null};
       }
     }
