@@ -99,9 +99,11 @@ export function validateEdgeResearchBundle(body:unknown,now=new Date()):string[]
     if(raw.verification_status==='CONFLICTED'&&!isNonEmptyString(raw.conflict_note))errors.push(`claims[${i}] CONFLICTED claim requires conflict_note`);
 
     if(material&&verified&&Array.isArray(raw.source_ids)){
-      const used=body.sources.filter((s:unknown)=>isObject(s)&&raw.source_ids.includes(s.source_id));
-      const independent=used.some((s:any)=>s.provider==='CHATGPT_WEB'||s.provider==='EXA');
-      const providerOnly=used.every((s:any)=>s.provider==='UPSTOX');
+      const claimSourceIds=raw.source_ids.map(x=>String(x));
+      const sourceRows=Array.isArray(body.sources)?body.sources:[];
+      const used=sourceRows.filter((source:unknown)=>isObject(source)&&claimSourceIds.includes(String(source.source_id)));
+      const independent=used.some((source:unknown)=>isObject(source)&&(source.provider==='CHATGPT_WEB'||source.provider==='EXA'));
+      const providerOnly=used.length>0&&used.every((source:unknown)=>isObject(source)&&source.provider==='UPSTOX');
       if(!independent||providerOnly)errors.push(`claims[${i}] material VERIFIED claim cannot be provider-only`);
     }
   });
