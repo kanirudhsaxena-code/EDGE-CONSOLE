@@ -1,0 +1,21 @@
+{
+  "contract":"EDGE_RESEARCH_GOVERNANCE_V1",
+  "status":"FROZEN_CLARIFICATION",
+  "research_authority":"CHATGPT",
+  "fresh_web_research_required_every_run":true,
+  "mandatory_retrieval_provider":"CHATGPT_WEB",
+  "optional_retrieval_providers":["EXA"],
+  "supporting_structured_providers":["UPSTOX"],
+  "material_provider_claim_requires_independent_web_validation":true,
+  "provider_self_validation_prohibited":true,
+  "stale_research_publish_prohibited":true,
+  "unresolved_high_critical_conflict_publish_prohibited":true,
+  "scheduled_provider_only_publish_prohibited":true,
+  "frozen_methodology_changed":false,
+  "user_facing_order":[
+    "EDGE_MASTER_ASSESSMENT",
+    "ACTIVE_CALLS",
+    "CURRENT_STOCK_OUTCOME",
+    "DRILLDOWN"
+  ]
+}
