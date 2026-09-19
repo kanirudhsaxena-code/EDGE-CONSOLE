@@ -384,7 +384,7 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
-  const automatedMarket=url.pathname.match(/^\\/api\\/5dr\\/run-requests\\/([^/]+)\\/automated-market-evidence$/);
+  const automatedMarket=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/automated-market-evidence$/);
   if(automatedMarket&&request.method==='POST')return receiveAutomatedMarketEvidence(request,env,decodeURIComponent(automatedMarket[1]));
   if(url.pathname==='/api/5dr/vision-readiness'&&request.method==='GET')return visionReadiness(env);
   const vision=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/shadow-vision$/);
