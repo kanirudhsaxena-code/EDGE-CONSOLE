@@ -13,13 +13,13 @@ const base=()=>({
   research_authority:'CHATGPT',
   retrieval_providers:['CHATGPT_WEB','EXA','UPSTOX'],
   sources:[
-    {source_id:'s1',provider:'UPSTOX',authority:'BROKER_PROVIDER',url:'https://api.upstox.com/example',title:'Upstox structured evidence',retrieved_at:'2026-09-19T08:54:00Z'},
-    {source_id:'s2',provider:'CHATGPT_WEB',authority:'EXCHANGE',url:'https://www.nseindia.com/example',title:'NSE primary evidence',retrieved_at:'2026-09-19T08:54:30Z',publication_date:'2026-09-18T00:00:00Z',event_date:'2026-09-18T00:00:00Z'},
-    {source_id:'s3',provider:'EXA',authority:'REPUTABLE_SECONDARY',url:'https://example.com/news',title:'Independent current report',retrieved_at:'2026-09-19T08:54:40Z',publication_date:'2026-09-19T00:00:00Z'}
+    {source_id:'src1',provider:'UPSTOX',authority:'BROKER_PROVIDER',url:'https://api.upstox.com/example',title:'Upstox structured evidence',retrieved_at:'2026-09-19T08:54:00Z'},
+    {source_id:'src2',provider:'CHATGPT_WEB',authority:'EXCHANGE',url:'https://www.nseindia.com/example',title:'NSE primary evidence',retrieved_at:'2026-09-19T08:54:30Z',publication_date:'2026-09-18T00:00:00Z',event_date:'2026-09-18T00:00:00Z'},
+    {source_id:'src3',provider:'EXA',authority:'REPUTABLE_SECONDARY',url:'https://example.com/news',title:'Independent current report',retrieved_at:'2026-09-19T08:54:40Z',publication_date:'2026-09-19T00:00:00Z'}
   ],
   claims:[
-    {claim_id:'c1',evidence_category:'NEWS_EVENTS_CATALYSTS',statement:'Material catalyst independently corroborated.',materiality:'HIGH',direction:'POSITIVE',source_ids:['s1','s2'],verification_status:'VERIFIED',independent_validation:true},
-    {claim_id:'c2',evidence_category:'BUSINESS_FUNDAMENTALS',statement:'Latest reported fundamentals were checked.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['s1','s2'],verification_status:'VERIFIED',independent_validation:true}
+    {claim_id:'claim1',evidence_category:'NEWS_EVENTS_CATALYSTS',statement:'Material catalyst independently corroborated.',materiality:'HIGH',direction:'POSITIVE',source_ids:['src1','src2'],verification_status:'VERIFIED',independent_validation:true},
+    {claim_id:'claim2',evidence_category:'BUSINESS_FUNDAMENTALS',statement:'Latest reported fundamentals were checked.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['src1','src2'],verification_status:'VERIFIED',independent_validation:true}
   ],
   limitations:[]
 });
@@ -35,7 +35,7 @@ test('CHATGPT_WEB is mandatory even when Exa and Upstox are present',()=>{
 });
 
 test('material Upstox-only claim cannot be VERIFIED',()=>{
-  const b:any=base(); b.claims[0].source_ids=['s1'];
+  const b:any=base(); b.claims[0].source_ids=['src1'];
   assert.ok(validateEdgeResearchBundle(b,NOW).some(e=>e.includes('provider-only')));
 });
 
