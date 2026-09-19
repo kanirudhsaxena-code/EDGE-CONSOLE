@@ -1,0 +1,68 @@
+name: EDGE Chat Research Dispatch
+
+on:
+  push:
+    branches:
+      - edge-chat-requests
+    paths:
+      - 'requests/*.json'
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve governed request artifact
+        id: request
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^requests/[^/]+\.json$' | head -1 || true)"
+          test -n "$FILE"
+          test -f "$FILE"
+          python - "$FILE" <<'PY'
+          import json,sys
+          path=sys.argv[1]
+          data=json.load(open(path,encoding='utf-8'))
+          assert isinstance(data,dict)
+          assert isinstance(data.get('command'),str) and data['command'].upper().startswith('EDGE ')
+          bundle=data.get('research_bundle')
+          assert isinstance(bundle,dict)
+          assert bundle.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1'
+          assert bundle.get('research_authority')=='CHATGPT'
+          assert 'CHATGPT_WEB' in bundle.get('retrieval_providers',[])
+          print(path)
+          PY
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Invoke protected EDGE Console
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'content-type: application/json' \
+            -X POST \
+            --data-binary "@${{ steps.request.outputs.file }}" \
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke' \
+            | tee /tmp/edge-chat-dispatch.json
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/edge-chat-dispatch.json'))
+          assert data.get('ok') is True, data
+          assert data.get('status')=='DISPATCHED', data
+          assert data.get('research_contract_version')=='EDGE_RESEARCH_BUNDLE_V1', data
+          assert data.get('research_bundle_id'), data
+          assert data.get('trading_enabled') is False, data
+          PY

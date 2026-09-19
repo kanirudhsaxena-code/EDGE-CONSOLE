@@ -1,0 +1,21 @@
+{
+  "$schema":"https://json-schema.org/draft/2020-12/schema",
+  "$id":"https://edge.local/contracts/edge-research-bundle-v1.schema.json",
+  "title":"EDGE Research Bundle V1",
+  "type":"object",
+  "required":["contract_version","bundle_id","ticker","command","created_at","research_fresh_at","research_authority","retrieval_providers","sources","claims","limitations"],
+  "properties":{
+    "contract_version":{"const":"EDGE_RESEARCH_BUNDLE_V1"},
+    "bundle_id":{"type":"string","minLength":3,"maxLength":160},
+    "ticker":{"type":"string","pattern":"^[A-Z0-9._&-]{1,20}$"},
+    "command":{"type":"string","minLength":6},
+    "created_at":{"type":"string","format":"date-time"},
+    "research_fresh_at":{"type":"string","format":"date-time"},
+    "research_authority":{"const":"CHATGPT"},
+    "retrieval_providers":{"type":"array","items":{"enum":["CHATGPT_WEB","EXA","UPSTOX"]},"contains":{"const":"CHATGPT_WEB"}},
+    "sources":{"type":"array","minItems":1},
+    "claims":{"type":"array","minItems":1},
+    "limitations":{"type":"array","items":{"type":"string"}}
+  },
+  "additionalProperties":false
+}

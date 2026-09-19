@@ -28,7 +28,10 @@ export default {
         service: 'EDGE Console',
         edge_database_configured: Boolean(env.EDGE_DATABASE_URL),
         environment: env.APP_ENV ?? null,
-        prompt_dispatch_configured: Boolean(env.EDGE_GITHUB_TOKEN)
+        prompt_dispatch_configured: Boolean(env.EDGE_GITHUB_TOKEN),
+        research_contract_version: 'EDGE_RESEARCH_BUNDLE_V1',
+        research_authority: 'CHATGPT',
+        fresh_web_research_required: true
       });
     }
 

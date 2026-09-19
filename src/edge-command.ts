@@ -30,6 +30,7 @@ export async function dispatchEdgeWorkflow(
   token: string,
   ticker: string,
   holdingState = 'UNKNOWN',
+  researchBundleId?: string,
 ): Promise<EdgeDispatchResult> {
   if (!token.trim()) return { ok: false, status: 503, error: 'EDGE dispatch credential is not configured' };
   const response = await fetch(
@@ -48,6 +49,7 @@ export async function dispatchEdgeWorkflow(
         inputs: {
           ticker,
           holding_state: holdingState,
+          ...(researchBundleId ? { research_bundle_id: researchBundleId } : {}),
         },
       }),
     },
