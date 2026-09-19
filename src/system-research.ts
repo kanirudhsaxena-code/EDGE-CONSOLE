@@ -28,7 +28,7 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
   {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'RBI_HOME',category:'EVENT_SHOCK',url:'https://www.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',url:'https://m.rbi.org.in/home.aspx',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',url:'https://m.rbi.org.in/Scripts/NotificationUser.aspx?Id=10001&Mode=0',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'EIA_CRUDE_SPOT',category:'EVENT_SHOCK',url:'https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
 
   {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
@@ -67,25 +67,73 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
     if(source.id==='NSE_MARKET_STATUS'){
       const parsed=JSON.parse(body),rows=Array.isArray(parsed?.marketState)?parsed.marketState:[];
       const cash=rows.find((x:any)=>x&&x.market==='Capital Market');
-      if(cash)return {capital_market:{status:cash.marketStatus,trade_date:cash.tradeDate,index:cash.index,last:cash.last,variation:cash.variation,percent_change:cash.percentChange,message:cash.marketStatusMessage}};
+      const fx=rows.find((x:any)=>x&&String(x.underlying||'').toUpperCase()==='USDINR');
+      const gift=parsed?.giftnifty;
+      const facts:Record<string,unknown>={};
+      if(cash)facts.capital_market={status:cash.marketStatus,trade_date:cash.tradeDate,index:cash.index,last:cash.last,variation:cash.variation,percent_change:cash.percentChange,message:cash.marketStatusMessage};
+      if(fx)facts.usdinr_futures={last:Number(fx.last),expiry:fx.expiryDate,updated_time:fx.updated_time,status:fx.marketStatus};
+      if(gift)facts.gift_nifty={last:Number(gift.LASTPRICE),percent_change:Number(gift.PERCHANGE),day_change:Number(gift.DAYCHANGE),expiry:gift.EXPIRYDATE,timestamp:gift.TIMESTMP};
+      return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='EIA_CRUDE_SPOT'){
-      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
-      const brent=excerpt.match(/Brent\s*-\s*Europe\s+((?:\d+(?:\.\d+)?\s+){2,10})/i);
-      const wf=wti?nums(wti[1]):[],bf=brent?nums(brent[1]):[];
+      const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
+      const brent=excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
+      const wf=wti?nums(wti[1]).slice(0,10):[],bf=brent?nums(brent[1]).slice(0,10):[];
       const facts:Record<string,unknown>={};
-      if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf};
-      if(bf.length)facts.brent_usd_per_barrel={latest:bf.at(-1),recent:bf};
+      if(wf.length)facts.wti_usd_per_barrel={latest:wf.at(-1),recent:wf,change_from_first:Math.round(((wf.at(-1)!-wf[0])*100))/100};
+      if(bf.length)facts.brent_usd_per_barrel={latest:bf.at(-1),recent:bf,change_from_first:Math.round(((bf.at(-1)!-bf[0])*100))/100};
+      const release=excerpt.match(/Release Date:\s*([0-9/]+)/i),next=excerpt.match(/Next Release Date:\s*([0-9/]+)/i);
+      if(release)facts.release_date=release[1];
+      if(next)facts.next_release_date=next[1];
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='FED_MONETARY_POLICY'){
+      const facts:Record<string,unknown>={};
+      const release=excerpt.match(/FOMC Statement:[\s\S]{0,120}?Released\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i);
+      const press=excerpt.match(/Press Conference\s+([A-Za-z]+\s+\d{1,2},\s+20\d{2})/i);
+      const nextMeeting=excerpt.match(/Upcoming Dates[\s\S]{0,500}?([A-Z][a-z]{2}\.?\s+\d{1,2}-\d{1,2})\s+FOMC Meeting/i);
+      const nextMinutes=excerpt.match(/Upcoming Dates[\s\S]{0,300}?([A-Z][a-z]{2}\.?\s+\d{1,2})\s+FOMC Minutes/i);
+      if(release)facts.latest_fomc_statement_release=release[1];
+      if(press)facts.latest_press_conference=press[1];
+      if(nextMeeting)facts.next_fomc_meeting=nextMeeting[1];
+      if(nextMinutes)facts.next_fomc_minutes=nextMinutes[1];
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='FED_FOMC_CALENDAR'){
+      const facts:Record<string,unknown>={};
+      const section=excerpt.match(/2026 FOMC Meetings([\s\S]*?)2025 FOMC Meetings/i)?.[1]||excerpt;
+      const meetings=[...section.matchAll(/(?:January|March|April|May|June|July|September|October|December)\s+\d{1,2}(?:-\d{1,2})?\*?/g)].map(m=>m[0].replace('*',''));
+      if(meetings.length)facts.meeting_dates_2026=meetings;
       return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='RBI_CURRENT_RATES'){
-      const repo=excerpt.match(/Policy Repo Rate[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
-      const sdf=excerpt.match(/Standing Deposit Facility[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
-      const msf=excerpt.match(/Marginal Standing Facility[^0-9]{0,60}(\d+(?:\.\d+)?)\s*%/i);
+      const repo=excerpt.match(/Policy\s*Repo Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const sdf=excerpt.match(/Standing Deposit Facility Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const msf=excerpt.match(/Marginal Standing Facility Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const usdinr=excerpt.match(/INR\s*\/\s*1 USD\s*:?\s*(\d+(?:\.\d+)?)/i);
+      const dated=excerpt.match(/As at\s+[^A-Za-z0-9]*([A-Za-z]+\s+\d{1,2},\s*20\d{2})/i);
       const facts:Record<string,unknown>={};
       if(repo)facts.policy_repo_rate_pct=Number(repo[1]);
       if(sdf)facts.standing_deposit_facility_pct=Number(sdf[1]);
       if(msf)facts.marginal_standing_facility_pct=Number(msf[1]);
+      if(usdinr)facts.usdinr_reference=Number(usdinr[1]);
+      if(dated)facts.rates_as_of=dated[1];
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='FED_LATEST_FOMC_STATEMENT'){
+      const facts:Record<string,unknown>={};
+      const action=excerpt.match(/Committee decided to\s+(raise|lower|maintain|keep)[^.]{0,220}/i);
+      const range=excerpt.match(/target range for the federal funds rate[^.]{0,100}?to\s+([^.;]+?)\s+percent/i);
+      const inflation=excerpt.match(/Inflation[^.]{0,140}\./i);
+      const activity=excerpt.match(/Economic activity[^.]{0,160}\./i);
+      const geopolitical=excerpt.match(/uncertainty[^.]{0,180}geopolitical[^.]{0,180}\./i);
+      const vote=excerpt.match(/(?:approved|voted)[^.]{0,100}?(\d+)\s*[–-]\s*(\d+)/i);
+      if(action)facts.policy_action=action[1].toLowerCase();
+      if(range)facts.target_range_text=range[1].trim();
+      if(inflation)facts.inflation_assessment=inflation[0].trim();
+      if(activity)facts.activity_assessment=activity[0].trim();
+      if(geopolitical)facts.geopolitical_assessment=geopolitical[0].trim();
+      if(vote)facts.vote={for:Number(vote[1]),against:Number(vote[2])};
       return Object.keys(facts).length?facts:undefined;
     }
   }catch{}
@@ -139,6 +187,16 @@ export async function acquireResearchSource(source:ResearchSource,fetcher:typeof
 
 export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<{snapshots:ResearchSnapshot[];by_category:Record<SystemResearchCategory,{retrieved:number;unavailable:number;ready_for_interpretation:boolean}>}>{
   const snapshots=await Promise.all(SYSTEM_RESEARCH_SOURCES.map(source=>acquireResearchSource(source,fetcher)));
+  const fedLanding=snapshots.find(s=>s.source_id==='FED_MONETARY_POLICY'&&s.status==='RETRIEVED');
+  const release=fedLanding?.excerpt?.match(/FOMC Statement:[\s\S]{0,160}?Released\s+([A-Za-z]+)\s+(\d{1,2}),\s+(20\d{2})/i);
+  if(release){
+    const monthMap:Record<string,string>={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
+    const mm=monthMap[release[1]],dd=release[2].padStart(2,'0'),yyyy=release[3];
+    if(mm){
+      const latest:ResearchSource={id:'FED_LATEST_FOMC_STATEMENT',category:'EVENT_SHOCK',url:`https://www.federalreserve.gov/newsevents/pressreleases/monetary${yyyy}${mm}${dd}a.htm`,authority:'PRIMARY',accept:'text/html,*/*;q=0.5'};
+      snapshots.push(await acquireResearchSource(latest,fetcher));
+    }
+  }
   const categories:SystemResearchCategory[]=['MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'];
   const by_category={} as Record<SystemResearchCategory,{retrieved:number;unavailable:number;ready_for_interpretation:boolean}>;
   for(const category of categories){
