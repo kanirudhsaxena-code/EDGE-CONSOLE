@@ -113,25 +113,52 @@ function governedWhy(meta,normalized,result){
   const supportNum=medianNumber(supportVals),resistanceNum=medianNumber(resistanceVals);
   const support=supportNum?supportNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null,resistance=resistanceNum?resistanceNum.toLocaleString('en-IN',{maximumFractionDigits:2}):null;
   const rows=optionRows(df),strikeText=rows.length?compactStrikeText(rows,spot):null,biases=rows.map(strikeBias).filter(x=>x!=='unclear'),mixedBias=new Set(biases).size>1||biases.includes('mixed');
-  let breadth=null;
-  for(const snap of research){if(snap&&snap.source_id==='NSE_ALL_INDICES'&&typeof snap.excerpt==='string'){try{const data=JSON.parse(snap.excerpt);const n50=Array.isArray(data.data)?data.data.find(x=>x&&x.index==='NIFTY 50'):null;if(n50){breadth={change:Number(n50.percentChange),advances:Number(n50.advances),declines:Number(n50.declines),month:Number(n50.perChange30d),year:Number(n50.perChange365d)};break}}catch{}}}
+  let breadth=null,sectorMoves=[],vix=null,repoRate=null,crude=null;
+  for(const snap of research){
+    if(!snap)continue;
+    if(snap.source_id==='NSE_ALL_INDICES'){
+      const facts=snap.facts&&typeof snap.facts==='object'?snap.facts:null;
+      if(facts&&facts.nifty50){
+        const n=facts.nifty50;breadth={change:Number(n.percent_change),advances:Number(n.advances),declines:Number(n.declines),month:Number(n.change_30d),year:Number(n.change_365d)};
+        const pairs=[['Bank',facts.nifty_bank],['Financials',facts.nifty_financial_services],['IT',facts.nifty_it],['Auto',facts.nifty_auto],['Midcap',facts.nifty_midcap_100],['Smallcap',facts.nifty_smallcap_100]];
+        sectorMoves=pairs.filter(([,x])=>x&&Number.isFinite(Number(x.percent_change))).map(([name,x])=>({name,change:Number(x.percent_change)}));
+        if(facts.india_vix&&Number.isFinite(Number(facts.india_vix.percent_change)))vix={last:Number(facts.india_vix.last),change:Number(facts.india_vix.percent_change)};
+      }else if(typeof snap.excerpt==='string'){
+        try{const data=JSON.parse(snap.excerpt),rows=Array.isArray(data.data)?data.data:[],pick=name=>rows.find(x=>x&&x.index===name),n=pick('NIFTY 50');if(n){breadth={change:Number(n.percentChange),advances:Number(n.advances),declines:Number(n.declines),month:Number(n.perChange30d),year:Number(n.perChange365d)};const pairs=[['Bank',pick('NIFTY BANK')],['Financials',pick('NIFTY FINANCIAL SERVICES')],['IT',pick('NIFTY IT')],['Auto',pick('NIFTY AUTO')],['Midcap',pick('NIFTY MIDCAP 100')],['Smallcap',pick('NIFTY SMALLCAP 100')]];sectorMoves=pairs.filter(([,x])=>x&&Number.isFinite(Number(x.percentChange))).map(([name,x])=>({name,change:Number(x.percentChange)}));const iv=pick('INDIA VIX');if(iv)vix={last:Number(iv.last),change:Number(iv.percentChange)}}}catch{}
+      }
+    }
+    if(snap.source_id==='RBI_CURRENT_RATES'&&snap.facts&&Number.isFinite(Number(snap.facts.policy_repo_rate_pct)))repoRate=Number(snap.facts.policy_repo_rate_pct);
+    if(snap.source_id==='EIA_CRUDE_SPOT'&&snap.facts&&snap.facts.wti_usd_per_barrel){
+      const w=snap.facts.wti_usd_per_barrel,recent=Array.isArray(w.recent)?w.recent.map(Number).filter(Number.isFinite):[];
+      if(recent.length)crude={latest:Number(w.latest),first:recent[0],trend:Number(w.latest)-recent[0]};
+    }
+  }
   const priceFacts=['NIFTY around '+(spot?spot.toLocaleString('en-IN',{maximumFractionDigits:2}):'—'),trend.detail];
   if(emaVals.some(v=>/above/i.test(v)))priceFacts.push('price is above the visible EMA');
   if(vwapVals.some(v=>/above/i.test(v)))priceFacts.push('price is above VWAP on at least one intraday view');
   if(support)priceFacts.push('support near '+support);if(resistance)priceFacts.push('resistance near '+resistance);
   const priceMeaning=result.directional_label==='RANGE'
-    ? 'The underlying chart structure is constructive, but price is still close to an immediate resistance zone and the shorter-term views are not uniformly trending. That supports a range/transition call unless derivatives and participation confirm a breakout.'
-    : 'The price structure supports the published direction only to the extent that it is confirmed by derivatives, participation and execution quality.';
+    ? 'That is constructive underneath, but not a clean breakout: price structure is firmer than the headline range call, so the range view is being driven by missing confirmation from positioning, participation and execution rather than by outright bearish price action.'
+    : 'The price structure supports the published direction only if derivatives, participation and macro risk confirm it; otherwise the system deliberately reduces conviction.';
   const optionsObserved=strikeText?('Near-ATM strikes show '+strikeText+'.'):'The stored derivatives extraction does not contain enough strike-level premium/OI/volume fields for a reliable directional read.';
-  const optionsMeaning=rows.length?(mixedBias?'Adjacent strikes are not aligned: some are call-heavy while others are put-heavy/mixed. That is a real reason directional conviction stays low even though the chart itself looks constructive.':'Nearby strikes are broadly aligned, which provides directional confirmation.'):'No directional conclusion should be inferred from aggregate OI alone.';
-  const marketObserved=breadth?('Official NSE breadth: NIFTY '+(breadth.change>=0?'+':'')+breadth.change.toFixed(2)+'%; '+breadth.advances+' advances vs '+breadth.declines+' declines. The index is '+breadth.month.toFixed(2)+'% over 30 days and '+breadth.year.toFixed(2)+'% over one year.'):'A structured breadth reading was not available.';
-  const marketMeaning=breadth?(breadth.advances>breadth.declines?'Breadth is mildly positive, but 26 vs 24 is not strong enough to validate a high-conviction directional move by itself.':'Breadth is weak or negative, so the headline price move lacks broad confirmation.'):'Without breadth, the system should not claim broad market confirmation.';
+  const optionsMeaning=rows.length?(mixedBias?'The strike surface is internally conflicted, so options are not confirming the constructive chart structure. That conflict is a direct reason the 5-day probability stays closer to range than to a directional breakout.':'Nearby strikes are broadly aligned, so options are reinforcing rather than contradicting the chart structure.'):'Without reliable strike-level alignment, aggregate OI is not allowed to create a directional call.';
+  const sectorText=sectorMoves.length?sectorMoves.map(x=>x.name+' '+(x.change>=0?'+':'')+x.change.toFixed(2)+'%').join(', '):'sector participation unavailable';
+  const vixText=vix&&Number.isFinite(vix.change)?('India VIX '+(vix.change>=0?'+':'')+vix.change.toFixed(2)+'%'):'India VIX unavailable';
+  const marketObserved=breadth?('Official NSE breadth is '+breadth.advances+' advances vs '+breadth.declines+' declines with NIFTY '+(breadth.change>=0?'+':'')+breadth.change.toFixed(2)+'%. '+vixText+'. Sector tape: '+sectorText+'.'):'A structured NSE breadth reading was not available.';
+  let marketMeaning='Participation cannot be used as confirmation because the breadth evidence is incomplete.';
+  if(breadth){
+    const spread=breadth.advances-breadth.declines,sectorPos=sectorMoves.filter(x=>x.change>0).length,sectorNeg=sectorMoves.filter(x=>x.change<0).length;
+    marketMeaning=spread>=10&&sectorPos>sectorNeg?'Breadth is genuinely broad and supportive; this would strengthen a bullish interpretation if derivatives also align.':spread<=-10&&sectorNeg>sectorPos?'Breadth is broadly weak, so a bullish price move would be suspect until participation improves.':'Participation is mixed rather than decisive: the index move is not being confirmed strongly enough across breadth and sectors to justify high conviction.';
+    if(vix&&vix.change>5)marketMeaning+=' Rising India VIX adds risk premium and argues for lower conviction.';
+    else if(vix&&vix.change<-5)marketMeaning+=' Falling India VIX is supportive, but it does not override mixed directional evidence.';
+  }
   const macro=raw.MACRO_CATALYSTS||{};
-  let crudeText='Crude context was retrieved but not converted into a clean governed numeric signal.';
-  const eia=research.find(x=>x&&x.source_id==='EIA_CRUDE_SPOT'&&typeof x.excerpt==='string');
-  if(eia){const m=String(eia.excerpt).match(/WTI[^0-9]+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)\s+([0-9.]+)/i);if(m)crudeText='WTI rose from '+m[1]+' to '+m[6]+' over the visible EIA sequence, so crude was an adverse inflation/risk input rather than a bullish confirmation.'}
-  const macroObserved='Global risk '+signedSignal(macro.global_risk_environment)+'; India rates/INR '+signedSignal(macro.india_macro_rbi_inr_rates)+'; crude/geopolitics '+signedSignal(macro.crude_commodities_geopolitics)+'; scheduled catalysts '+signedSignal(macro.scheduled_high_impact_catalysts)+'. '+crudeText;
-  const macroMeaning='Macro was not strong enough to rescue an otherwise mixed setup. Any unavailable or degraded macro input is treated as lack of confirmation, not as a neutral positive.';
+  let crudeText='crude trend not cleanly verified';
+  if(crude&&Number.isFinite(crude.latest)&&Number.isFinite(crude.trend))crudeText='WTI '+crude.latest.toFixed(2)+' with recent change '+(crude.trend>=0?'+':'')+crude.trend.toFixed(2)+' USD/bbl';
+  const rateText=repoRate!=null?'RBI repo '+repoRate.toFixed(2)+'%':'RBI policy rate not cleanly extracted';
+  const macroObserved=rateText+'; '+crudeText+'; global-risk signal '+signedSignal(macro.global_risk_environment)+'; India macro/INR signal '+signedSignal(macro.india_macro_rbi_inr_rates)+'; scheduled-event risk '+signedSignal(macro.scheduled_high_impact_catalysts)+'.';
+  const adverseCrude=crude&&crude.trend>1;
+  const macroMeaning=(adverseCrude?'Crude is moving higher, which is an adverse input for India through inflation/current-account sensitivity. ':'Crude is not adding a strong adverse impulse in the verified sample. ')+(repoRate!=null?'The RBI policy rate anchors the domestic rate backdrop, but the directional call still depends on whether INR/rates and event risk are reinforcing or conflicting. ':'Domestic rate confirmation is incomplete. ')+'Macro therefore acts as a conviction filter: it can strengthen or veto a trade, but it does not manufacture direction when price, options and breadth disagree.';
   const rr=Number(normalized.expected_rr??0),edge=Number(result.execution_edge??0),trust=Number(result.market_trust??0);
   const tradeObserved='Market Trust '+(Number.isFinite(trust)?trust.toFixed(1):'—')+'/100; execution edge '+(Number.isFinite(edge)?edge.toFixed(0):'—')+'/100; expected reward/risk '+(Number.isFinite(rr)?rr.toFixed(1):'—')+'.';
   const tradeMeaning=result.tradeable===true?'The directional view and execution gates both passed, so the setup is actionable.':'The forecast can still be valid while the trade is rejected. Here the evidence quality, execution setup and reward/risk are not strong enough to justify a position.';
