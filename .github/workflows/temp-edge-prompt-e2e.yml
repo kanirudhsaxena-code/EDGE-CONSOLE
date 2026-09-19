@@ -32,10 +32,10 @@ jobs:
           data=json.load(open('/tmp/invoke.json'))
           assert data['ok'] is True, data
           assert data['engine']=='EDGE_STOCKS', data
-          assert data['contract_version']=='EDGE_STOCKS_V1_2', data
+          assert data['contract_version']=='EDGE_STOCKS_V1_3', data
           assert data['ticker']=='TITAN', data
           assert data['trading_enabled'] is False, data
-          assert data['status'] in ('DISPATCHED','ALREADY_PUBLISHED_TODAY'), data
+          assert data['status'] in ('DISPATCHED','ALREADY_PUBLISHED_TODAY','BEFORE_MARKET_CLOSE'), data
           PY
 
 
