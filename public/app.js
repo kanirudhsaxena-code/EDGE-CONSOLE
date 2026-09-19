@@ -226,18 +226,22 @@ function ipoIssueCard(issue){
 function humanText(v){return String(v??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase())}
 function renderIpoAssessment(result){
   if(!ipoAssessmentSummary)return;
-  const e=result.efficacy||{},counts=result.counts||{};
-  const recs=Number(e.recommendation_count||0);
+  const e=result.historical_efficacy||{},counts=result.counts||{},assessed=Number(e.assessed||0),actionable=Number(e.actionable_recommendation_count||0);
   ipoAssessmentSummary.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+escapeHtml(counts.assessments??0)+' assessments</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · HISTORICAL</div><h3>IPO EDGE efficacy</h3></div><small>'+escapeHtml(assessed)+' assessed IPOs</small></div>',
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>—</strong><small>No matured forecast-accuracy sample in latest efficacy snapshot</small></div>',
-      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(e.positive_hit_rate==null?null:Number(e.positive_hit_rate)*100)+'</strong><small>'+recs+' recommendations in efficacy sample</small></div>',
-      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(e.avg_recommended_gain==null?null:Number(e.avg_recommended_gain)*100)+'</strong><small>Average recommended gain where available</small></div>',
-      '<div class="assessment-metric"><span>Correct avoidance</span><strong>'+pct(e.correct_avoidance_rate==null?null:Number(e.correct_avoidance_rate)*100)+'</strong><small>Rejected/avoided issues correctly filtered</small></div>',
-      '<div class="assessment-metric"><span>Opportunity capture</span><strong>'+pct(e.opportunity_capture_rate==null?null:Number(e.opportunity_capture_rate)*100)+'</strong><small>Latest governed efficacy snapshot</small></div>',
+      '<div class="assessment-metric"><span>Decision accuracy</span><strong>'+pct(e.decision_accuracy_pct)+'</strong><small>'+escapeHtml(e.correct_avoidance||0)+' correct avoidances / '+escapeHtml(assessed)+' assessed</small></div>',
+      '<div class="assessment-metric"><span>High-grade signal hit rate</span><strong>'+pct(e.high_grade_hit_rate_pct)+'</strong><small>'+escapeHtml(e.high_grade_20pct_count||0)+' / '+escapeHtml(e.high_grade_track_count||0)+' A-grade TRACK cases delivered ≥20% listing gain</small></div>',
+      '<div class="assessment-metric"><span>Actionable recommendation accuracy</span><strong>'+(actionable?pct(e.actionable_recommendation_accuracy_pct):'Not scorable')+'</strong><small>'+escapeHtml(actionable)+' APPLY / SUBSCRIBE recommendations in stored history</small></div>',
+      '<div class="assessment-metric"><span>A-grade avg listing gain</span><strong>'+pct(e.high_grade_avg_listing_gain_pct)+'</strong><small>Observed listing gain across '+escapeHtml(e.high_grade_track_count||0)+' high-grade TRACK cases</small></div>',
+      '<div class="assessment-metric"><span>Missed opportunity rate</span><strong>'+pct(e.miss_rate_pct)+'</strong><small>'+escapeHtml(e.missed_opportunity||0)+' / '+escapeHtml(assessed)+' historical assessments</small></div>',
     '</div>',
-    '<details class="assessment-detail-row"><summary>Assessment details</summary><div class="scorecard-context"><span>Coverage</span><strong>'+escapeHtml(counts.ipos??0)+' IPOs · '+escapeHtml(counts.listing_outcomes??0)+' listing outcomes</strong><p>'+escapeHtml(counts.checkpoints??0)+' checkpoints · '+escapeHtml(counts.evidence??0)+' evidence records · '+escapeHtml(counts.runs??0)+' autonomous runs.</p></div></details>'
+    '<details class="assessment-detail-row"><summary>Gain/loss & backtest detail</summary><div class="scorecard-days">',
+      '<div class="scorecard-day"><strong>All assessed IPOs</strong><div><span>Average listing gain</span><b>'+pct(e.all_outcomes_avg_listing_gain_pct)+'</b><small>'+escapeHtml(assessed)+' historical outcomes</small></div><div><span>Framework accuracy</span><b>'+pct(e.decision_accuracy_pct)+'</b><small>Correct avoidance vs missed opportunity</small></div></div>',
+      '<div class="scorecard-day"><strong>Correct avoidances</strong><div><span>Count</span><b>'+escapeHtml(e.correct_avoidance||0)+'</b><small>Issues correctly filtered</small></div><div><span>Avg listing gain</span><b>'+pct(e.correct_avoidance_avg_listing_gain_pct)+'</b><small>Low average gain validates most avoidances</small></div></div>',
+      '<div class="scorecard-day"><strong>Missed opportunities</strong><div><span>Count</span><b>'+escapeHtml(e.missed_opportunity||0)+'</b><small>Historical misses</small></div><div><span>Avg listing gain</span><b>'+pct(e.missed_opportunity_avg_listing_gain_pct)+'</b><small>Magnitude of opportunities the framework failed to capture</small></div></div>',
+      '<div class="scorecard-day"><strong>A-grade TRACK signals</strong><div><span>Positive / ≥20%</span><b>'+escapeHtml(e.high_grade_positive_count||0)+' / '+escapeHtml(e.high_grade_20pct_count||0)+'</b><small>Out of '+escapeHtml(e.high_grade_track_count||0)+' signals</small></div><div><span>Avg listing gain</span><b>'+pct(e.high_grade_avg_listing_gain_pct)+'</b><small>Strong historical signal quality, but TRACK was not an APPLY recommendation</small></div></div>',
+    '</div><div class="scorecard-context"><p>These are historical efficacy statistics from stored IPO outcomes. Listing gains are observed market outcomes, not portfolio returns. Actionable recommendation accuracy remains unscorable until the framework produces APPLY/SUBSCRIBE calls.</p></div></details>'
   ].join('')
 }
 function renderIpoSnapshot(target,runsData){
@@ -350,11 +354,11 @@ function render5dr(run,request,outcomeAssessment){
       '<div class="analysis-detail" data-analysis-detail hidden>',
       '<details class="why-details" open><summary>Why this view?</summary>',
         '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p><b>What we saw:</b> '+escapeHtml(why.price.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p><b>What we saw:</b> '+escapeHtml(why.options.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Market participation</strong><p><b>What we saw:</b> '+escapeHtml(why.market.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
-          '<div class="why-card"><strong>Macro & events</strong><p><b>What we saw:</b> '+escapeHtml(why.macro.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p><b>What we saw:</b> '+escapeHtml(why.trade.observed)+'</p><p><b>What it means:</b> '+escapeHtml(why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
+          '<div class="why-card"><strong>Price & structure</strong><p>'+escapeHtml(why.price.observed+' '+why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
+          '<div class="why-card"><strong>Options & positioning</strong><p>'+escapeHtml(why.options.observed+' '+why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
+          '<div class="why-card"><strong>Market participation</strong><p>'+escapeHtml(why.market.observed+' '+why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
+          '<div class="why-card"><strong>Macro & events</strong><p>'+escapeHtml(why.macro.observed+' '+why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
+          '<div class="why-card"><strong>Trade quality</strong><p>'+escapeHtml(why.trade.observed+' '+why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',
