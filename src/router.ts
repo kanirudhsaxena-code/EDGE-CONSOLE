@@ -548,6 +548,21 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   return json({ report: payload });
 }
 
+async function ipoEdgeSnapshot(request: Request, env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Console database is not configured' }, 503);
+  const sql = neon(env.DATABASE_URL);
+  if (request.method === 'GET') {
+    const rows = await sql`select captured_at,payload from ipo_console_snapshots order by captured_at desc,id desc limit 1`;
+    return json({ snapshot: rows[0] ?? null });
+  }
+  let body: unknown;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (!isObject(body) || !Array.isArray(body.issues)) return json({ error: 'IPO snapshot requires issues[]' }, 422);
+  const capturedAt = isNonEmptyString(body.captured_at) ? String(body.captured_at) : new Date().toISOString();
+  await sql`insert into ipo_console_snapshots(captured_at,payload) values (${capturedAt}::timestamptz,${JSON.stringify(body)}::jsonb)`;
+  return json({ ok: true, captured_at: capturedAt }, 201);
+}
+
 async function edgeStocksMaster(env: Env): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -572,5 +587,6 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
+  if (url.pathname === '/api/ipo-edge/snapshot' && (request.method === 'GET' || request.method === 'POST')) return ipoEdgeSnapshot(request, env);
   return app.fetch(request, env);
 }};
