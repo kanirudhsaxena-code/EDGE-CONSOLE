@@ -167,26 +167,22 @@ runForm.addEventListener('submit',async event=>{event.preventDefault();saveDecis
 document.addEventListener('click',event=>{const toggle=event.target.closest&&event.target.closest('[data-analysis-toggle]');if(!toggle)return;const card=toggle.closest('.simple-result'),detail=card&&card.querySelector('[data-analysis-detail]');if(!detail)return;detail.hidden=!detail.hidden;toggle.textContent=detail.hidden?'View full analysis':'Hide full analysis';});
 document.addEventListener('click',async event=>{const button=event.target.closest&&event.target.closest('#resume5drRequest');if(!button)return;const requestId=button.dataset.requestId,status=document.getElementById('resume5drStatus');if(!requestId||!status)return;button.disabled=true;button.textContent='Processing…';try{status.textContent='Resuming from the last persisted governed stage…';const result=await runStage(requestId,'resume-processing','Resuming 5DR from its persisted governed stage…');status.textContent=result.status==='PROCESSING'?'Engine dispatched successfully. Refreshing…':'Pipeline advanced successfully. Refreshing…';setTimeout(()=>location.reload(),1200)}catch(error){status.textContent=friendlyFailureMessage(error&&error.message);const card=status.closest('.simple-result');if(card&&!card.querySelector('.diagnostic-details'))card.insertAdjacentHTML('beforeend',diagnosticSummary(error&&error.message,'Safe to retry'));button.disabled=false;button.textContent='Retry 5DR'}});
 function pct(v){return v==null?'—':Number(v).toFixed(Number(v)%1?1:0)+'%'}
-function assessmentDayCell(label,day,zone){
-  const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{};
-  const status=String(d.status||'').toUpperCase();
-  if(status==='NOT DUE'||Number(d.scorable||0)===0){
-    return '<div class="scorecard-day pending"><strong>'+escapeHtml(label)+'</strong><span>Not due</span><small>Awaiting governed checkpoint</small></div>'
-  }
+function assessmentDayCell(label,day,zone,rec){
+  const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{},r=rec&&typeof rec==='object'?rec:{};
+  const status=String(d.status||'').toUpperCase(),forecastDue=status!=='NOT DUE'&&Number(d.scorable||0)>0;
   const hits=Number(d.hits||0),scorable=Number(d.scorable||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
   const dirPct=d.hit_rate_pct!=null?Number(d.hit_rate_pct):scorable?hits/scorable*100:null;
   const zonePct=z.zone_hit_rate_pct!=null?Number(z.zone_hit_rate_pct):(d.zone_hit_rate_pct!=null?Number(d.zone_hit_rate_pct):(zoneScorable?zoneHits/zoneScorable*100:null));
-  return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong><div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits</small></div></div>'
+  const resolved=Number(r.resolved||0),recHits=Number(r.hits||0),recMisses=Number(r.misses||0),recPct=r.hit_rate_pct!=null?Number(r.hit_rate_pct):(resolved?recHits/resolved*100:null);
+  const forecastHtml=forecastDue?'<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits</small></div>':'<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
+  const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
+  return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
 function renderAssessmentDetails(details){
   if(!details.length)return '<p class="assessment-empty-copy">No matured outcome records yet. The current forecast will enter this scorecard only as governed checkpoints mature.</p>';
-  const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{};
-  const m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{};
+  const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
   const labels=['D+1','D+2','D+3','D+4','D+5'];
-  return [
-    '<div class="scorecard-context"><span>Last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString():'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p></div>',
-    '<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label])).join('')+'</div>'
-  ].join('')
+  return ['<div class="scorecard-context"><span>Last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString():'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>Recommendation results are attributed once, to the D+n horizon on which the call first resolves.</small></div>','<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'].join('')
 }
 function renderAssessment(container,payload){
   if(!container)return;
@@ -314,7 +310,12 @@ function renderGenericModule(engine,target,runsData){
 }
 async function loadRecentResults(module){
   if(!runs||!runsNote)return;
-  try{const d=await fetch('/api/runs/latest?engine='+encodeURIComponent(module),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.runs)?d.runs:[];if(!list.length){runs.innerHTML='<div class="generic-empty">No published results for this module yet.</div>';runsNote.textContent='0 recent';return}runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'5DR result':module==='EDGE_STOCKS'?'EDGE Stocks result':'EDGE IPO result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'}catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
+  try{
+    if(module==='EDGE_IPO'){const d=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()),snap=d.snapshot||null;if(!snap){runs.innerHTML='<div class="generic-empty">No IPO EDGE snapshot available.</div>';runsNote.textContent='0 recent';return}runs.innerHTML='<article class="run history-row"><strong>IPO EDGE snapshot</strong><span class="muted">'+escapeHtml(new Date(snap.captured_at).toLocaleString())+'</span></article>';runsNote.textContent='1 current snapshot';return}
+    const d=await fetch('/api/runs/latest?engine='+encodeURIComponent(module),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.runs)?d.runs:[];
+    if(!list.length){runs.innerHTML='<div class="generic-empty">No published results for this module yet.</div>';runsNote.textContent='0 recent';return}
+    runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'5DR result':'EDGE Stocks result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'
+  }catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
 }
 function render5dr(run,request,outcomeAssessment){
   if(!run){
@@ -397,8 +398,9 @@ async function loadDashboard(){
       render5dr(f.run,matchedRequest,oa)
     }else render5dr(null,latestReq,null);
 
-    const ipoRuns=await fetch('/api/runs/latest?engine=EDGE_IPO',{cache:'no-store'}).then(r=>r.json()).then(d=>d.runs||[]).catch(()=>[]);
-    renderIpoSnapshot(ipoSummary,ipoRuns);
+    const ipoData=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()).catch(()=>({snapshot:null}));
+    const ipoSnap=ipoData.snapshot||null,ipoPayload=ipoSnap&&ipoSnap.payload?ipoSnap.payload:null;
+    renderIpoSnapshot(ipoSummary,ipoPayload?[{run_id:'IPO-SNAPSHOT-'+String(ipoSnap.captured_at||''),generated_at:ipoSnap.captured_at,framework_version:ipoPayload.framework_version||'1.1',result:{...ipoPayload,current_issues:ipoPayload.issues||[]}}]:[]);
     await loadRecentResults(activeModule);
   }catch(e){
     console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load 5DR integration status.</div>';renderIpoSnapshot(ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
