@@ -25,7 +25,10 @@ Completed:
 - governed research, normalization, frozen-engine execution and result persistence are wired;
 - cross-repository workflow permission blocker removed through governed proxy execution of the pinned 5DR engine;
 - weekend/closed-session transport acceptance passes fail-closed;
-- Console CI, deployment, smoke and automated production acceptance are green on 20 September 2026;
+- Console CI, deployment and EDGE production smoke are green on 20 September 2026;
+- closed-session zero-upload end-to-end acceptance run `35519575645` passed with `acceptance_mode=FULL_LIVE_E2E`;
+- sandbox persistence boundary passed: unpublished and Learning-Lab-ineligible;
+- Console persistence validation is aligned with the frozen canonical 5DR directional label set;
 - 5DR CI and read-only Upstox verification are green.
 
 Remaining GO gate:
@@ -48,12 +51,16 @@ Canonical production contract:
 
 Required user-facing order:
 1. EDGE MASTER ASSESSMENT
-2. ACTIVE CALLS
-3. CURRENT STOCK OUTCOME
-4. DRILL-DOWN
+2. CURRENT STOCK OUTCOME
+3. DRILL-DOWN
+4. ACTIVE CALLS
 
 Production validation includes:
 - canonical V1.3 renderer;
+- mobile-first 5DR-style card presentation with no horizontal result tables;
+- plain-English user labels with technical metrics collapsed under advanced details;
+- cache-busted UI assets and Worker-first no-store delivery;
+- fresh-shell EDGE production smoke run `35525766577` attempt 2 passed on 20 September 2026;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +77,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `efc552b0328ffc1dd6810feea9cd45efe2dd3b35`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v2`
 
 Cutover change:
 - set `APP_ENV=production`.
