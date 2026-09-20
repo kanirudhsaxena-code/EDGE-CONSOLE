@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
-import { dispatch5drAcquisition, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
 import { sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
@@ -117,6 +117,8 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
 
 async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const dispatchHealth=await check5drWorkflowAccess(env,fetch);
+  if(!dispatchHealth.ok)return json({error:'5DR automated dispatch is not ready',code:'FIVEDR_DISPATCH_NOT_READY',dispatch_health:dispatchHealth,next_step:'FIX_5DR_GITHUB_ACTIONS_PERMISSION'},503);
   const actor=await resolveAccessActor(request,env);
   if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
   let body:unknown={};try{body=await request.json()}catch{}
@@ -460,6 +462,7 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
+  if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
   const scopedRead=await scoped5drRead(request,env);if(scopedRead)return scopedRead;
   if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
