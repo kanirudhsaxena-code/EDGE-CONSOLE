@@ -54,6 +54,9 @@ Required user-facing order:
 
 Production validation includes:
 - canonical V1.3 renderer;
+- final reviewed UI v4: dark bold section headings; collapsed What could change the view; actual call dates; side-by-side Trade Setup Quality + Options Fit with explanations; user-facing EDGE NIFTY naming;
+- UI asset version edge-ui-v4-20260921 with Worker-first no-store delivery;
+- EDGE production smoke run `35529741085` attempt 2 passed on Console `160865c1ddfe2c22e73c6b900b983e2efd3883d1`;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +73,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `160865c1ddfe2c22e73c6b900b983e2efd3883d1`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v4`
 
 Cutover change:
 - set `APP_ENV=production`.
