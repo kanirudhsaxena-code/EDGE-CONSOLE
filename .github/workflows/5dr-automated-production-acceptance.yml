@@ -5,6 +5,8 @@ on:
     workflows: ["EDGE Console Deploy"]
     types: [completed]
   workflow_dispatch:
+  schedule:
+    - cron: "0 5 * * 1-5"
 
 permissions:
   contents: read
@@ -13,6 +15,7 @@ jobs:
   acceptance:
     if: >-
       github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'schedule' ||
       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
     runs-on: ubuntu-24.04
     timeout-minutes: 8
@@ -67,11 +70,35 @@ jobs:
             fi
             if python - <<'PY'
           import json
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          d=json.load(open('/tmp/status.json'))
+          if d.get('adapter_stage')!='AUTOMATED_MARKET_DATA_BLOCKED':
+              raise SystemExit(1)
+          blockers=d.get('blockers') or []
+          weekend=datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
+          if blockers==['CANDLE_ARRAY_MISSING'] and weekend:
+              raise SystemExit(0)
+          raise SystemExit(2)
+          PY
+            then
+              echo "Weekend transport acceptance reached governed market-data block as expected"
+              break
+            else
+              rc=$?
+              if [ "$rc" = "2" ]; then
+                echo "Unexpected automated market-data block"
+                cat /tmp/status.json
+                exit 1
+              fi
+            fi
+            if python - <<'PY'
+          import json
           d=json.load(open('/tmp/status.json'))
           raise SystemExit(0 if d.get('status')=='FAILED' else 1)
           PY
             then
-              echo "5DR sandbox run failed closed"
+              echo "5DR sandbox run failed closed unexpectedly"
               cat /tmp/status.json
               exit 1
             fi
@@ -83,17 +110,30 @@ jobs:
           python - <<'PY'
           import json
           d=json.load(open('/tmp/final.json'))
-          if d.get('status')!='COMPLETED':
-              raise SystemExit('acceptance did not reach COMPLETED: '+json.dumps(d))
-          if d.get('sandbox') is not True:
-              raise SystemExit('tester acceptance result was not marked sandbox')
-          if d.get('published') is not False:
-              raise SystemExit('tester acceptance result crossed canonical publish boundary')
-          if d.get('learning_eligible') is not False:
-              raise SystemExit('tester acceptance result crossed Learning Lab boundary')
-          print('5DR_AUTOMATED_SANDBOX_ACCEPTANCE=PASS')
-          print('request_id='+str(d.get('request_id')))
-          print('run_id='+str(d.get('run_id')))
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          if d.get('status')=='COMPLETED':
+              if d.get('sandbox') is not True:
+                  raise SystemExit('tester acceptance result was not marked sandbox')
+              if d.get('published') is not False:
+                  raise SystemExit('tester acceptance result crossed canonical publish boundary')
+              if d.get('learning_eligible') is not False:
+                  raise SystemExit('tester acceptance result crossed Learning Lab boundary')
+              print('5DR_AUTOMATED_SANDBOX_ACCEPTANCE=PASS')
+              print('acceptance_mode=FULL_LIVE_E2E')
+              print('request_id='+str(d.get('request_id')))
+              print('run_id='+str(d.get('run_id')))
+          elif (
+              d.get('adapter_stage')=='AUTOMATED_MARKET_DATA_BLOCKED'
+              and (d.get('blockers') or [])==['CANDLE_ARRAY_MISSING']
+              and datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
+          ):
+              print('5DR_AUTOMATED_TRANSPORT_ACCEPTANCE=PASS')
+              print('acceptance_mode=WEEKEND_FAIL_CLOSED')
+              print('request_id='+str(d.get('request_id')))
+              print('live_engine_execution_proven=false')
+          else:
+              raise SystemExit('acceptance did not reach a governed accepted terminal state: '+json.dumps(d))
           PY
 
       - name: Preserve acceptance evidence
