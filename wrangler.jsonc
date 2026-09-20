@@ -18,7 +18,7 @@
     }
   ],
   "vars": {
-    "APP_ENV": "development",
+    "APP_ENV": "production",
     "ACCESS_IDENTITY_MODE": "AUDIT",
     "OUTPUT_CONTRACT_VERSION": "1.0",
     "FIVEDR_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
