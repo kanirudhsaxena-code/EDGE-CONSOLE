@@ -54,6 +54,10 @@ Required user-facing order:
 
 Production validation includes:
 - canonical V1.3 renderer;
+- unified visual system v5 across EDGE NIFTY + EDGE Stocks: standardized headings, card titles, values, explanation text, outcome/status badges and monochrome icon chips;
+- Drill-down outcome shown once per card (duplicate footer outcome removed);
+- UI asset version edge-ui-v5-20260921 with Worker-first no-store delivery;
+- EDGE production smoke run `35530430366` attempt 2 passed on Console `454be5ec0457a2514a722e4db63662615b8b3243`;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +74,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `454be5ec0457a2514a722e4db63662615b8b3243`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v5`
 
 Cutover change:
 - set `APP_ENV=production`.
