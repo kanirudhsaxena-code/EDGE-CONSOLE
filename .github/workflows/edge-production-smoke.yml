@@ -27,7 +27,7 @@ jobs:
               -o /tmp/edge-live.js \
               && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js \
               && grep -q 'edge-user-output' /tmp/edge-live.js \
-              && grep -q 'Forecast checks completed' /tmp/edge-live.js; then
+              && grep -q 'Outcome checks recorded' /tmp/edge-live.js; then
               exit 0
             fi
             sleep 10
@@ -177,7 +177,7 @@ jobs:
           grep -q '4 — ACTIVE CALLS' /tmp/edge-live.js
           grep -q 'edge-user-output' /tmp/edge-live.js
           grep -q 'Evidence confidence' /tmp/edge-live.js
-          grep -q 'Forecast checks completed' /tmp/edge-live.js
+          grep -q 'Outcome checks recorded' /tmp/edge-live.js
           ! grep -q 'semantic-contract-tables' /tmp/edge-live.js
           ! grep -q 'aria-hidden="true"' /tmp/edge-live.js
           python - <<'PY'
