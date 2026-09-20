@@ -55,6 +55,24 @@ test('assessment is the first user-facing table',()=>{
   assert.ok(html.indexOf('EDGE MASTER ASSESSMENT') < html.indexOf('CURRENT STOCK OUTCOME'));
 });
 
+test('canonical sections are visible rather than hidden semantic placeholders',()=>{
+  const html=renderEdgeV13(report);
+  assert.equal((html.match(/<table /g)||[]).length,4);
+  assert.ok(!html.includes('semantic-contract-tables'));
+  assert.ok(!html.includes('aria-hidden="true"'));
+  assert.ok(html.indexOf('1 — EDGE MASTER ASSESSMENT') < html.indexOf('2 — ACTIVE CALLS'));
+  assert.ok(html.indexOf('2 — ACTIVE CALLS') < html.indexOf('3 — CURRENT STOCK OUTCOME'));
+  assert.ok(html.indexOf('3 — CURRENT STOCK OUTCOME') < html.indexOf('4 — DRILL-DOWN'));
+});
+
+test('non-optionable execution remains explicit in current outcome',()=>{
+  const dm=structuredClone(report);
+  dm.current_stock_outcome.execution={instrument:'NONE',option_strike:null,option_expiry:null,observed_premium:null,option_suitability_status:'NO OPTION TRADE',execution_quality_score:60};
+  const html=renderEdgeV13(dm);
+  assert.ok(html.includes('No Option Trade'));
+  assert.ok(html.includes('Execution instrument'));
+});
+
 test('verified drill-down requires meaningful interpretation',()=>{
   const bad=structuredClone(report);
   bad.drilldown[0].interpretation='No additional interpretation recorded in the governed audit record.';
