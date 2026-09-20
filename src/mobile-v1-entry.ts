@@ -120,17 +120,19 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   const actor=await resolveAccessActor(request,env);
   if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
   let body:unknown={};try{body=await request.json()}catch{}
+  const sandboxRequested=isObject(body)&&body.sandbox===true;
+  const runActor=sandboxRequested?{id:actor.authenticated?actor.id:'sandbox_acceptance',role:'TESTER' as const,authenticated:actor.authenticated}:actor;
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
   const sql=neon(env.DATABASE_URL);
-  if(isAccessIdentityEnforced(env)&&actor.role==='TESTER'){
-    const recent=await sql`select count(*)::int as count from analysis_requests where engine='5DR' and created_at>now()-interval '60 seconds' and metadata->'actor'->>'id'=${actor.id}`;
+  if((isAccessIdentityEnforced(env)&&actor.role==='TESTER')||sandboxRequested){
+    const recent=await sql`select count(*)::int as count from analysis_requests where engine='5DR' and created_at>now()-interval '60 seconds' and metadata->'actor'->>'id'=${runActor.id}`;
     if(Number(recent[0]?.count??0)>=3)return json({error:'Run limit reached. Try again after the current minute.'},429);
   }
   const requestId=`5drreq_${crypto.randomUUID()}`;
   const batchId=`auto_${crypto.randomUUID()}`;
   let metadata:Record<string,unknown>={
-    actor:actorMetadata(actor),
+    actor:actorMetadata(runActor),
     decision_setup:setup.value,
     evidence_file_count:0,
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
@@ -148,7 +150,7 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ok:true,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
+  return json({ok:true,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
 }
 
 async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{
