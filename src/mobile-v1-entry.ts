@@ -70,6 +70,51 @@ async function sessionInfo(request:Request,env:Env):Promise<Response>{
   });
 }
 
+async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
+  if(!isAccessIdentityEnforced(env))return null;
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
+  if(actor.role==='OWNER')return null;
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const url=new URL(request.url),sql=neon(env.DATABASE_URL);
+
+  if(url.pathname==='/api/5dr/run-requests/latest'&&request.method==='GET'){
+    const rows=await sql`select request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,run_id,metadata,error,created_at,updated_at from analysis_requests where engine='5DR' and metadata->'actor'->>'id'=${actor.id} order by created_at desc limit 1`;
+    return json({request:rows[0]??null,note:rows.length?undefined:'No 5DR run request yet'});
+  }
+
+  if(url.pathname==='/api/5dr/run-request'&&request.method==='GET'){
+    const runId=url.searchParams.get('run_id');
+    if(!runId)return json({request:null,error:'run_id is mandatory'},422);
+    const rows=await sql`select request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,run_id,metadata,error,created_at,updated_at from analysis_requests where engine='5DR' and run_id=${runId} and metadata->'actor'->>'id'=${actor.id} order by updated_at desc limit 1`;
+    return json({request:rows[0]??null,note:rows.length?undefined:'No owned request found for this run'});
+  }
+
+  if(url.pathname==='/api/runs/latest'&&request.method==='GET'&&url.searchParams.get('engine')==='5DR'){
+    const rows=await sql`select ar.run_id,ar.engine,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.freshness_at,ar.generated_at,ar.published,ar.result,ar.warnings from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 20`;
+    return json({runs:rows,sandbox:true});
+  }
+
+  if(url.pathname==='/api/5dr/latest'&&request.method==='GET'){
+    const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
+    return json({run:rows[0]??null,sandbox:true,note:rows.length?undefined:'No sandbox 5DR run yet'});
+  }
+
+  if(url.pathname==='/api/5dr/outcome-assessment'&&request.method==='GET'){
+    const runId=url.searchParams.get('run_id');
+    if(!runId)return json({assessment:null,error:'run_id is mandatory'},422);
+    const owned=await sql`select 1 from analysis_requests where engine='5DR' and run_id=${runId} and metadata->'actor'->>'id'=${actor.id} limit 1`;
+    if(!owned.length)return json({assessment:null,error:'Run is not owned by this Console user'},403);
+    return json({assessment:null,sandbox:true,note:'Tester sandbox runs are excluded from canonical efficacy and outcome assessment'});
+  }
+
+  if(url.pathname==='/api/assessment-summary'&&request.method==='GET'&&(url.searchParams.get('engine')??'5DR')==='5DR'){
+    return json({summary:{engine:'5DR',sandbox:true,matured_runs:0,forecast:{total:0,hits:0,accuracy_pct:null},recommendation:{total:0,hits:0,accuracy_pct:null},returns:{absolute_return_pct:null,hits_return_pct:null,misses_return_pct:null}},details:[],note:'Tester sandbox runs are isolated from canonical efficacy'});
+  }
+
+  return null;
+}
+
 async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const actor=await resolveAccessActor(request,env);
@@ -413,6 +458,7 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
+  const scopedRead=await scoped5drRead(request,env);if(scopedRead)return scopedRead;
   if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
