@@ -1,0 +1,167 @@
+{
+  "command": "EDGE RELIANCE",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-RELIANCE-20260920T061520Z",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-09-20T06:15:20Z",
+    "research_fresh_at": "2026-09-20T06:15:20Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB",
+      "EXA"
+    ],
+    "sources": [
+      {
+        "source_id": "rel20_s1_q1_official",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/sites/default/files/2026-07/Media_Release_RIL_Q1_FY2026-27_Financial_and_Operational_Performance.pdf",
+        "title": "RIL Q1 FY27 Financial and Operational Performance",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": "2026-07-17T00:00:00+05:30",
+        "event_date": "2026-07-17T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s2_integrated",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/shareholders-information/integrated-filing",
+        "title": "RIL Integrated Filing",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s3_shp_official",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/sites/default/files/2026-07/SHP30062026.pdf",
+        "title": "RIL Shareholding Pattern as on June 30 2026",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": "2026-07-01T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s4_shp_secondary",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/1127/RELIANCE/latest/reliance-industries-ltd/",
+        "title": "Reliance Industries latest shareholding pattern",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s5_valuation",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/RELIANCE/financials/ratios/",
+        "title": "Reliance Industries valuation ratios",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": null,
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s6_windfall",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/markets/stocks/news/reliance-industries-shares-in-focus-as-govt-slashes-windfall-tax-on-fuel-exports-stock-down-21-in-2026-so-far/articleshow/134301211.cms",
+        "title": "Reliance in focus after windfall tax cut and bond issue",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": "2026-09-17T04:02:00Z",
+        "event_date": "2026-09-17T00:00:00+05:30"
+      },
+      {
+        "source_id": "rel20_s7_market",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.marketwatch.com/story/reliance-industries-advances-wednesday-outperforms-competitors-626d3fab-e284cb7d7a68",
+        "title": "Reliance Industries market update",
+        "retrieved_at": "2026-09-20T06:15:20Z",
+        "publication_date": "2026-09-16T00:00:00+05:30",
+        "event_date": "2026-09-16T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "rel20_c1_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Q1 FY27 consolidated results show positive sequential movement on the same quarter-to-quarter basis consumed by the structured provider: gross revenue rose from Rs 325,290 crore in March 2026 to Rs 340,257 crore in June 2026, and PAT including share of associates/JVs rose from Rs 20,589 crore to Rs 23,196 crore. Year-on-year revenue and recurring earnings also grew. This independently supports a positive fundamentals direction without altering the provider raw score.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "rel20_s1_q1_official",
+          "rel20_s2_integrated"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "rel20_c2_valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Current September 2026 references place Reliance near 22.2x trailing P/E and 1.53x P/B, but a conglomerate-wide sector benchmark is not consistently defined across sources. The ratios are verified, while the directional valuation implication remains benchmark-dependent.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "rel20_s5_valuation"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "rel20_c3_institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 ownership is mixed: promoter holding increased to 50.48% from 50.00%, FII/FPI holding declined to about 17.2% from 18.67%, and mutual-fund holding increased to 10.11% from 9.78%. The filing is independently verified but does not establish a single institutional direction.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "rel20_s3_shp_official",
+          "rel20_s4_shp_secondary"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "rel20_c4_news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Fresh September reporting identifies a cut in windfall taxes on fuel exports, which is directionally supportive for a major fuel exporter, alongside a reported Rs 12,500 crore five-year bond raise. The combined near-term catalyst set is current but not uniformly directional across all businesses.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "rel20_s6_windfall",
+          "rel20_s7_market"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "rel20_c5_event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No independently verified company-specific adverse event shock was identified in the fresh RIL evidence reviewed. The windfall-tax change is supportive rather than an adverse shock; live market and volatility evidence remains the structured provider's responsibility.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "rel20_s6_windfall",
+          "rel20_s7_market"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      }
+    ],
+    "conflicts": [],
+    "limitations": [
+      "Q1 FY27 results dated 17 July 2026 are used as the latest reported fundamentals, not as a fresh September catalyst.",
+      "Institutional ownership is based on the latest filed June 2026 quarter and is not a live fund-flow measure.",
+      "Reliance spans multiple businesses, so a single sector valuation benchmark is not treated as authoritative; the valuation direction remains BINARY_UNCERTAIN.",
+      "The bond transaction is supported by reputable reporting; the research bundle does not infer a positive or negative EDGE score from the financing event.",
+      "This bundle contains no manually created EDGE score, DES, Market Trust, BOT, probability, Decision Ladder, price zone, or recommendation."
+    ]
+  }
+}
