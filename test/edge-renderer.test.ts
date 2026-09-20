@@ -79,8 +79,10 @@ test('legacy drill-down narrative is simplified for users',()=>{
 
 test('assessment and decision labels are user-friendly',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('Forecast checks completed'));
+  assert.ok(html.includes('Outcome checks recorded'));
   assert.ok(html.includes('Internal model P/L score'));
+  assert.ok(html.includes('Early forecast tracking'));
+  assert.ok(html.includes('Official recommendation accuracy'));
   assert.ok(html.includes('Audit-only model score. It is not your portfolio return'));
   assert.ok(html.includes('Evidence confidence'));
   assert.ok(html.includes('High evidence confidence does not mean bullish'));
