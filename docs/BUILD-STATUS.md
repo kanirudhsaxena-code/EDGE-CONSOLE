@@ -48,12 +48,20 @@ Canonical production contract:
 
 Required user-facing order:
 1. EDGE MASTER ASSESSMENT
-2. ACTIVE CALLS
-3. CURRENT STOCK OUTCOME
-4. DRILL-DOWN
+2. CURRENT STOCK OUTCOME
+3. DRILL-DOWN
+4. ACTIVE CALLS
 
 Production validation includes:
 - canonical V1.3 renderer;
+- 5DR-style mobile card hierarchy;
+- prominent 5-Day Direction and Expected 5-Day Range blocks;
+- side-by-side key metrics on mobile;
+- drill-down structured as Finding -> Why it matters -> Outcome;
+- PV/PVPO expanded as Price & Volume / Price, Volume, Premium & Open Interest;
+- legacy rows disclose when detailed historical narrative was not persisted rather than inventing findings;
+- UI asset version edge-ui-v3-20260920 with Worker-first no-store delivery;
+- EDGE production smoke run `35528145344` passed on Console `a5ac84977bf5b4762bd5bfb5fdea479c45a43b77`;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +78,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `a5ac84977bf5b4762bd5bfb5fdea479c45a43b77`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v3`
 
 Cutover change:
 - set `APP_ENV=production`.
