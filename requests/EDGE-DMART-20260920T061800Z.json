@@ -1,0 +1,190 @@
+{
+  "command": "EDGE DMART",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-DMART-20260920T061800Z",
+    "ticker": "DMART",
+    "command": "EDGE DMART",
+    "created_at": "2026-09-20T06:18:00Z",
+    "research_fresh_at": "2026-09-20T06:18:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB",
+      "EXA"
+    ],
+    "sources": [
+      {
+        "source_id": "dm20_s1_nse_q1",
+        "provider": "CHATGPT_WEB",
+        "authority": "EXCHANGE",
+        "url": "https://www.nseindia.com/corporate/corporate-announcements/DMART/Avenue%20Supermarts%20Limited?ann_dt=11072026160333&segtype=EOD&seqid=106694815",
+        "title": "Avenue Supermarts Q1 FY27 Investor Presentation filing",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": "2026-07-11T16:03:33+05:30",
+        "event_date": "2026-07-11T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s2_q1",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.financialexpress.com/business/industry-dmart-q1-fy27-earnings-net-profit-rises-11-to-rs-860-crore-metro-store-growth-flat-4289036/",
+        "title": "DMart Q1 FY27 earnings",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": "2026-07-11T11:25:27Z",
+        "event_date": "2026-07-11T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s3_q1_seq",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.livemint.com/market/market-stats/avenue-supermarts-q1-results-S0003106",
+        "title": "Avenue Supermarts Q1 Results",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s4_valuation",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/DMART/financials/ratios/",
+        "title": "Avenue Supermarts current financial ratios",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s5_valuation_peer",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://flashfinance.news/fundamentals/company/DMART",
+        "title": "Avenue Supermarts fundamentals and peers",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-20T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s6_shareholding",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/53208/DMART/latest/avenue-supermarts-ltd/",
+        "title": "Avenue Supermarts latest shareholding pattern",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s7_ir",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.dmartindia.com/investor-relationship",
+        "title": "Avenue Supermarts Investor Relations",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-19T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s8_store",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.sahi.com/news/avenue-supermarts-opens-new-store-in-ludhiana-taking-total-store-count-to-511",
+        "title": "Avenue Supermarts opens Ludhiana store",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": "2026-09-19T00:00:00+05:30",
+        "event_date": "2026-09-19T00:00:00+05:30"
+      },
+      {
+        "source_id": "dm20_s9_cp",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.news18.com/amp/agency-feeds/avenue-supermarts-raises-rs-300-cr-via-commercial-paper-10317388.html",
+        "title": "Avenue Supermarts raises Rs 300 crore via commercial paper",
+        "retrieved_at": "2026-09-20T06:18:00Z",
+        "publication_date": "2026-09-08T17:15:05Z",
+        "event_date": "2026-09-08T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "dm20_c1_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Q1 FY27 consolidated revenue increased sequentially from Rs 17,683.86 crore in March 2026 to Rs 18,794.53 crore in June 2026 (+6.28%), while net income increased from Rs 656.59 crore to about Rs 860.44 crore (+31%). Year-on-year revenue and profit also rose. This independently supports a positive fundamentals direction on the sequential basis consumed by the structured provider.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "dm20_s1_nse_q1",
+          "dm20_s2_q1",
+          "dm20_s3_q1_seq"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "dm20_c2_valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Current September 2026 references show DMart at roughly 79-80x trailing P/E, about 10x P/B and around 45x EV/EBITDA, with its P/E above many large consumer/retail peers. This independently supports a negative valuation-risk direction while leaving the frozen structured-provider calculation unchanged.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "dm20_s4_valuation",
+          "dm20_s5_valuation_peer"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "dm20_c3_institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 ownership changes are mixed: promoter holding eased from 74.51% to 74.48%, FII/FPI holding rose from 9.00% to 9.22%, mutual-fund holding fell from 6.77% to 6.64%, while total institutional holding increased from 17.84% to 17.96%. No single institutional direction is independently established.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "dm20_s6_shareholding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "dm20_c4_news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Fresh company-related events include the September 19 opening of DMart's 511th store and a September 8 Rs 300 crore commercial-paper issuance. These are current operating/financing developments but do not by themselves establish a single five-day directional catalyst.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "dm20_s7_ir",
+          "dm20_s8_store",
+          "dm20_s9_cp"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "dm20_c5_event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No independently verified adverse company-specific event shock was identified in the fresh Avenue Supermarts evidence reviewed through September 19, 2026. Live market and volatility evidence remains the structured provider's responsibility.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "dm20_s7_ir",
+          "dm20_s8_store",
+          "dm20_s9_cp"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      }
+    ],
+    "conflicts": [],
+    "limitations": [
+      "Q1 FY27 results are used as the latest fundamentals evidence, not as a fresh September catalyst.",
+      "The latest ownership evidence is the June 2026 quarter and is not a live fund-flow measure.",
+      "Valuation peer sets vary across sources; the research conclusion is limited to the consistently high absolute multiples and broad peer premium.",
+      "NSE's current derivatives-underlyings list does not include DMART; the structured provider must independently determine option availability at execution.",
+      "This bundle contains no manually created EDGE score, DES, Market Trust, BOT, probability, Decision Ladder, price zone, option trade, or recommendation."
+    ]
+  }
+}
