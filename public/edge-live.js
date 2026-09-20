@@ -5,6 +5,7 @@ const pct=v=>v===null||v===undefined||Number.isNaN(Number(v))?'—':Number(v).to
 const num=(v,d=1)=>v===null||v===undefined||Number.isNaN(Number(v))?'—':Number(v).toFixed(d);
 const money=v=>v===null||v===undefined||Number.isNaN(Number(v))?'—':'₹'+Number(v).toLocaleString('en-IN',{maximumFractionDigits:2});
 const zone=z=>!z||(z.low==null&&z.high==null)?'—':[z.low??'—',z.high??'—'].join(' – ');
+const dateText=v=>{if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})};
 const human=s=>String(s??'').replaceAll('_',' ').toLowerCase().replace(/\b\w/g,c=>c.toUpperCase());
 const noTrade=v=>/NO[_ ]?TRADE|NONE|WAIT|AVOID/i.test(String(v??''));
 const scoreTone=v=>Number(v)>0?'positive':Number(v)<0?'negative':'neutral';
@@ -68,12 +69,30 @@ function stockChangeItems(report){
 }
 function activeCallCards(calls,currentTicker){
   if(!Array.isArray(calls)||!calls.length)return'<p class="muted">No active calls.</p>';
-  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
+  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small><b>Call date:</b> '+esc(dateText(c.call_timestamp))+'</small><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
 }
 function executionCard(d){
   const e=d.execution||{},none=String(e.instrument||'NONE')==='NONE';
-  if(none)return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div><p class="stock-section-copy">The engine has published a stock view, but no governed entry/stop/target structure passes the execution gate. A forecast is not automatically a trade.</p><div class="stock-detail-grid"><div><span>Trade setup quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div><div><span>Options fit</span><strong>'+esc(human(e.option_suitability_status||'NO OPTION TRADE'))+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong></div></div></section>';
-  return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>Trade plan</h3></div><span class="status-chip positive">'+esc(human(e.instrument))+'</span></div><div class="stock-detail-grid"><div><span>Entry</span><strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong></div><div><span>Stop</span><strong>'+money(e.stop_price)+'</strong></div><div><span>Target 1</span><strong>'+money(e.target1)+'</strong></div><div><span>Target 2</span><strong>'+money(e.target2)+'</strong></div><div><span>Invalidation</span><strong>'+esc(e.invalidation||'—')+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'—')+'</strong></div><div><span>Option strike</span><strong>'+esc(e.option_strike??'—')+'</strong></div><div><span>Option expiry</span><strong>'+esc(e.option_expiry||'—')+'</strong></div><div><span>Observed premium</span><strong>'+money(e.observed_premium)+'</strong></div><div><span>Trade setup quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div></div></section>'
+  const quality=num(e.execution_quality_score,1)+'/100';
+  const optionFit=human(e.option_suitability_status||'NO OPTION TRADE');
+  const key='<div class="execution-key-grid">'+
+    '<div class="execution-metric"><span>Trade setup quality</span><strong>'+quality+'</strong><small>Measures how complete and usable the governed entry, stop, target and risk structure is.</small></div>'+
+    '<div class="execution-metric"><span>Options fit</span><strong>'+esc(optionFit)+'</strong><small>Shows whether an options trade is suitable for this stock view and current evidence.</small></div>'+
+  '</div>';
+  if(none)return '<section class="stock-section execution-section"><div class="stock-section-title"><div><span>Execution</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div><p class="stock-section-copy">EDGE has a stock view, but no governed entry/stop/target structure currently passes the execution gate. A forecast is not automatically a trade.</p>'+key+
+    '<div class="execution-support-grid"><div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong><small>The forecast remains valid only for its governed time window unless invalidated earlier.</small></div></div></section>';
+  return '<section class="stock-section execution-section"><div class="stock-section-title"><div><span>Execution</span><h3>Trade plan</h3></div><span class="status-chip positive">'+esc(human(e.instrument))+'</span></div><p class="stock-section-copy">This setup has passed the governed execution checks. Entry, stop, targets and time exit define the trade—not the directional forecast alone.</p>'+key+
+    '<div class="stock-detail-grid execution-detail-grid">'+
+      '<div><span>Entry</span><strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong><small>Preferred price area for initiating the governed setup.</small></div>'+
+      '<div><span>Stop</span><strong>'+money(e.stop_price)+'</strong><small>Price level that limits downside if the setup fails.</small></div>'+
+      '<div><span>Target 1</span><strong>'+money(e.target1)+'</strong><small>First governed profit objective.</small></div>'+
+      '<div><span>Target 2</span><strong>'+money(e.target2)+'</strong><small>Second objective if momentum and evidence remain supportive.</small></div>'+
+      '<div><span>Invalidation</span><strong>'+esc(e.invalidation||'—')+'</strong><small>Condition that tells us the original trade thesis is no longer valid.</small></div>'+
+      '<div><span>Time exit</span><strong>'+esc(e.time_exit||'—')+'</strong><small>Maximum time window for holding the setup if neither target nor stop is reached.</small></div>'+
+      '<div><span>Option strike</span><strong>'+esc(e.option_strike??'—')+'</strong><small>Governed strike selected when an options expression is suitable.</small></div>'+
+      '<div><span>Option expiry</span><strong>'+esc(e.option_expiry||'—')+'</strong><small>Expiry associated with the approved options expression.</small></div>'+
+      '<div><span>Observed premium</span><strong>'+money(e.observed_premium)+'</strong><small>Premium observed when the trade setup was assessed.</small></div>'+
+    '</div></section>'
 }
 function decisionDetails(d){
   return '<section class="stock-section"><div class="stock-section-title"><div><span>DECISION DETAILS</span><h3>Conviction & governance</h3></div></div><div class="stock-detail-grid"><div><span>DES</span><strong>'+num(d.des,2)+'</strong></div><div><span>Market Trust</span><strong>'+num(d.market_trust?.score,1)+'/100 · '+esc(human(d.market_trust?.band||'—'))+'</strong></div><div><span>Directional agreement</span><strong>'+pct(d.directional_agreement)+'</strong></div><div><span>Effective conviction</span><strong>'+pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100)+'</strong></div><div><span>BOT</span><strong>'+num(d.bot?.score,1)+' · '+esc(human(d.bot?.grade||'—'))+'</strong></div><div><span>Decision ladder</span><strong>'+esc(human(d.decision_ladder||'—'))+'</strong></div><div><span>Risk override</span><strong>'+esc(d.risk_override?.status==='ACTIVE'?'ACTIVE · '+human(d.risk_override.code):'Clear')+'</strong></div><div><span>Outcome status</span><strong>'+esc(human(d.outcome_status||'OPEN'))+'</strong></div></div></section>'
@@ -203,7 +222,7 @@ export function renderEdgeV13(report){
     '</div>'+
     '<div class="action-box"><span>Suggested action</span><strong>'+esc(userActionText(d))+'</strong></div>'+
     executionCard(d)+
-    '<details class="change-details" open><summary>What could change the view?</summary><ul>'+(changeItems.length?changeItems.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No material change condition was published.</li>')+'</ul></details>'+
+    '<details class="change-details"><summary>What could change the view?</summary><ul>'+(changeItems.length?changeItems.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No material change condition was published.</li>')+'</ul></details>'+
     '<details class="edge-advanced-details"><summary>Advanced decision details</summary><div class="edge-user-grid compact">'+
       metricCard('Internal direction score',num(d.des,2),'Technical audit score (DES): negative leans bearish, positive leans bullish. It is not a recommendation by itself.')+
       metricCard('Signals pointing the same way',pct(d.directional_agreement),'How much the underlying evidence agrees on direction. Higher agreement means fewer conflicting signals.')+
