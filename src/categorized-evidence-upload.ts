@@ -1,6 +1,7 @@
 import { neon } from '@neondatabase/serverless';
+import { actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 
-export type UploadEnv={EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string};
+export type UploadEnv=AccessIdentityEnv&{EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string};
 type Category='PRICE_TECHNICALS'|'DERIVATIVES_OI';
 type ManifestItem={category:Category;file_name:string};
 const CATEGORIES=new Set<Category>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
@@ -26,6 +27,8 @@ function parseManifest(raw:FormDataEntryValue|null,files:File[]):ManifestItem[]|
 
 export async function uploadCategorizedEvidence(request:Request,env:UploadEnv):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
   let form:FormData;try{form=await request.formData()}catch{return json({error:'Invalid multipart form data'},400)}
   const engine=String(form.get('engine')||''),mode=String(form.get('provenance_mode')||'').toUpperCase(),capturedRaw=String(form.get('captured_at')||''),files=form.getAll('files').filter((x):x is File=>x instanceof File);
   if(engine!=='5DR')return json({error:'Evidence upload currently supports 5DR only'},422);
@@ -34,7 +37,7 @@ export async function uploadCategorizedEvidence(request:Request,env:UploadEnv):P
   const manifest=parseManifest(form.get('evidence_manifest'),files);if(!manifest)return json({error:'Governed evidence_manifest is invalid or incomplete'},422);
   for(const file of files){if(!TYPES.has(file.type))return json({error:`Unsupported evidence type: ${file.type||'unknown'}`,file:file.name},415);if(file.size<=0||file.size>MAX_BYTES)return json({error:'Each evidence file must be between 1 byte and 10 MB',file:file.name},413)}
   const capturedAt=capturedRaw&&!Number.isNaN(Date.parse(capturedRaw))?new Date(capturedRaw).toISOString():new Date().toISOString(),now=new Date(),batchId=crypto.randomUUID(),prefix=`5dr/${now.getUTCFullYear()}/${String(now.getUTCMonth()+1).padStart(2,'0')}/${String(now.getUTCDate()).padStart(2,'0')}`,sql=neon(env.DATABASE_URL),stored:string[]=[],uploaded:any[]=[];
-  try{for(let i=0;i<files.length;i++){const file=files[i],category=manifest[i].category,uploadId=crypto.randomUUID(),filename=safe(file.name),key=`${prefix}/${batchId}/${uploadId}-${filename}`;await env.EVIDENCE_BUCKET.put(key,file.stream(),{httpMetadata:{contentType:file.type},customMetadata:{engine,provenance_mode:mode,upload_id:uploadId,batch_id:batchId,original_filename:filename,captured_at:capturedAt,evidence_category:category}});stored.push(key);const metadata={storage:'R2',bucket_binding:'EVIDENCE_BUCKET',evidence_category:category};await sql`insert into evidence_uploads (upload_id,batch_id,engine,provenance_mode,object_key,file_name,mime_type,size_bytes,captured_at,status,metadata) values (${uploadId},${batchId},${engine},${mode},${key},${filename},${file.type},${file.size},${capturedAt},'STAGED',${JSON.stringify(metadata)}::jsonb)`;uploaded.push({upload_id:uploadId,file_name:filename,mime_type:file.type,size_bytes:file.size,captured_at:capturedAt,status:'STAGED',evidence_category:category})}}
+  try{for(let i=0;i<files.length;i++){const file=files[i],category=manifest[i].category,uploadId=crypto.randomUUID(),filename=safe(file.name),key=`${prefix}/${batchId}/${uploadId}-${filename}`;await env.EVIDENCE_BUCKET.put(key,file.stream(),{httpMetadata:{contentType:file.type},customMetadata:{engine,provenance_mode:mode,upload_id:uploadId,batch_id:batchId,original_filename:filename,captured_at:capturedAt,evidence_category:category,actor_id:actor.id}});stored.push(key);const metadata={storage:'R2',bucket_binding:'EVIDENCE_BUCKET',evidence_category:category,actor:actorMetadata(actor)};await sql`insert into evidence_uploads (upload_id,batch_id,engine,provenance_mode,object_key,file_name,mime_type,size_bytes,captured_at,status,metadata) values (${uploadId},${batchId},${engine},${mode},${key},${filename},${file.type},${file.size},${capturedAt},'STAGED',${JSON.stringify(metadata)}::jsonb)`;uploaded.push({upload_id:uploadId,file_name:filename,mime_type:file.type,size_bytes:file.size,captured_at:capturedAt,status:'STAGED',evidence_category:category})}}
   catch(error){console.error('Categorized evidence upload failed',error);await Promise.allSettled(stored.map(k=>env.EVIDENCE_BUCKET.delete(k)));if(uploaded.length)await sql`delete from evidence_uploads where batch_id=${batchId}`;return json({error:'Evidence upload failed; staged files were rolled back'},500)}
   return json({ok:true,batch_id:batchId,engine,provenance_mode:mode,file_count:uploaded.length,evidence:uploaded,next_step:'Apply screenshot readiness gate'},201);
 }
