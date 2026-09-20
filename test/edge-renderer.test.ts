@@ -74,12 +74,19 @@ test('drill-down uses finding, explanation and outcome without fabricating legac
   const html=renderEdgeV13(report);
   assert.ok(html.includes('FINDING'));
   assert.ok(html.includes('WHY IT MATTERS'));
-  assert.ok(html.includes('Outcome:'));
+  assert.ok(!html.includes('<b>Outcome:</b>'));
   assert.ok(html.includes('This older run preserved a verified component score of 1 (positive)'));
   assert.ok(html.includes('did not preserve the detailed source narrative'));
   assert.ok(!html.includes('Legacy active run'));
   assert.ok(!html.includes('original narrative field was not persisted'));
   assert.ok(!html.includes('immutable verified component score'));
+});
+
+test('drill-down shows each outcome only once as the outcome badge',()=>{
+  const html=renderEdgeV13(report);
+  assert.equal((html.match(/<b>Outcome:<\/b>/g)||[]).length,0);
+  assert.ok(html.includes('score-pill positive'));
+  assert.ok(html.includes('score-pill negative'));
 });
 
 test('current outcome makes direction and five-day range the primary visual highlights',()=>{
