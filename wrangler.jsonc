@@ -20,6 +20,9 @@
     "APP_ENV": "development",
     "ACCESS_IDENTITY_MODE": "AUDIT",
     "OUTPUT_CONTRACT_VERSION": "1.0",
+    "FIVEDR_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
+    "FIVEDR_ACQUIRE_WORKFLOW": "5dr-console-acquire-proxy.yml",
+    "FIVEDR_WORKFLOW": "5dr-console-execute-proxy.yml",
     "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev"
   }
 }
