@@ -26,8 +26,8 @@ jobs:
               'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
               && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js \
-              && grep -q 'canonical-edge-table' /tmp/edge-live.js \
-              && grep -q 'Previous recommendation' /tmp/edge-live.js; then
+              && grep -q 'edge-user-output' /tmp/edge-live.js \
+              && grep -q 'Forecast checks completed' /tmp/edge-live.js; then
               exit 0
             fi
             sleep 10
@@ -104,7 +104,7 @@ jobs:
           assert r['presentation_contract']=='EFFICACY_V2', r
           pres=r['presentation']
           assert [pres[f'table_{i}'] for i in range(1,5)] == [
-            'EDGE_MASTER_ASSESSMENT','ACTIVE_CALLS','CURRENT_STOCK_OUTCOME','DRILLDOWN'
+            'EDGE_MASTER_ASSESSMENT','CURRENT_STOCK_OUTCOME','DRILLDOWN','ACTIVE_CALLS'
           ], pres
           probs=r['current_stock_outcome']['probabilities']
           assert math.isclose(sum(float(probs[k]) for k in ('bull','base','bear')),100.0,abs_tol=0.01), probs
@@ -147,7 +147,7 @@ jobs:
           pres=r['presentation']
           assert pres['standard_table_count']==4, pres
           assert [pres[f'table_{i}'] for i in range(1,5)] == [
-            'EDGE_MASTER_ASSESSMENT','ACTIVE_CALLS','CURRENT_STOCK_OUTCOME','DRILLDOWN'
+            'EDGE_MASTER_ASSESSMENT','CURRENT_STOCK_OUTCOME','DRILLDOWN','ACTIVE_CALLS'
           ], pres
           m=r['master_assessment']
           assert 'official_scorable_recommendations' in m, m
@@ -172,20 +172,21 @@ jobs:
             -o /tmp/edge-live.js
           grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js
           grep -q '1 — EDGE MASTER ASSESSMENT' /tmp/edge-live.js
-          grep -q '2 — ACTIVE CALLS' /tmp/edge-live.js
-          grep -q '3 — CURRENT STOCK OUTCOME' /tmp/edge-live.js
-          grep -q '4 — DRILL-DOWN' /tmp/edge-live.js
-          grep -q 'canonical-edge-table' /tmp/edge-live.js
-          grep -q 'Previous recommendation' /tmp/edge-live.js
+          grep -q '2 — CURRENT STOCK OUTCOME' /tmp/edge-live.js
+          grep -q '3 — DRILL-DOWN' /tmp/edge-live.js
+          grep -q '4 — ACTIVE CALLS' /tmp/edge-live.js
+          grep -q 'edge-user-output' /tmp/edge-live.js
+          grep -q 'Evidence confidence' /tmp/edge-live.js
+          grep -q 'Forecast checks completed' /tmp/edge-live.js
           ! grep -q 'semantic-contract-tables' /tmp/edge-live.js
           ! grep -q 'aria-hidden="true"' /tmp/edge-live.js
           python - <<'PY'
           text=open('/tmp/edge-live.js',encoding='utf-8').read()
           positions=[text.index(x) for x in (
               '1 — EDGE MASTER ASSESSMENT',
-              '2 — ACTIVE CALLS',
-              '3 — CURRENT STOCK OUTCOME',
-              '4 — DRILL-DOWN',
+              '2 — CURRENT STOCK OUTCOME',
+              '3 — DRILL-DOWN',
+              '4 — ACTIVE CALLS',
           )]
           assert positions==sorted(positions), positions
           PY
