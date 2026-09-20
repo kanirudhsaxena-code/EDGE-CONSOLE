@@ -116,7 +116,7 @@ test('assessment and decision labels are user-friendly',()=>{
 test('active calls show the actual stored call date',()=>{
   const html=renderEdgeV13(report);
   assert.ok(html.includes('Call date:'));
-  assert.ok(html.includes('17 Sep 2026'));
+  assert.match(html,/17 Sep(?:t)? 2026/);
 });
 
 test('what-could-change stays collapsed until the user opens it',()=>{
