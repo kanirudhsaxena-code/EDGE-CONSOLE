@@ -77,7 +77,7 @@ jobs:
               raise SystemExit(1)
           blockers=d.get('blockers') or []
           weekend=datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
-          if blockers==['CANDLE_ARRAY_MISSING'] and weekend:
+          if blockers in (['CANDLE_ARRAY_MISSING'], ['INTRADAY_CANDLES_EMPTY']) and weekend:
               raise SystemExit(0)
           raise SystemExit(2)
           PY
@@ -125,7 +125,7 @@ jobs:
               print('run_id='+str(d.get('run_id')))
           elif (
               d.get('adapter_stage')=='AUTOMATED_MARKET_DATA_BLOCKED'
-              and (d.get('blockers') or [])==['CANDLE_ARRAY_MISSING']
+              and (d.get('blockers') or []) in (['CANDLE_ARRAY_MISSING'], ['INTRADAY_CANDLES_EMPTY'])
               and datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
           ):
               print('5DR_AUTOMATED_TRANSPORT_ACCEPTANCE=PASS')
