@@ -68,7 +68,7 @@ function stockChangeItems(report){
 }
 function activeCallCards(calls,currentTicker){
   if(!Array.isArray(calls)||!calls.length)return'<p class="muted">No active calls.</p>';
-  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(human(c.definitive_recommendation||'—'))+'</p><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Return '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
+  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
 }
 function executionCard(d){
   const e=d.execution||{},none=String(e.instrument||'NONE')==='NONE';
@@ -143,17 +143,17 @@ export function renderEdgeV13(report){
   const official=Number(stock.official_scorable_recommendations??0);
 
   const previousCard=previous
-    ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Return since that call: '+esc(pct(previous.current_return_pct)))+'</small></div></div>'
+    ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Move since that earlier call: '+esc(pct(previous.current_return_pct))+(String(previous.outcome_verdict||previous.lifecycle_status||'').toUpperCase()==='OPEN'?' · still provisional':'') )+'</small></div></div>'
     : '<div class="edge-previous-call single"><div><span>Previous call</span><strong>None yet</strong><small>This stock does not yet have an earlier EDGE call to compare.</small></div></div>';
 
   const section1='<section class="edge-user-section" data-edge-section="master-assessment">'+
     '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Past calls are checked against what actually happened. More completed checks make the performance record more meaningful.</p></div>'+
     previousCard+
     '<div class="edge-user-grid">'+
-      metricCard('Past forecast accuracy',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' completed direction checks were correct.'):'No completed forecast checks yet.')+
-      metricCard('Price-zone accuracy',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' of '+zoneScorable+' completed price-zone checks were correct.'):'No completed price-zone checks yet.')+
-      metricCard('Recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'Not enough history',official?(official+' officially resolved recommendation'+(official===1?'':'s')+' are available.'):'No recommendation has matured enough for an official score yet.')+
-      metricCard('Forecast checks completed',forecastChecks+' of '+dueChecks,'Each check compares an earlier D+1 to D+5 forecast with the market outcome. This is the evidence behind the accuracy numbers.')+
+      metricCard('Early forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' direction checks were correct so far. This remains provisional until the calls mature.'):'No completed forecast checks yet.')+
+      metricCard('Early price-zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' of '+zoneScorable+' price-zone checks were correct so far. This remains provisional until the calls mature.'):'No completed price-zone checks yet.')+
+      metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'Not enough history',official?(official+' fully matured recommendation'+(official===1?' has':'s have')+' an official outcome.'):'No recommendation has matured enough for an official score yet.')+
+      metricCard('Outcome checks recorded',forecastChecks+' of '+dueChecks,'Each past call is checked from D+1 to D+5. More recorded checks mean the performance statistics are based on stronger evidence.')+
     '</div>'+
     '<details class="edge-advanced-details"><summary>Advanced assessment details</summary><div class="edge-user-grid compact">'+
       metricCard('Tracked calls',stock.recommendations??0,'All EDGE calls recorded for this stock.')+
@@ -176,12 +176,12 @@ export function renderEdgeV13(report){
     executionCard(d)+
     '<details class="change-details" open><summary>What could change the view?</summary><ul>'+(changeItems.length?changeItems.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No material change condition was published.</li>')+'</ul></details>'+
     '<details class="edge-advanced-details"><summary>Advanced decision details</summary><div class="edge-user-grid compact">'+
-      metricCard('Directional score (DES)',num(d.des,2),'Internal directional score used by the frozen EDGE engine.')+
+      metricCard('Internal direction score',num(d.des,2),'Technical audit score (DES): negative leans bearish, positive leans bullish. It is not a recommendation by itself.')+
       metricCard('Signals pointing the same way',pct(d.directional_agreement),'How much the underlying evidence agrees on direction. Higher agreement means fewer conflicting signals.')+
       metricCard('Overall conviction after checks',pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100),'Final strength after evidence quality and risk checks are applied.')+
       metricCard('Extra safety block',d.risk_override?.status==='ACTIVE'?('Active · '+human(d.risk_override.code||'—')):'None','An active safety block can prevent a trade even when the directional view looks attractive.')+
       metricCard('Decision stage',human(d.decision_ladder||'—'),'Where the setup currently sits in the governed decision process.')+
-      metricCard('BOT',num(d.bot?.score,1)+' · '+human(d.bot?.grade||'—'),'Internal execution-quality grade retained for audit and governance.')+
+      metricCard('Trade-quality grade',num(d.bot?.score,1)+' · '+human(d.bot?.grade||'—'),'Internal BOT grade retained for audit; the user-facing action above remains the decision to follow.')+
     '</div></details>'+
   '</section>';
 
