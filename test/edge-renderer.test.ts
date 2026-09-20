@@ -38,7 +38,7 @@ const report = {
       }
     }
   },
-  active_calls:[{ticker:'TCS',recommendation_id:'EDGE-TCS-X',definitive_forecast:'BASE_RANGE',definitive_recommendation:'NO TRADE; NO OPTION TRADE.',expected_price_zone:{low:3000,high:3200},outcome_verdict:'OPEN'}],
+  active_calls:[{ticker:'TCS',recommendation_id:'EDGE-TCS-X',call_timestamp:'2026-09-17T11:15:00Z',definitive_forecast:'BASE_RANGE',definitive_recommendation:'NO TRADE; NO OPTION TRADE.',expected_price_zone:{low:3000,high:3200},outcome_verdict:'OPEN'}],
   current_stock_outcome:{
     des:-30,market_trust:{score:92,band:'VERY HIGH'},directional_agreement:80,effective_conviction:.276,
     probabilities:{bull:5,base:60,bear:35},definitive_forecast:'BASE_RANGE',expected_price_zone:{low:3000,high:3200},
@@ -111,6 +111,28 @@ test('assessment and decision labels are user-friendly',()=>{
   assert.ok(html.includes('Overall conviction after checks'));
   assert.ok(html.includes('Extra safety block'));
   assert.ok(!html.includes('Captured / due checkpoints'));
+});
+
+test('active calls show the actual stored call date',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Call date:'));
+  assert.ok(html.includes('17 Sep 2026'));
+});
+
+test('what-could-change stays collapsed until the user opens it',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('<details class="change-details"><summary>What could change the view?</summary>'));
+  assert.ok(!html.includes('<details class="change-details" open>'));
+});
+
+test('execution keeps trade quality and options fit side by side with explanations',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('execution-key-grid'));
+  assert.ok(html.includes('Trade setup quality'));
+  assert.ok(html.includes('Measures how complete and usable the governed entry, stop, target and risk structure is.'));
+  assert.ok(html.includes('Options fit'));
+  assert.ok(html.includes('Shows whether an options trade is suitable for this stock view and current evidence.'));
+  assert.ok(html.includes('The forecast remains valid only for its governed time window unless invalidated earlier.'));
 });
 
 test('non-optionable execution remains explicit and user-friendly',()=>{
