@@ -34,7 +34,7 @@ Remaining GO gate:
 - no methodology, scoring, DES/tradeability, output semantics or Learning Lab governance may change during cutover.
 
 5DR engine checkpoint:
-- `233cf52e3ffd237f85c91e3c88eb38e9924e60c8`
+- `ad2afc81e3fcaee86e9f647abcce1ec8d138ceeb`
 
 ## EDGE Stocks
 
@@ -63,7 +63,7 @@ Production validation includes:
 - trading execution disabled.
 
 Current EDGE engine checkpoint:
-- `be7d778254c5a438a6ef1527f0cc2f55a7202825`
+- `7152858f1d6eded9090fcd0d49459848e699e775`
 
 The stale supersession PR was closed because V1.3/Efficacy V2 is already canonical on `main`.
 
