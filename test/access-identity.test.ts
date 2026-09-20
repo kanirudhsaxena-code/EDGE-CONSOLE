@@ -19,7 +19,7 @@ test('Cloudflare Access email becomes stable pseudonymous tester id',async()=>{
   assert.equal(a.role,'TESTER');
   assert.equal(a.id,b.id);
   assert.match(a.id,/^usr_[0-9a-f]{32}$/);
-  assert.equal(actorMetadata(a).email,'tester@example.com');
+  assert.deepEqual(actorMetadata(a),{id:a.id,role:'TESTER',authenticated:true});
 });
 
 test('owner allowlist is case-insensitive and owner is not history-scoped',async()=>{
