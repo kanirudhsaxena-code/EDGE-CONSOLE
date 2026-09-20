@@ -5,7 +5,7 @@ import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evi
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
-import { isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 
 type Env = AccessIdentityEnv & {
   ASSETS: Fetcher;
@@ -36,7 +36,7 @@ async function testerEdgeSandboxGate(request:Request,env:Env):Promise<Response|n
   if(!isAccessIdentityEnforced(env))return null;
   const actor=await resolveAccessActor(request,env);
   if(!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
-  if(actor.role==='OWNER')return null;
+  if(actorCanUseCanonicalEdge(actor,env))return null;
   return json({
     error:'EDGE Stocks tester sandbox is not enabled yet',
     code:'EDGE_TESTER_SANDBOX_NOT_READY',
