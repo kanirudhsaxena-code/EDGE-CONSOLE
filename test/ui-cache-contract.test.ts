@@ -10,7 +10,9 @@ test('Console HTML forces the approved EDGE UI v2 assets',()=>{
   assert.ok(html.includes('EDGE IPO</span><span class="module-desc">IPO decision support</span><span class="module-status">In progress</span>'));
 });
 
-test('static Console assets are served no-store to prevent stale mobile UI',()=>{
+test('static Console assets are served through Worker middleware with no-store',()=>{
+  const config=readFileSync('wrangler.jsonc','utf8');
+  assert.ok(config.includes('"run_worker_first": true'));
   const source=readFileSync('src/index.ts','utf8');
   assert.ok(source.includes("headers.set('cache-control','no-store, max-age=0')"));
   assert.ok(source.includes("headers.set('pragma','no-cache')"));
