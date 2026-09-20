@@ -476,9 +476,9 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',
-      table_2: 'ACTIVE_CALLS',
-      table_3: 'CURRENT_STOCK_OUTCOME',
-      table_4: 'DRILLDOWN'
+      table_2: 'CURRENT_STOCK_OUTCOME',
+      table_3: 'DRILLDOWN',
+      table_4: 'ACTIVE_CALLS'
     },
     master_assessment: {
       recommendations: integerOrZero(master.recommendations),

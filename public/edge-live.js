@@ -59,24 +59,62 @@ function stockChangeItems(report){
   if(z.high!=null)items.push('A sustained close above '+z.high+' with stronger breadth/volume and improving directional agreement would strengthen the bullish case.');
   if(z.low!=null)items.push('A sustained close below '+z.low+' with confirming price-volume weakness would strengthen the bearish case.');
   if(/BASE|RANGE/i.test(forecast))items.push('The current base/range forecast changes only if price accepts outside the expected D+5 zone rather than briefly touching it.');
-  if(Number(d.directional_agreement||0)<65)items.push('Directional agreement needs to rise materially from '+num(d.directional_agreement,1)+'% before the setup deserves higher conviction.');
-  if(Number(d.market_trust?.score||0)<70)items.push('Market Trust needs to improve from '+num(d.market_trust?.score,1)+'/100 through fresher, more consistent evidence.');
-  if(d.risk_override?.status==='ACTIVE')items.push('The active risk override ('+human(d.risk_override.code||'unspecified')+') must clear before the setup can become actionable.');
+  if(Number(d.directional_agreement||0)<65)items.push('More of the underlying signals need to point the same way before this view deserves higher confidence.');
+  if(Number(d.market_trust?.score||0)<70)items.push('The evidence needs to become fresher and more consistent before the view deserves higher confidence.');
+  if(d.risk_override?.status==='ACTIVE')items.push('An extra safety block is active and must clear before the setup can become actionable.');
   if(noTrade(d.primary_action)||String(d.execution?.instrument||'NONE')==='NONE')items.push('A trade requires a governed entry, invalidation, stop and target plan; until those exist, the forecast remains a view rather than an executable trade.');
   if(Number(p.bull||0)>0&&Number(p.bear||0)>0&&Math.abs(Number(p.bull)-Number(p.bear))<15)items.push('Bull and bear probabilities remain too close for a high-conviction directional call.');
   return [...new Set(items)].slice(0,7)
 }
 function activeCallCards(calls,currentTicker){
   if(!Array.isArray(calls)||!calls.length)return'<p class="muted">No active calls.</p>';
-  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(human(c.definitive_recommendation||'—'))+'</p><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Return '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
+  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
 }
 function executionCard(d){
   const e=d.execution||{},none=String(e.instrument||'NONE')==='NONE';
-  if(none)return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div><p class="stock-section-copy">The engine has published a stock view, but no governed entry/stop/target structure passes the execution gate. A forecast is not automatically a trade.</p><div class="stock-detail-grid"><div><span>Execution quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div><div><span>Option suitability</span><strong>'+esc(human(e.option_suitability_status||'NO OPTION TRADE'))+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong></div></div></section>';
-  return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>Trade plan</h3></div><span class="status-chip positive">'+esc(human(e.instrument))+'</span></div><div class="stock-detail-grid"><div><span>Entry</span><strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong></div><div><span>Stop</span><strong>'+money(e.stop_price)+'</strong></div><div><span>Target 1</span><strong>'+money(e.target1)+'</strong></div><div><span>Target 2</span><strong>'+money(e.target2)+'</strong></div><div><span>Invalidation</span><strong>'+esc(e.invalidation||'—')+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'—')+'</strong></div><div><span>Option strike</span><strong>'+esc(e.option_strike??'—')+'</strong></div><div><span>Option expiry</span><strong>'+esc(e.option_expiry||'—')+'</strong></div><div><span>Observed premium</span><strong>'+money(e.observed_premium)+'</strong></div><div><span>Execution quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div></div></section>'
+  if(none)return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div><p class="stock-section-copy">The engine has published a stock view, but no governed entry/stop/target structure passes the execution gate. A forecast is not automatically a trade.</p><div class="stock-detail-grid"><div><span>Trade setup quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div><div><span>Options fit</span><strong>'+esc(human(e.option_suitability_status||'NO OPTION TRADE'))+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong></div></div></section>';
+  return '<section class="stock-section"><div class="stock-section-title"><div><span>EXECUTION</span><h3>Trade plan</h3></div><span class="status-chip positive">'+esc(human(e.instrument))+'</span></div><div class="stock-detail-grid"><div><span>Entry</span><strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong></div><div><span>Stop</span><strong>'+money(e.stop_price)+'</strong></div><div><span>Target 1</span><strong>'+money(e.target1)+'</strong></div><div><span>Target 2</span><strong>'+money(e.target2)+'</strong></div><div><span>Invalidation</span><strong>'+esc(e.invalidation||'—')+'</strong></div><div><span>Time exit</span><strong>'+esc(e.time_exit||'—')+'</strong></div><div><span>Option strike</span><strong>'+esc(e.option_strike??'—')+'</strong></div><div><span>Option expiry</span><strong>'+esc(e.option_expiry||'—')+'</strong></div><div><span>Observed premium</span><strong>'+money(e.observed_premium)+'</strong></div><div><span>Trade setup quality</span><strong>'+num(e.execution_quality_score,1)+'/100</strong></div></div></section>'
 }
 function decisionDetails(d){
   return '<section class="stock-section"><div class="stock-section-title"><div><span>DECISION DETAILS</span><h3>Conviction & governance</h3></div></div><div class="stock-detail-grid"><div><span>DES</span><strong>'+num(d.des,2)+'</strong></div><div><span>Market Trust</span><strong>'+num(d.market_trust?.score,1)+'/100 · '+esc(human(d.market_trust?.band||'—'))+'</strong></div><div><span>Directional agreement</span><strong>'+pct(d.directional_agreement)+'</strong></div><div><span>Effective conviction</span><strong>'+pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100)+'</strong></div><div><span>BOT</span><strong>'+num(d.bot?.score,1)+' · '+esc(human(d.bot?.grade||'—'))+'</strong></div><div><span>Decision ladder</span><strong>'+esc(human(d.decision_ladder||'—'))+'</strong></div><div><span>Risk override</span><strong>'+esc(d.risk_override?.status==='ACTIVE'?'ACTIVE · '+human(d.risk_override.code):'Clear')+'</strong></div><div><span>Outcome status</span><strong>'+esc(human(d.outcome_status||'OPEN'))+'</strong></div></div></section>'
+}
+function userForecastLabel(value){
+  const v=String(value||'').toUpperCase();
+  if(/BASE|RANGE/.test(v))return 'Range-bound';
+  if(/STRONG_BULL/.test(v))return 'Strong bullish';
+  if(/MILD_BULL/.test(v))return 'Mild bullish';
+  if(/BULL/.test(v))return 'Bullish';
+  if(/STRONG_BEAR/.test(v))return 'Strong bearish';
+  if(/MILD_BEAR/.test(v))return 'Mild bearish';
+  if(/BEAR/.test(v))return 'Bearish';
+  return human(value||'—');
+}
+function trustUserText(d){
+  const score=Number(d?.market_trust?.score);
+  const band=human(d?.market_trust?.band||'—');
+  const view=userForecastLabel(d?.definitive_forecast);
+  if(!Number.isFinite(score))return {value:'Not available',detail:'The quality and consistency of the evidence could not be measured.'};
+  if(score>=70)return {value:band+' · '+num(score,0)+'/100',detail:'The evidence is consistent enough to trust the current '+view.toLowerCase()+' view. High evidence confidence does not mean bullish; it means the evidence agrees with the published view.'};
+  if(score>=50)return {value:band+' · '+num(score,0)+'/100',detail:'The evidence is usable but still mixed. Treat the '+view.toLowerCase()+' view as moderate-confidence rather than a strong directional signal.'};
+  return {value:band+' · '+num(score,0)+'/100',detail:'The evidence behind the '+view.toLowerCase()+' view is weak or mixed, so the forecast should be treated cautiously.'};
+}
+function userActionText(d){
+  if(noTrade(d?.primary_action)||String(d?.execution?.instrument||'NONE')==='NONE')return 'Wait — no trade setup currently passes the EDGE execution gates.';
+  return human(d?.primary_action||'Review the governed trade plan');
+}
+function friendlyLegacyInterpretation(row){
+  const raw=String(row?.interpretation||'').trim();
+  const legacy=row?.narrative_source==='LEGACY_SCORE_RECONSTRUCTION'||/legacy active run|original narrative field was not persisted|immutable verified component score/i.test(raw);
+  if(!legacy)return raw||'No user-facing interpretation is available.';
+  const component=human(row?.component||'This factor');
+  const n=Number(row?.score_or_level);
+  if(n>0)return component+' is currently supporting the five-day stock view.';
+  if(n<0)return component+' is currently weighing against the five-day stock view.';
+  if(n===0)return component+' is currently neutral and is not pushing the view in either direction.';
+  return component+' is retained for audit history, but there is not enough user-facing detail to draw a stronger conclusion.';
+}
+function metricCard(label,value,detail){
+  return '<div class="edge-user-metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(detail)+'</small></div>';
 }
 export function renderEdgeV13(report){
   const r=report||{};
@@ -93,73 +131,71 @@ export function renderEdgeV13(report){
   const calls=Array.isArray(r.active_calls)?r.active_calls:[];
   const drill=Array.isArray(r.drilldown)?r.drilldown:[];
   const previous=stock.previous_recommendation||null;
-  const cell=v=>esc(v===null||v===undefined?'—':v);
-  const metric=(label,stockValue,masterValue)=>'<tr><th scope="row">'+esc(label)+'</th><td>'+cell(stockValue)+'</td><td>'+cell(masterValue)+'</td></tr>';
   const changeItems=stockChangeItems(r);
-  const previousRows=previous
-    ? metric('Previous recommendation',previous.recommendation_id||'—','—')+
-      metric('Previous forecast',human(previous.definitive_forecast||'—'),'—')+
-      metric('Previous action',human(previous.definitive_recommendation||'—'),'—')+
-      metric('Previous assessment',human(previous.outcome_verdict||previous.lifecycle_status||'OPEN'),'—')+
-      metric('Previous return',pct(previous.current_return_pct),'—')+
-      metric('Previous last assessed',previous.last_assessed_at?new Date(previous.last_assessed_at).toLocaleString():'Not yet observed','—')
-    : metric('Previous recommendation','None','—');
+  const trust=trustUserText(d);
+  const actionable=!noTrade(d.primary_action)&&String(ex.instrument||'NONE')!=='NONE';
+  const forecastChecks=Number(stock.provisional_captured_checkpoints??0);
+  const dueChecks=Number(stock.provisional_due_checkpoints??0);
+  const forecastHits=Number(stock.provisional_forecast_hits??0);
+  const forecastScorable=Number(stock.provisional_forecast_scorable??0);
+  const zoneHits=Number(stock.provisional_zone_hits??0);
+  const zoneScorable=Number(stock.provisional_zone_scorable??0);
+  const official=Number(stock.official_scorable_recommendations??0);
 
-  const table1='<section class="canonical-edge-section" data-edge-section="master-assessment"><div class="canonical-edge-table-wrap"><table class="canonical-edge-table"><caption>1 — EDGE MASTER ASSESSMENT</caption><thead><tr><th>Metric</th><th>'+esc(r.ticker||'Stock')+'</th><th>All EDGE Stocks</th></tr></thead><tbody>'+
-    previousRows+
-    metric('Tracked recommendations',stock.recommendations??0,master.recommendations??0)+
-    metric('Open recommendations',stock.open_recommendations??0,master.open_recommendations??0)+
-    metric('Closed recommendations',stock.closed_recommendations??0,master.closed_recommendations??0)+
-    metric('Official scorable recommendations',stock.official_scorable_recommendations??0,master.official_scorable_recommendations??0)+
-    metric('Recommendation hit rate',stock.official_scorable_recommendations?pct(stock.recommendation_hit_rate_pct):'Not scorable',master.official_scorable_recommendations?pct(master.recommendation_hit_rate_pct):'Not scorable')+
-    metric('Provisional forecast accuracy',pct(stock.provisional_forecast_accuracy_pct),pct(master.provisional_forecast_accuracy_pct))+
-    metric('Provisional zone accuracy',pct(stock.provisional_zone_accuracy_pct),pct(master.provisional_zone_accuracy_pct))+
-    metric('Captured / due checkpoints',(stock.provisional_captured_checkpoints??0)+' / '+(stock.provisional_due_checkpoints??0),(master.provisional_captured_checkpoints??0)+' / '+(master.provisional_due_checkpoints??0))+
-    metric('Model P/L units',stock.cumulative_model_pnl_units??'—',master.cumulative_model_pnl_units??'—')+
-    '</tbody></table></div></section>';
+  const previousCard=previous
+    ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Move since that earlier call: '+esc(pct(previous.current_return_pct))+(String(previous.outcome_verdict||previous.lifecycle_status||'').toUpperCase()==='OPEN'?' · still provisional':'') )+'</small></div></div>'
+    : '<div class="edge-previous-call single"><div><span>Previous call</span><strong>None yet</strong><small>This stock does not yet have an earlier EDGE call to compare.</small></div></div>';
 
-  const callRows=calls.length?calls.map(c=>{
-    const cp=c.probabilities||{};
-    return '<tr><th scope="row">'+esc(c.ticker||'—')+(String(c.ticker||'')===String(r.ticker||'')?' <span class="verify verified">CURRENT</span>':'')+'</th>'+
-      '<td><strong>'+esc(human(c.definitive_forecast||'—'))+'</strong><br><small>B '+pct(cp.bull)+' · Base '+pct(cp.base)+' · Bear '+pct(cp.bear)+'</small></td>'+
-      '<td>'+esc(human(c.definitive_recommendation||'—'))+'</td>'+
-      '<td>'+esc(zone(c.expected_price_zone))+'<br><small>'+esc(human(c.outcome_verdict||'OPEN'))+' · Return '+pct(c.current_return_pct)+'</small></td></tr>';
-  }).join(''):'<tr><td colspan="4">No active calls.</td></tr>';
-  const table2='<section class="canonical-edge-section" data-edge-section="active-calls"><div class="canonical-edge-table-wrap"><table class="canonical-edge-table"><caption>2 — ACTIVE CALLS</caption><thead><tr><th>Ticker</th><th>Forecast / probability</th><th>Action</th><th>D+5 zone / status</th></tr></thead><tbody>'+callRows+'</tbody></table></div></section>';
+  const section1='<section class="edge-user-section" data-edge-section="master-assessment">'+
+    '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Past calls are checked against what actually happened. More completed checks make the performance record more meaningful.</p></div>'+
+    previousCard+
+    '<div class="edge-user-grid">'+
+      metricCard('Early forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' direction checks were correct so far. This remains provisional until the calls mature.'):'No completed forecast checks yet.')+
+      metricCard('Early price-zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' of '+zoneScorable+' price-zone checks were correct so far. This remains provisional until the calls mature.'):'No completed price-zone checks yet.')+
+      metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'Not enough history',official?(official+' fully matured recommendation'+(official===1?' has':'s have')+' an official outcome.'):'No recommendation has matured enough for an official score yet.')+
+      metricCard('Outcome checks recorded',forecastChecks+' of '+dueChecks,'Each past call is checked from D+1 to D+5. More recorded checks mean the performance statistics are based on stronger evidence.')+
+    '</div>'+
+    '<details class="edge-advanced-details"><summary>Advanced assessment details</summary><div class="edge-user-grid compact">'+
+      metricCard('Tracked calls',stock.recommendations??0,'All EDGE calls recorded for this stock.')+
+      metricCard('Open / closed calls',(stock.open_recommendations??0)+' / '+(stock.closed_recommendations??0),'Open calls are still being tracked; closed calls have finished their lifecycle.')+
+      metricCard('Internal model P/L score',stock.cumulative_model_pnl_units??'—','Audit-only model score. It is not your portfolio return and should not be read as rupees or percentage profit.')+
+      metricCard('Average gain / loss on resolved calls',pct(stock.avg_gain_pct)+' / '+pct(stock.avg_loss_pct),'Average move on past hits versus misses, when enough resolved history exists.')+
+    '</div></details>'+
+  '</section>';
 
-  const outcomeRows=[
-    ['DES',num(d.des,3)],
-    ['Market Trust',num(d.market_trust?.score,3)+' / 100 · '+human(d.market_trust?.band||'—')],
-    ['Directional agreement',pct(d.directional_agreement)],
-    ['Effective conviction',pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100)],
-    ['Bull / Base / Bear',pct(p.bull)+' / '+pct(p.base)+' / '+pct(p.bear)],
-    ['Definitive forecast',human(d.definitive_forecast||'—')],
-    ['Expected D+5 price zone',zone(d.expected_price_zone)],
-    ['Primary action',d.primary_action||'—'],
-    ['Decision ladder',human(d.decision_ladder||'—')],
-    ['BOT',num(d.bot?.score,3)+' · '+human(d.bot?.grade||'—')],
-    ['Risk override',d.risk_override?.status==='ACTIVE'?'ACTIVE · '+human(d.risk_override.code||'—'):'Clear'],
-    ['Execution instrument',human(ex.instrument||'NONE')],
-    ['Entry / Stop',money(ex.entry_low)+' – '+money(ex.entry_high)+' / '+money(ex.stop_price)],
-    ['Targets',money(ex.target1)+' / '+money(ex.target2)],
-    ['Option strike / expiry',cell(ex.option_strike)+' / '+cell(ex.option_expiry)],
-    ['Option suitability',human(ex.option_suitability_status||'—')],
-    ['Execution quality',num(ex.execution_quality_score,1)+' / 100'],
-    ['Outcome status',human(d.outcome_status||'OPEN')],
-    ['What could change the view',changeItems.length?'<ul>'+changeItems.map(x=>'<li>'+esc(x)+'</li>').join('')+'</ul>':'—']
-  ].map(([k,v])=>'<tr><th scope="row">'+esc(k)+'</th><td>'+(String(v).startsWith('<ul>')?v:esc(v))+'</td></tr>').join('');
-  const table3='<section class="canonical-edge-section" data-edge-section="current-stock-outcome"><div class="canonical-edge-table-wrap"><table class="canonical-edge-table canonical-edge-decision"><caption>3 — CURRENT STOCK OUTCOME</caption><tbody>'+outcomeRows+'</tbody></table></div></section>';
+  const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
+    '<div class="edge-result-hero"><div class="result-kicker">2 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h2>'+esc(r.ticker||'—')+' · '+esc(userForecastLabel(d.definitive_forecast))+'</h2>'+
+    '<p>Current '+money(d.current_price)+' · Expected D+5 zone '+esc(zone(d.expected_price_zone))+'</p></div>'+
+    '<div class="probability-line edge-user-probabilities"><span class="bull">Bull <strong>'+pct(p.bull)+'</strong></span><span class="range">Base <strong>'+pct(p.base)+'</strong></span><span class="bear">Bear <strong>'+pct(p.bear)+'</strong></span></div>'+
+    '<div class="edge-user-grid">'+
+      metricCard('Evidence confidence',trust.value,trust.detail)+
+      metricCard('Can I act on this?',actionable?'Trade setup available':'No trade',actionable?'A governed entry, stop and target plan is available below.':'The stock view exists, but the execution gates do not support a trade yet.')+
+      metricCard('Expected price area',zone(d.expected_price_zone),'The zone EDGE expects the stock to trade around over the D+5 horizon; it is not a guaranteed target.')+
+    '</div>'+
+    '<div class="action-box"><span>Suggested action</span><strong>'+esc(userActionText(d))+'</strong></div>'+
+    executionCard(d)+
+    '<details class="change-details" open><summary>What could change the view?</summary><ul>'+(changeItems.length?changeItems.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No material change condition was published.</li>')+'</ul></details>'+
+    '<details class="edge-advanced-details"><summary>Advanced decision details</summary><div class="edge-user-grid compact">'+
+      metricCard('Internal direction score',num(d.des,2),'Technical audit score (DES): negative leans bearish, positive leans bullish. It is not a recommendation by itself.')+
+      metricCard('Signals pointing the same way',pct(d.directional_agreement),'How much the underlying evidence agrees on direction. Higher agreement means fewer conflicting signals.')+
+      metricCard('Overall conviction after checks',pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100),'Final strength after evidence quality and risk checks are applied.')+
+      metricCard('Extra safety block',d.risk_override?.status==='ACTIVE'?('Active · '+human(d.risk_override.code||'—')):'None','An active safety block can prevent a trade even when the directional view looks attractive.')+
+      metricCard('Decision stage',human(d.decision_ladder||'—'),'Where the setup currently sits in the governed decision process.')+
+      metricCard('Trade-quality grade',num(d.bot?.score,1)+' · '+human(d.bot?.grade||'—'),'Internal BOT grade retained for audit; the user-facing action above remains the decision to follow.')+
+    '</div></details>'+
+  '</section>';
 
-  const drillRows=drill.map(row=>{
+  const drillCards=drill.length?drill.map(row=>{
     const verified=String(row.verification_status||'NOT_VERIFIED')==='VERIFIED';
-    return '<tr><th scope="row">'+esc(human(row.component||'—'))+'</th>'+
-      '<td>'+esc(row.score_or_level??'N/A')+'<br><span class="verify '+(verified?'verified':'not_verified')+'">'+esc(human(row.verification_status||'NOT VERIFIED'))+'</span></td>'+
-      '<td>'+esc(human(row.key_outcome||'—'))+'</td>'+
-      '<td>'+esc(row.interpretation||'Evidence not verified; no interpretation inferred.')+'</td></tr>';
-  }).join('');
-  const table4='<section class="canonical-edge-section" data-edge-section="drilldown"><div class="canonical-edge-table-wrap"><table class="canonical-edge-table canonical-edge-drilldown"><caption>4 — DRILL-DOWN</caption><thead><tr><th>Component</th><th>Score / verification</th><th>Key outcome</th><th>Interpretation</th></tr></thead><tbody>'+drillRows+'</tbody></table></div></section>';
+    const outcome=human(row.key_outcome||'—');
+    const interpretation=verified?friendlyLegacyInterpretation(row):'There is not enough verified evidence to use this factor confidently in the user-facing explanation.';
+    return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(human(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(scoreText(row.score_or_level))+'</span></div><p>'+esc(interpretation)+'</p><div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span><small>'+esc(outcome)+'</small></div></div>';
+  }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
+  const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>3 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
-  return '<article class="canonical-edge-result" data-contract="'+esc(r.contract_version)+'">'+table1+table2+table3+table4+
+  const section4='<section class="edge-user-section" data-edge-section="active-calls"><div class="edge-user-head"><div><span>4 — ACTIVE CALLS</span><h3>Calls still being tracked</h3></div><p>These are open EDGE calls that have not completed their full assessment lifecycle yet.</p></div>'+activeCallCards(calls,r.ticker)+'</section>';
+
+  return '<article class="canonical-edge-result edge-user-output" data-contract="'+esc(r.contract_version)+'">'+section1+section2+section3+section4+
     '<div class="canonical-edge-meta">Run '+esc(r.run_id||'—')+' · '+esc(r.framework_version||'—')+' · Generated '+esc(r.generated_at?new Date(r.generated_at).toLocaleString():'—')+'</div></article>';
 }
 if(typeof document!=='undefined'){

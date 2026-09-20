@@ -14,9 +14,9 @@ const report = {
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
-    table_2:'ACTIVE_CALLS',
-    table_3:'CURRENT_STOCK_OUTCOME',
-    table_4:'DRILLDOWN'
+    table_2:'CURRENT_STOCK_OUTCOME',
+    table_3:'DRILLDOWN',
+    table_4:'ACTIVE_CALLS'
   },
   master_assessment:{
     recommendations:5,unique_stocks:3,open_recommendations:5,closed_recommendations:0,
@@ -25,68 +25,95 @@ const report = {
     provisional_captured_checkpoints:3,provisional_due_checkpoints:17,
     provisional_forecast_scorable:3,provisional_forecast_hits:2,provisional_forecast_misses:1,provisional_forecast_accuracy_pct:66.7,
     provisional_zone_scorable:3,provisional_zone_hits:3,provisional_zone_misses:0,provisional_zone_accuracy_pct:100,
-    stock_assessment:{ticker:'TCS'}
+    stock_assessment:{
+      ticker:'TCS',recommendations:2,open_recommendations:2,closed_recommendations:0,
+      official_scorable_recommendations:0,recommendation_hit_rate_pct:null,
+      avg_gain_pct:null,avg_loss_pct:null,cumulative_model_pnl_units:null,
+      provisional_captured_checkpoints:3,provisional_due_checkpoints:17,
+      provisional_forecast_scorable:3,provisional_forecast_hits:2,provisional_forecast_accuracy_pct:66.7,
+      provisional_zone_scorable:3,provisional_zone_hits:3,provisional_zone_accuracy_pct:100,
+      previous_recommendation:{
+        recommendation_id:'EDGE-TCS-PREV',definitive_forecast:'BASE_RANGE',
+        definitive_recommendation:'NO TRADE',outcome_verdict:'OPEN',current_return_pct:1.2
+      }
+    }
   },
   active_calls:[{ticker:'TCS',recommendation_id:'EDGE-TCS-X',definitive_forecast:'BASE_RANGE',definitive_recommendation:'NO TRADE; NO OPTION TRADE.',expected_price_zone:{low:3000,high:3200},outcome_verdict:'OPEN'}],
   current_stock_outcome:{
     des:-30,market_trust:{score:92,band:'VERY HIGH'},directional_agreement:80,effective_conviction:.276,
     probabilities:{bull:5,base:60,bear:35},definitive_forecast:'BASE_RANGE',expected_price_zone:{low:3000,high:3200},
     forecast_horizon:'D+5',risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
-    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B'},execution:{instrument:'NONE'},current_price:3100
+    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B'},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
   },
   drilldown:[
-    {component:'PRICE_STRUCTURE',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is TREND_CONTINUATION.'},
+    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
     {component:'VALUATION',score_or_level:'N/A',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
   ]
 };
 
-test('Efficacy V2 renderer produces exactly four tables in mandatory order',()=>{
+test('Efficacy V2 renderer produces four mobile-first sections in approved order',()=>{
   const html=renderEdgeV13(report);
-  assert.equal((html.match(/<table /g)||[]).length,4);
   const i1=html.indexOf('1 — EDGE MASTER ASSESSMENT');
-  const i2=html.indexOf('2 — ACTIVE CALLS');
-  const i3=html.indexOf('3 — CURRENT STOCK OUTCOME');
-  const i4=html.indexOf('4 — DRILL-DOWN');
+  const i2=html.indexOf('2 — CURRENT STOCK OUTCOME');
+  const i3=html.indexOf('3 — DRILL-DOWN');
+  const i4=html.indexOf('4 — ACTIVE CALLS');
   assert.ok(i1<i2 && i2<i3 && i3<i4);
+  assert.equal((html.match(/data-edge-section=/g)||[]).length,4);
 });
 
-test('assessment is the first user-facing table',()=>{
+test('user-facing EDGE renderer uses cards rather than horizontally scrolling tables',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.indexOf('EDGE MASTER ASSESSMENT') < html.indexOf('CURRENT STOCK OUTCOME'));
+  assert.equal((html.match(/<table /g)||[]).length,0);
+  assert.ok(html.includes('edge-user-output'));
+  assert.ok(html.includes('edge-user-metric'));
+  assert.ok(html.includes('edge-drill-card'));
 });
 
-test('canonical sections are visible rather than hidden semantic placeholders',()=>{
+test('legacy drill-down narrative is simplified for users',()=>{
   const html=renderEdgeV13(report);
-  assert.equal((html.match(/<table /g)||[]).length,4);
-  assert.ok(!html.includes('semantic-contract-tables'));
-  assert.ok(!html.includes('aria-hidden="true"'));
-  assert.ok(html.indexOf('1 — EDGE MASTER ASSESSMENT') < html.indexOf('2 — ACTIVE CALLS'));
-  assert.ok(html.indexOf('2 — ACTIVE CALLS') < html.indexOf('3 — CURRENT STOCK OUTCOME'));
-  assert.ok(html.indexOf('3 — CURRENT STOCK OUTCOME') < html.indexOf('4 — DRILL-DOWN'));
+  assert.ok(html.includes('Business Fundamentals is currently supporting the five-day stock view.'));
+  assert.ok(!html.includes('Legacy active run'));
+  assert.ok(!html.includes('original narrative field was not persisted'));
+  assert.ok(!html.includes('immutable verified component score'));
 });
 
-test('non-optionable execution remains explicit in current outcome',()=>{
-  const dm=structuredClone(report);
-  dm.current_stock_outcome.execution={instrument:'NONE',option_strike:null,option_expiry:null,observed_premium:null,option_suitability_status:'NO OPTION TRADE',execution_quality_score:60};
-  const html=renderEdgeV13(dm);
+test('assessment and decision labels are user-friendly',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Outcome checks recorded'));
+  assert.ok(html.includes('Internal model P/L score'));
+  assert.ok(html.includes('Early forecast tracking'));
+  assert.ok(html.includes('Official recommendation accuracy'));
+  assert.ok(html.includes('Audit-only model score. It is not your portfolio return'));
+  assert.ok(html.includes('Evidence confidence'));
+  assert.ok(html.includes('High evidence confidence does not mean bullish'));
+  assert.ok(html.includes('Signals pointing the same way'));
+  assert.ok(html.includes('Overall conviction after checks'));
+  assert.ok(html.includes('Extra safety block'));
+  assert.ok(!html.includes('Captured / due checkpoints'));
+});
+
+test('non-optionable execution remains explicit and user-friendly',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('No executable trade'));
   assert.ok(html.includes('No Option Trade'));
-  assert.ok(html.includes('Execution instrument'));
+  assert.ok(html.includes('Wait — no trade setup currently passes the EDGE execution gates.'));
 });
 
-test('verified drill-down requires meaningful interpretation',()=>{
+test('verified drill-down still requires meaningful persisted evidence',()=>{
   const bad=structuredClone(report);
   bad.drilldown[0].interpretation='No additional interpretation recorded in the governed audit record.';
   assert.throws(()=>renderEdgeV13(bad),/interpretation missing/);
   assert.ok(validateEdgeStocksResult(bad).some(e=>e.includes('interpretation must be meaningful')));
 });
 
-test('validator rejects obsolete two-table presentation',()=>{
+test('validator rejects obsolete presentation order',()=>{
   const bad=structuredClone(report);
-  bad.presentation.standard_table_count=2;
-  bad.presentation.table_1='EDGE_OUTCOME_DECISION';
+  bad.presentation.table_2='ACTIVE_CALLS';
+  bad.presentation.table_3='CURRENT_STOCK_OUTCOME';
+  bad.presentation.table_4='DRILLDOWN';
   assert.ok(validateEdgeStocksResult(bad).length>0);
 });
 
-test('official metrics remain null when no closed scorable sample exists',()=>{
+test('current approved presentation contract validates cleanly',()=>{
   assert.equal(validateEdgeStocksResult(report).length,0);
 });
