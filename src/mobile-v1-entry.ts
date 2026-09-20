@@ -3,7 +3,7 @@ import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
 import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
-import { sync5drEngineResult } from './engine-result-sync';
+import { sync5drAcquisitionResult, sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
 import { assessAutomatedMarketEvidence } from './automated-market-evidence';
@@ -444,7 +444,25 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
     return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
   }
 
-  if(stage==='AUTOMATED_MARKET_DATA_PENDING')return json({ok:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,next_step:'WAIT_FOR_AUTOMATED_MARKET_DATA'},202);
+  if(stage==='AUTOMATED_MARKET_DATA_PENDING'){
+    const sync=await sync5drAcquisitionResult(env,requestId);
+    if(sync.status==='PROCESSING'||sync.status==='NOT_FOUND')return json({ok:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,acquisition_sync:sync,next_step:'WAIT_FOR_AUTOMATED_MARKET_DATA'},202);
+    if(sync.status==='FAILED'){
+      const blocked={...metadata,adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_sync:sync};
+      await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(blocked)}::jsonb,error=${JSON.stringify({stage:'AUTOMATED_ACQUISITION',detail:sync.detail??'5DR acquisition workflow failed'})}::jsonb,updated_at=now() where request_id=${requestId}`;
+      return json({ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_sync:sync,next_step:'USE_SCREENSHOT_BACKUP'},409);
+    }
+    if(sync.status==='SUCCEEDED'&&sync.evidence){
+      const origin=new URL(request.url).origin;
+      const handoffReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/automated-market-evidence`,{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify(sync.evidence)
+      });
+      return receiveAutomatedMarketEvidence(handoffReq,env,requestId);
+    }
+    return json({ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,acquisition_sync:sync,next_step:'RETRY_AUTOMATED_ACQUISITION_SYNC'},503);
+  }
   if(stage==='AUTOMATED_MARKET_DATA_BLOCKED')return json({ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,next_step:'USE_SCREENSHOT_BACKUP'},409);
   if(stage==='AUTOMATED_MARKET_DATA_READY'){
     const research=await systemResearch(env,requestId);
