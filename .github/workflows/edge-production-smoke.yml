@@ -25,7 +25,9 @@ jobs:
             if curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Cache-Control: no-cache' \
               'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
-              && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js; then
+              && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js \
+              && grep -q 'canonical-edge-table' /tmp/edge-live.js \
+              && grep -q 'Previous recommendation' /tmp/edge-live.js; then
               exit 0
             fi
             sleep 10
