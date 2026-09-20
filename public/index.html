@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f7fb" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=edge-ui-v3-20260920" />
+  <link rel="stylesheet" href="/styles.css?v=edge-ui-v4-20260921" />
 </head>
 <body>
   <main class="shell">
@@ -17,7 +17,7 @@
 
     <section class="module-selector" aria-label="Select decision module">
       <button class="module-tile active" data-module="5DR" type="button">
-        <span class="module-name">5DR</span><span class="module-desc">5-day NIFTY market view</span><span class="module-status">Ready</span>
+        <span class="module-name">EDGE NIFTY</span><span class="module-desc">5-day NIFTY market view</span><span class="module-status">Ready</span>
       </button>
       <button class="module-tile" data-module="EDGE_STOCKS" type="button">
         <span class="module-name">EDGE Stocks</span><span class="module-desc">Stock decision support</span><span class="module-status">Ready</span>
@@ -28,15 +28,15 @@
     </section>
 
     <section class="module-action-row">
-      <div><div class="eyebrow" id="selectedModuleEyebrow">5DR</div><h2 id="selectedModuleTitle">Latest market view</h2></div>
-      <button id="runButton" class="primary">Run 5DR</button>
+      <div><div class="eyebrow" id="selectedModuleEyebrow">EDGE NIFTY</div><h2 id="selectedModuleTitle">Latest market view</h2></div>
+      <button id="runButton" class="primary">Run EDGE NIFTY</button>
     </section>
 
     <section id="fiveDrPanel" class="module-panel active">
       <div id="assessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
       <div class="integration card">
-        <div class="section-head compact"><div><div class="eyebrow">5DR</div><h3>Current result</h3></div><span id="fiveDrState" class="badge">Checking</span></div>
-        <div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest 5DR publication…</div></div>
+        <div class="section-head compact"><div><div class="eyebrow">EDGE NIFTY</div><h3>Current result</h3></div><span id="fiveDrState" class="badge">Checking</span></div>
+        <div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest EDGE NIFTY publication…</div></div>
       </div>
     </section>
 
@@ -57,15 +57,15 @@
   </main>
   <dialog id="runDialog">
     <form id="runForm" class="dialog-card">
-      <div class="section-head"><h3>Run 5DR</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
-      <div class="run-steps" aria-label="5DR run progress">
+      <div class="section-head"><h3>Run EDGE NIFTY</h3><button id="closeRunDialog" type="button" class="ghost">Close</button></div>
+      <div class="run-steps" aria-label="EDGE NIFTY run progress">
         <span class="active">1 Decision setup</span><span>2 Evidence</span><span>3 Analysis</span><span>4 Result</span>
       </div>
       <input id="runEngine" type="hidden" value="5DR" />
       <input id="evidenceMode" type="hidden" value="HYBRID" />
       <div class="run decision-setup">
         <div class="step-label">1 · Decision setup</div>
-        <strong>What do you want 5DR to help with?</strong>
+        <strong>What do you want EDGE NIFTY to help with?</strong>
         <label>Objective
           <select id="decisionObjective">
             <option value="BOTH" selected>Market view + options setup</option>
@@ -87,13 +87,13 @@
             <option value="GROWTH">Growth first</option>
           </select>
         </label>
-        <p class="muted">5DR horizon is fixed at the next 5 market days. These choices define the decision context; they do not change the frozen 5DR methodology.</p>
+        <p class="muted">EDGE NIFTY horizon is fixed at the next 5 market days. These choices define the decision context; they do not change the frozen 5DR methodology.</p>
       </div>
       <div class="run">
         <div class="step-label">2 · Evidence</div>
         <strong>Automated market data</strong>
-        <p class="muted">5DR now uses authenticated Upstox market data plus governed official/web research automatically. No screenshots are required in the normal flow.</p>
-        <div class="file-selection"><span>● Upstox structured market data</span><span>● Official/web research</span><span>● Frozen 5DR engine</span></div>
+        <p class="muted">EDGE NIFTY now uses authenticated Upstox market data plus governed official/web research automatically. No screenshots are required in the normal flow.</p>
+        <div class="file-selection"><span>● Upstox structured market data</span><span>● Official/web research</span><span>● Frozen EDGE NIFTY engine</span></div>
       </div>
       <details class="run tech-details" id="manualBackup">
         <summary>Having a data issue? Use screenshot backup</summary>
@@ -103,12 +103,12 @@
         </div>
       </details>
       <div id="fileSelection" class="file-selection muted">No screenshots selected · automated evidence will be used.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted">Next: EDGE Console acquires market evidence, checks wider conditions and runs the governed 5DR engine automatically.</p>
-      <button id="uploadEvidenceButton" type="submit" class="primary">Run 5DR</button>
+      <p class="muted">Next: EDGE Console acquires market evidence, checks wider conditions and runs the governed EDGE NIFTY engine automatically.</p>
+      <button id="uploadEvidenceButton" type="submit" class="primary">Run EDGE NIFTY</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=edge-ui-v3-20260920"></script>
-  <script type="module" src="/resume.js?v=edge-ui-v3-20260920"></script>
-  <script type="module" src="/edge-live.js?v=edge-ui-v3-20260920"></script>
+  <script type="module" src="/app.js?v=edge-ui-v4-20260921"></script>
+  <script type="module" src="/resume.js?v=edge-ui-v4-20260921"></script>
+  <script type="module" src="/edge-live.js?v=edge-ui-v4-20260921"></script>
 </body>
 </html>

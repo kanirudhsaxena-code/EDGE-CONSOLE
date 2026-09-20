@@ -336,12 +336,14 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   if (!activeRows.length) return json({ error: 'No active EDGE call found', ticker: symbol }, 404);
 
   const allActiveRows = await sql`
-    select ticker,recommendation_id,definitive_forecast,definitive_recommendation,
-           expected_price_zone_low,expected_price_zone_high,expiry_trading_date,
-           current_price,current_return_pct,outcome_verdict,open_recommendations,
-           bull_probability,base_probability,bear_probability
-      from v_edge_active_calls
-     order by ticker
+    select a.ticker,a.recommendation_id,a.definitive_forecast,a.definitive_recommendation,
+           a.expected_price_zone_low,a.expected_price_zone_high,a.expiry_trading_date,
+           a.current_price,a.current_return_pct,a.outcome_verdict,a.open_recommendations,
+           a.bull_probability,a.base_probability,a.bear_probability,
+           r.run_timestamp as call_timestamp
+      from v_edge_active_calls a
+      left join recommendations r on r.recommendation_id = a.recommendation_id
+     order by a.ticker
   `;
 
   const master = masterRows[0] as Record<string, unknown>;
@@ -538,6 +540,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       definitive_forecast: row.definitive_forecast,
       definitive_recommendation: row.definitive_recommendation,
       expected_price_zone: { low: numberOrNull(row.expected_price_zone_low), high: numberOrNull(row.expected_price_zone_high) },
+      call_timestamp: row.call_timestamp ?? null,
       expiry_trading_date: row.expiry_trading_date ?? null,
       current_price: numberOrNull(row.current_price),
       current_return_pct: numberOrNull(row.current_return_pct),
