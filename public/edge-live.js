@@ -92,11 +92,21 @@ export function renderEdgeV13(report){
   const master=r.master_assessment||{},stock=master.stock_assessment||{};
   const calls=Array.isArray(r.active_calls)?r.active_calls:[];
   const drill=Array.isArray(r.drilldown)?r.drilldown:[];
+  const previous=stock.previous_recommendation||null;
   const cell=v=>esc(v===null||v===undefined?'—':v);
   const metric=(label,stockValue,masterValue)=>'<tr><th scope="row">'+esc(label)+'</th><td>'+cell(stockValue)+'</td><td>'+cell(masterValue)+'</td></tr>';
   const changeItems=stockChangeItems(r);
+  const previousRows=previous
+    ? metric('Previous recommendation',previous.recommendation_id||'—','—')+
+      metric('Previous forecast',human(previous.definitive_forecast||'—'),'—')+
+      metric('Previous action',human(previous.definitive_recommendation||'—'),'—')+
+      metric('Previous assessment',human(previous.outcome_verdict||previous.lifecycle_status||'OPEN'),'—')+
+      metric('Previous return',pct(previous.current_return_pct),'—')+
+      metric('Previous last assessed',previous.last_assessed_at?new Date(previous.last_assessed_at).toLocaleString():'Not yet observed','—')
+    : metric('Previous recommendation','None','—');
 
   const table1='<section class="canonical-edge-section" data-edge-section="master-assessment"><div class="canonical-edge-table-wrap"><table class="canonical-edge-table"><caption>1 — EDGE MASTER ASSESSMENT</caption><thead><tr><th>Metric</th><th>'+esc(r.ticker||'Stock')+'</th><th>All EDGE Stocks</th></tr></thead><tbody>'+
+    previousRows+
     metric('Tracked recommendations',stock.recommendations??0,master.recommendations??0)+
     metric('Open recommendations',stock.open_recommendations??0,master.open_recommendations??0)+
     metric('Closed recommendations',stock.closed_recommendations??0,master.closed_recommendations??0)+
