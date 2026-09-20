@@ -1,0 +1,104 @@
+name: 5DR Automated Production Acceptance
+
+on:
+  workflow_run:
+    workflows: ["EDGE Console Deploy"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  acceptance:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 8
+    steps:
+      - name: Start sandbox zero-upload 5DR run
+        env:
+          CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          curl --location --fail-with-body --silent --show-error             -X POST             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Content-Type: application/json"             --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}'             "$CONSOLE_URL/api/5dr/automated-runs"             -o /tmp/start.json
+          python - <<'PY'
+          import json, os
+          data=json.load(open('/tmp/start.json'))
+          req=(data.get('request') or {}).get('request_id')
+          if not req:
+              raise SystemExit('sandbox automated run did not return request_id: '+json.dumps(data))
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('REQUEST_ID='+req+'\n')
+          print('sandbox_request_started='+req)
+          PY
+
+      - name: Follow governed run to terminal state
+        env:
+          CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+        run: |
+          : > /tmp/final.json
+          for attempt in $(seq 1 30); do
+            code="$(curl --location --silent --show-error               -o /tmp/status.json -w '%{http_code}'               -X POST               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"               -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"               -H "Content-Type: application/json"               --data '{}'               "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID/resume-processing")"
+            cp /tmp/status.json /tmp/final.json
+            python - <<'PY'
+          import json
+          try:
+              d=json.load(open('/tmp/status.json'))
+          except Exception:
+              d={}
+          print('status='+str(d.get('status'))+' stage='+str(d.get('adapter_stage'))+' error='+str(d.get('error')))
+          PY
+            if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          raise SystemExit(0 if d.get('status')=='COMPLETED' else 1)
+          PY
+            then
+              break
+            fi
+            if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          raise SystemExit(0 if d.get('status')=='FAILED' else 1)
+          PY
+            then
+              echo "5DR sandbox run failed closed"
+              cat /tmp/status.json
+              exit 1
+            fi
+            sleep 10
+          done
+
+      - name: Assert sandbox persistence boundary
+        run: |
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/final.json'))
+          if d.get('status')!='COMPLETED':
+              raise SystemExit('acceptance did not reach COMPLETED: '+json.dumps(d))
+          if d.get('sandbox') is not True:
+              raise SystemExit('tester acceptance result was not marked sandbox')
+          if d.get('published') is not False:
+              raise SystemExit('tester acceptance result crossed canonical publish boundary')
+          if d.get('learning_eligible') is not False:
+              raise SystemExit('tester acceptance result crossed Learning Lab boundary')
+          print('5DR_AUTOMATED_SANDBOX_ACCEPTANCE=PASS')
+          print('request_id='+str(d.get('request_id')))
+          print('run_id='+str(d.get('run_id')))
+          PY
+
+      - name: Preserve acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 5dr-automated-production-acceptance
+          path: |
+            /tmp/start.json
+            /tmp/final.json
+          retention-days: 30
+          if-no-files-found: warn
