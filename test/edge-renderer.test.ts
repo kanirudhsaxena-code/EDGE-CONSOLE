@@ -47,6 +47,7 @@ const report = {
   },
   drilldown:[
     {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
+    {component:'PV_PVPO',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
     {component:'VALUATION',score_or_level:'N/A',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
   ]
 };
@@ -69,12 +70,32 @@ test('user-facing EDGE renderer uses cards rather than horizontally scrolling ta
   assert.ok(html.includes('edge-drill-card'));
 });
 
-test('legacy drill-down narrative is simplified for users',()=>{
+test('drill-down uses finding, explanation and outcome without fabricating legacy detail',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('Business Fundamentals is currently supporting the five-day stock view.'));
+  assert.ok(html.includes('FINDING'));
+  assert.ok(html.includes('WHY IT MATTERS'));
+  assert.ok(html.includes('Outcome:'));
+  assert.ok(html.includes('This older run preserved a verified component score of 1 (positive)'));
+  assert.ok(html.includes('did not preserve the detailed source narrative'));
   assert.ok(!html.includes('Legacy active run'));
   assert.ok(!html.includes('original narrative field was not persisted'));
   assert.ok(!html.includes('immutable verified component score'));
+});
+
+test('current outcome makes direction and five-day range the primary visual highlights',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('5-DAY DIRECTION'));
+  assert.ok(html.includes('Range-bound'));
+  assert.ok(html.includes('EXPECTED 5-DAY RANGE'));
+  assert.ok(html.includes('₹3,000 – ₹3,200'));
+  assert.ok(html.includes('edge-decision-highlights'));
+  assert.ok(html.includes('edge-key-grid'));
+});
+
+test('PV/PVPO is expanded for users',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Price &amp; Volume / Price, Volume, Premium &amp; Open Interest (PV/PVPO)'));
+  assert.ok(html.includes('PV means Price &amp; Volume. PVPO means Price, Volume, Premium &amp; Open Interest.'));
 });
 
 test('assessment and decision labels are user-friendly',()=>{
