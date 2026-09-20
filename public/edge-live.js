@@ -102,16 +102,43 @@ function userActionText(d){
   if(noTrade(d?.primary_action)||String(d?.execution?.instrument||'NONE')==='NONE')return 'Wait — no trade setup currently passes the EDGE execution gates.';
   return human(d?.primary_action||'Review the governed trade plan');
 }
-function friendlyLegacyInterpretation(row){
+function componentDisplayName(raw){
+  const k=String(raw||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
+  if(k.includes('PV_PVPO')||k==='PVPO'||k==='PV')return 'Price & Volume / Price, Volume, Premium & Open Interest (PV/PVPO)';
+  if(k.includes('PRICE_STRUCTURE'))return 'Price Structure';
+  if(k.includes('SPECIFIC_CHART_PATTERN')||k.includes('CHART_PATTERN'))return 'Specific Chart Pattern';
+  if(k.includes('RELATIVE_STRENGTH'))return 'Relative Strength';
+  if(k.includes('BUSINESS_FUNDAMENTALS'))return 'Business Fundamentals';
+  if(k.includes('VALUATION'))return 'Valuation';
+  if(k.includes('INSTITUTIONAL'))return 'Institutional Behaviour';
+  if(k.includes('NEWS')||k.includes('CATALYST'))return 'News, Events & Catalysts';
+  if(k.includes('EVENT_SHOCK'))return 'Event Shock';
+  return human(raw||'This factor');
+}
+function componentMeaning(raw){
+  const k=String(raw||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
+  if(k.includes('PRICE_STRUCTURE'))return 'This checks the stock’s trend, range behaviour and acceptance or rejection around important price levels. It is a direct input into the five-day directional view.';
+  if(k.includes('PV_PVPO')||k==='PVPO'||k==='PV')return 'PV means Price & Volume. PVPO means Price, Volume, Premium & Open Interest. It checks whether participation in the stock and, when available, derivatives evidence confirm or contradict the price move.';
+  if(k.includes('RELATIVE_STRENGTH'))return 'This compares the stock with its relevant benchmark or market. Outperformance supports the view; underperformance weakens it.';
+  if(k.includes('BUSINESS_FUNDAMENTALS'))return 'This captures whether business quality and fundamental evidence provide medium-term support or create a drag on the five-day setup.';
+  if(k.includes('VALUATION'))return 'This asks whether valuation is supportive, neutral or restrictive at the current price. Valuation is a context factor, not a stand-alone trade trigger.';
+  if(k.includes('INSTITUTIONAL'))return 'This checks whether institutional ownership, flows or behaviour strengthen confirmation, conflict with it, or remain neutral.';
+  if(k.includes('NEWS')||k.includes('CATALYST'))return 'This checks whether current company, sector or market catalysts improve or worsen the risk/reward over the five-day horizon.';
+  if(k.includes('EVENT_SHOCK'))return 'This checks whether an event risk is large enough to alter the normal five-day setup or force additional caution.';
+  if(k.includes('SPECIFIC_CHART_PATTERN')||k.includes('CHART_PATTERN'))return 'This checks whether a recognised chart pattern is adding confirmation to the current setup.';
+  return 'This governed factor contributes to the overall EDGE direction and confidence.';
+}
+function drillFinding(row){
+  const verified=String(row?.verification_status||'NOT_VERIFIED')==='VERIFIED';
+  if(!verified)return 'The available evidence for this factor is not sufficiently verified, so EDGE does not use it as a confident user-facing finding.';
   const raw=String(row?.interpretation||'').trim();
   const legacy=row?.narrative_source==='LEGACY_SCORE_RECONSTRUCTION'||/legacy active run|original narrative field was not persisted|immutable verified component score/i.test(raw);
-  if(!legacy)return raw||'No user-facing interpretation is available.';
-  const component=human(row?.component||'This factor');
-  const n=Number(row?.score_or_level);
-  if(n>0)return component+' is currently supporting the five-day stock view.';
-  if(n<0)return component+' is currently weighing against the five-day stock view.';
-  if(n===0)return component+' is currently neutral and is not pushing the view in either direction.';
-  return component+' is retained for audit history, but there is not enough user-facing detail to draw a stronger conclusion.';
+  if(legacy){
+    const n=Number(row?.score_or_level);
+    const score=Number.isFinite(n)?String(n):'not available';
+    return 'This older run preserved a verified component score of '+score+' ('+scoreText(row?.score_or_level).toLowerCase()+'), but it did not preserve the detailed source narrative. No more specific market fact should be inferred from this historical row.';
+  }
+  return raw||String(row?.key_outcome||'No detailed finding was published.');
 }
 function metricCard(label,value,detail){
   return '<div class="edge-user-metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(detail)+'</small></div>';
@@ -149,7 +176,7 @@ export function renderEdgeV13(report){
   const section1='<section class="edge-user-section" data-edge-section="master-assessment">'+
     '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Past calls are checked against what actually happened. More completed checks make the performance record more meaningful.</p></div>'+
     previousCard+
-    '<div class="edge-user-grid">'+
+    '<div class="edge-key-grid">'+
       metricCard('Early forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' direction checks were correct so far. This remains provisional until the calls mature.'):'No completed forecast checks yet.')+
       metricCard('Early price-zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' of '+zoneScorable+' price-zone checks were correct so far. This remains provisional until the calls mature.'):'No completed price-zone checks yet.')+
       metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'Not enough history',official?(official+' fully matured recommendation'+(official===1?' has':'s have')+' an official outcome.'):'No recommendation has matured enough for an official score yet.')+
@@ -164,13 +191,15 @@ export function renderEdgeV13(report){
   '</section>';
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
-    '<div class="edge-result-hero"><div class="result-kicker">2 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h2>'+esc(r.ticker||'—')+' · '+esc(userForecastLabel(d.definitive_forecast))+'</h2>'+
-    '<p>Current '+money(d.current_price)+' · Expected D+5 zone '+esc(zone(d.expected_price_zone))+'</p></div>'+
+    '<div class="edge-result-hero"><div class="result-kicker">2 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3></div>'+
+    '<div class="edge-decision-highlights">'+
+      '<div class="edge-highlight-card direction"><span>5-DAY DIRECTION</span><strong>'+esc(userForecastLabel(d.definitive_forecast))+'</strong><small>Current price '+money(d.current_price)+'</small></div>'+
+      '<div class="edge-highlight-card range"><span>EXPECTED 5-DAY RANGE</span><strong>'+esc(d.expected_price_zone?.low==null&&d.expected_price_zone?.high==null?'—':money(d.expected_price_zone?.low)+' – '+money(d.expected_price_zone?.high))+'</strong><small>Expected trading area over D+5; this is not a guaranteed target.</small></div>'+
+    '</div>'+
     '<div class="probability-line edge-user-probabilities"><span class="bull">Bull <strong>'+pct(p.bull)+'</strong></span><span class="range">Base <strong>'+pct(p.base)+'</strong></span><span class="bear">Bear <strong>'+pct(p.bear)+'</strong></span></div>'+
-    '<div class="edge-user-grid">'+
+    '<div class="edge-key-grid">'+
       metricCard('Evidence confidence',trust.value,trust.detail)+
       metricCard('Can I act on this?',actionable?'Trade setup available':'No trade',actionable?'A governed entry, stop and target plan is available below.':'The stock view exists, but the execution gates do not support a trade yet.')+
-      metricCard('Expected price area',zone(d.expected_price_zone),'The zone EDGE expects the stock to trade around over the D+5 horizon; it is not a guaranteed target.')+
     '</div>'+
     '<div class="action-box"><span>Suggested action</span><strong>'+esc(userActionText(d))+'</strong></div>'+
     executionCard(d)+
@@ -187,9 +216,13 @@ export function renderEdgeV13(report){
 
   const drillCards=drill.length?drill.map(row=>{
     const verified=String(row.verification_status||'NOT_VERIFIED')==='VERIFIED';
-    const outcome=human(row.key_outcome||'—');
-    const interpretation=verified?friendlyLegacyInterpretation(row):'There is not enough verified evidence to use this factor confidently in the user-facing explanation.';
-    return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(human(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(scoreText(row.score_or_level))+'</span></div><p>'+esc(interpretation)+'</p><div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span><small>'+esc(outcome)+'</small></div></div>';
+    const outcome=scoreText(row.score_or_level);
+    const finding=drillFinding(row);
+    const meaning=componentMeaning(row.component);
+    return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(componentDisplayName(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(outcome)+'</span></div>'+
+      '<div class="edge-explanation-block"><span>FINDING</span><p>'+esc(finding)+'</p></div>'+
+      '<div class="edge-explanation-block"><span>WHY IT MATTERS</span><p>'+esc(meaning)+'</p></div>'+
+      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span><small><b>Outcome:</b> '+esc(outcome)+'</small></div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
   const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>3 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
