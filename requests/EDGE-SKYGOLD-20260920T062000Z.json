@@ -1,0 +1,178 @@
+{
+  "command": "EDGE SKYGOLD",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-SKYGOLD-20260920T062000Z",
+    "ticker": "SKYGOLD",
+    "command": "EDGE SKYGOLD",
+    "created_at": "2026-09-20T06:20:00Z",
+    "research_fresh_at": "2026-09-20T06:20:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB",
+      "EXA"
+    ],
+    "sources": [
+      {
+        "source_id": "sky20_s1_acq",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.capitalmarket.com/markets/news/corporate-news/board-of-sky-gold-and-diamonds-approves-acquisition-of-purvi-gems-and-jewellery/1732857",
+        "title": "Board approves acquisition of Purvi Gems & Jewellery",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-09-18T00:00:00+05:30",
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s2_acq",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.angelone.in/news/stocks/sky-gold-share-price-in-focus-to-acquire-purvi-gems-jewellery-for-up-to-9-crore",
+        "title": "Sky Gold acquisition terms",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-09-18T06:19:31Z",
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s3_q1",
+        "provider": "CHATGPT_WEB",
+        "authority": "EXCHANGE_SECONDARY",
+        "url": "https://www.moneycontrol.com/company-notices/skygolddiamonds/notices/SG08/",
+        "title": "Sky Gold exchange announcements and Q1 FY27 filing references",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-08-09T00:00:00+05:30",
+        "event_date": "2026-08-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s4_q1",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.business-standard.com/markets/capital-market-news/sky-gold-and-diamonds-surges-after-reporting-robust-q1-performance-126081000623_1.html",
+        "title": "Sky Gold Q1 FY27 performance",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-08-10T00:00:00+05:30",
+        "event_date": "2026-08-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s5_ratios",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/SKYGOLD/financials/ratios/",
+        "title": "Sky Gold current valuation ratios",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s6_holdings",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/109637/SKYGOLD/latest/sky-gold-and-diamonds-ltd/",
+        "title": "Sky Gold latest shareholding pattern",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s7_fraud_primary",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://skygold.co.in/wp-content/uploads/2026/07/e9d943ec-0759-4f73-b736-1e1dd8860134.pdf",
+        "title": "Regulation 30 disclosure - subsidiary fraud incident",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-07-16T00:00:00+05:30",
+        "event_date": "2026-07-15T00:00:00+05:30"
+      },
+      {
+        "source_id": "sky20_s8_fraud_independent",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/markets/stocks/news/deepfake-scam-rattles-sky-gold-as-subsidiary-suffers-rs-11-crore-loss-after-unauthorised-fund-transfer/articleshow/132451985.cms",
+        "title": "Sky Gold subsidiary fraud loss",
+        "retrieved_at": "2026-09-20T06:20:00Z",
+        "publication_date": "2026-07-17T00:00:00+05:30",
+        "event_date": "2026-07-15T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "sky20_c1_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Q1 FY27 consolidated revenue was about Rs 2,012.8 crore, up roughly 5.3% sequentially from Rs 1,911.5 crore in Q4 FY26 and 77.9% year on year; reported PAT was about Rs 104.9 crore, up roughly 15.6% sequentially and about 141% year on year. This independently supports a positive fundamentals direction on both sequential inputs.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "sky20_s3_q1",
+          "sky20_s4_q1"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "sky20_c2_valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Current September 2026 ratios show trailing P/E around 36x, P/B around 10x and EV/EBITDA around 23.5x. These absolute ratios are verified, but without a consistently defined jewellery-manufacturing peer benchmark the independent directional valuation implication remains uncertain.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "sky20_s5_ratios"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "sky20_c3_institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 ownership shows promoter holding unchanged at 51.74%, FII/FPI holding rising from 1.20% to 2.79%, mutual-fund holding rising from 10.33% to 11.03%, and total institutional holding rising from 14.34% to 16.99%. This independently supports a positive institutional direction for the latest filed quarter.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "sky20_s6_holdings"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "sky20_c4_news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "On September 18, 2026 the board approved acquisition of 100% of Purvi Gems & Jewellery for cash consideration up to Rs 9 crore, targeted to close by November 30, 2026. The target's provisional FY26 turnover was reported around Rs 103.4 crore and the stated rationale is portfolio expansion into lightweight uncut and precious jewellery. The event is fresh and material, but its short-horizon stock direction is not independently established.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "sky20_s1_acq",
+          "sky20_s2_acq"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "sky20_c5_event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Event risk is non-trivial rather than neutral: the fresh acquisition adds execution/integration uncertainty, while a disclosed July 15 subsidiary fraud caused an approximately Rs 10.70 crore loss and exposed verification/control weaknesses, though the company said broader IT systems and operations were not materially disrupted. Because the acquisition is current and the older fraud remains a governance context, the combined event direction is uncertain rather than automatically adverse.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "sky20_s1_acq",
+          "sky20_s2_acq",
+          "sky20_s7_fraud_primary",
+          "sky20_s8_fraud_independent"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      }
+    ],
+    "conflicts": [],
+    "limitations": [
+      "The September 18 acquisition is the current event; the July fraud disclosure is retained as governance/event-risk context and is not mislabeled as a fresh September shock.",
+      "Acquisition completion is expected by November 30, 2026; completion and integration outcomes are not yet known.",
+      "Valuation peer benchmarks are not treated as independently settled.",
+      "The latest institutional ownership filing is for June 2026 and is not a live flow measure.",
+      "This bundle contains no manually created EDGE score, DES, Market Trust, BOT, probability, Decision Ladder, price zone, option trade, or recommendation."
+    ]
+  }
+}
