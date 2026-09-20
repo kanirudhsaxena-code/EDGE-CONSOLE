@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {actorCanAccessStored,actorMetadata,isAccessIdentityEnforced,resolveAccessActor,shouldScopeHistoryToActor} from '../src/access-identity';
+import {actorCanAccessStored,actorCanUseCanonicalEdge,actorMetadata,isAccessIdentityEnforced,resolveAccessActor,shouldScopeHistoryToActor} from '../src/access-identity';
 
 test('anonymous remains allowed only while identity mode is audit',async()=>{
   const req=new Request('https://console.test/');
@@ -40,4 +40,16 @@ test('tester can access only matching stored actor when enforcement is on',async
   assert.equal(actorCanAccessStored(actor,{id:actor.id},env),true);
   assert.equal(actorCanAccessStored(actor,{id:'usr_other'},env),false);
   assert.equal(actorCanAccessStored(actor,null,env),false);
+});
+
+
+test('canonical EDGE access is owner-only once identity enforcement is enabled',async()=>{
+  const ownerReq=new Request('https://console.test/',{headers:{'Cf-Access-Authenticated-User-Email':'owner@example.com'}});
+  const testerReq=new Request('https://console.test/',{headers:{'Cf-Access-Authenticated-User-Email':'tester@example.com'}});
+  const env={ACCESS_IDENTITY_MODE:'ENFORCE',OWNER_EMAILS:'owner@example.com'};
+  const owner=await resolveAccessActor(ownerReq,env);
+  const tester=await resolveAccessActor(testerReq,env);
+  assert.equal(actorCanUseCanonicalEdge(owner,env),true);
+  assert.equal(actorCanUseCanonicalEdge(tester,env),false);
+  assert.equal(actorCanUseCanonicalEdge(tester,{ACCESS_IDENTITY_MODE:'AUDIT'}),true);
 });
