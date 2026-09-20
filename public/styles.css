@@ -310,6 +310,14 @@ html,body{max-width:100%;overflow-x:hidden}
 .edge-result-hero{display:grid;gap:5px}
 .edge-result-hero h2{margin:0;font-size:var(--fs-xl);line-height:1.15;color:var(--ink);overflow-wrap:anywhere}
 .edge-result-hero p{margin:0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5;overflow-wrap:anywhere}
+.edge-result-hero h3{margin:0;font-size:var(--fs-lg);line-height:1.2;color:var(--ink)}
+.edge-decision-highlights{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
+.edge-highlight-card{display:grid;align-content:start;gap:6px;padding:15px;border:1px solid var(--border-light);border-radius:16px;background:var(--surface-soft);overflow-wrap:anywhere}
+.edge-highlight-card span{font-size:var(--fs-xs);font-weight:800;letter-spacing:.065em;color:var(--accent-2)}
+.edge-highlight-card strong{font-size:28px;line-height:1.05;color:var(--ink);overflow-wrap:anywhere}
+.edge-highlight-card.range strong{font-size:21px;line-height:1.16}
+.edge-highlight-card small{font-size:var(--fs-xs);line-height:1.4;color:var(--text-soft)}
+.edge-key-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
 .edge-user-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:100%}
 .edge-user-grid.compact{grid-template-columns:repeat(2,minmax(0,1fr))}
 .edge-user-metric{display:grid;align-content:start;gap:4px;padding:12px;border:1px solid var(--border-light);border-radius:14px;background:var(--surface-soft);overflow-wrap:anywhere}
@@ -332,6 +340,9 @@ html,body{max-width:100%;overflow-x:hidden}
 .edge-drill-head,.edge-drill-foot{display:flex;align-items:flex-start;justify-content:space-between;gap:8px;flex-wrap:wrap}
 .edge-drill-head strong{font-size:var(--fs-md);line-height:1.3;color:var(--ink);overflow-wrap:anywhere}
 .edge-drill-card p{margin:0;font-size:var(--fs-sm);line-height:1.55;color:var(--ink-2);overflow-wrap:anywhere}
+.edge-explanation-block{display:grid;gap:4px;padding-top:2px}
+.edge-explanation-block span{font-size:10px;font-weight:800;letter-spacing:.07em;color:var(--accent-2)}
+.edge-explanation-block p{margin:0;font-size:var(--fs-sm);line-height:1.58;color:var(--ink-2)}
 .edge-drill-foot small{font-size:var(--fs-xs);line-height:1.4;color:var(--text-soft);overflow-wrap:anywhere}
 .edge-user-section .active-call-grid{grid-template-columns:repeat(2,minmax(0,1fr));width:100%}
 .edge-user-section .active-call-card{min-width:0;overflow-wrap:anywhere}
@@ -343,11 +354,18 @@ html,body{max-width:100%;overflow-x:hidden}
   .edge-user-output{gap:10px}
   .edge-user-section{padding:13px;border-radius:16px;gap:12px}
   .edge-user-grid,.edge-user-grid.compact,.edge-previous-call,.edge-drill-grid,.edge-user-section .active-call-grid{grid-template-columns:1fr}
+  .edge-key-grid,.edge-decision-highlights{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
   .edge-user-probabilities{grid-template-columns:repeat(3,minmax(0,1fr));gap:6px}
   .edge-user-probabilities span{padding:9px 6px;font-size:10px}
   .edge-user-probabilities strong{font-size:var(--fs-sm)}
-  .edge-result-hero h2{font-size:23px}
+  .edge-highlight-card{padding:12px}
+  .edge-highlight-card strong{font-size:24px}
+  .edge-highlight-card.range strong{font-size:18px}
+  .edge-result-hero h3{font-size:18px}
   .edge-user-head h3{font-size:18px}
+  .edge-key-grid .edge-user-metric{padding:10px}
+  .edge-key-grid .edge-user-metric strong{font-size:15px}
+  .edge-key-grid .edge-user-metric small{font-size:10px;line-height:1.35}
   .edge-user-metric,.edge-drill-card,.edge-previous-call>div{padding:11px}
   .edge-user-section .stock-detail-grid{grid-template-columns:1fr}
 }
