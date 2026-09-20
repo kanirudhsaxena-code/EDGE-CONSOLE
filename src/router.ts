@@ -5,8 +5,9 @@ import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evi
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
+import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 
-type Env = {
+type Env = AccessIdentityEnv & {
   ASSETS: Fetcher;
   EVIDENCE_BUCKET: R2Bucket;
   DATABASE_URL?: string;
@@ -30,6 +31,18 @@ const integerOrZero = (value: unknown): number => {
   const n = Number(value);
   return Number.isInteger(n) && n >= 0 ? n : 0;
 };
+
+async function testerEdgeSandboxGate(request:Request,env:Env):Promise<Response|null>{
+  if(!isAccessIdentityEnforced(env))return null;
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
+  if(actorCanUseCanonicalEdge(actor,env))return null;
+  return json({
+    error:'EDGE Stocks tester sandbox is not enabled yet',
+    code:'EDGE_TESTER_SANDBOX_NOT_READY',
+    detail:'Tester access is blocked from the canonical EDGE Stocks ledger until isolated sandbox persistence is available.'
+  },403);
+}
 
 const sha256Hex = async (text: string): Promise<string> => {
   const bytes = new TextEncoder().encode(text);
@@ -631,6 +644,10 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname.startsWith('/api/edge-stocks/') && isAccessIdentityEnforced(env)) {
+    const testerGate=await testerEdgeSandboxGate(request,env);
+    if(testerGate)return testerGate;
+  }
   if (url.pathname === '/api/edge-stocks/research-bundles' && request.method === 'POST') return saveEdgeResearchBundle(request, env);
   const researchBundle = url.pathname.match(/^\/api\/edge-stocks\/research-bundles\/([^/]+)$/);
   if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
