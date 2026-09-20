@@ -1,20 +1,92 @@
 # EDGE Console — Build Status
 
-Build initiated: 2026-09-11
+Last updated: 20 September 2026
 
-## Foundation
-- GitHub repository: active
-- Google Drive master documentation: active
-- Cloudflare Zero Trust Free: configured
-- Team: edge-intelligence
-- Architecture: Engine -> Normalizer -> Versioned Output Contract -> Database -> API -> UI
-- Deployment model: Development -> Staging -> Production
-- Cost policy: zero-cost-first; no paid upgrade without explicit approval
+## Production priority
 
-## Engines
-- 5DR: manual/hybrid now; Upstox automation planned
-- EDGE Stocks: manual/hybrid now; automation planned
-- EDGE IPO: autonomous integration target
+Current release scope is limited to **5DR + EDGE Stocks**.
 
-## Build state
-FOUNDATION_STARTED
+Explicitly deferred from this release:
+- IPO EDGE completion / source-completeness remediation
+- multi-user / tester-access enforcement and Cloudflare identity hardening
+
+These deferred items must not block the 5DR + EDGE Stocks production cutover.
+
+## 5DR
+
+Status: **PRODUCTION CANDIDATE — OPEN-MARKET GO GATE PENDING**
+
+Completed:
+- canonical 5DR V2.2.3 specification release-bound;
+- production model remains `5DR_V2_1`;
+- output contract remains `5DR_V2_1_2`;
+- Upstox structured evidence is the automated primary path;
+- screenshots are fallback/diagnostic only;
+- governed research, normalization, frozen-engine execution and result persistence are wired;
+- cross-repository workflow permission blocker removed through governed proxy execution of the pinned 5DR engine;
+- weekend/closed-session transport acceptance passes fail-closed;
+- Console CI, deployment, smoke and automated production acceptance are green on 20 September 2026;
+- 5DR CI and read-only Upstox verification are green.
+
+Remaining GO gate:
+- one real NSE open-session zero-upload run must reach terminal COMPLETED without fallback/fabrication;
+- sandbox acceptance must remain unpublished and Learning-Lab-ineligible;
+- no methodology, scoring, DES/tradeability, output semantics or Learning Lab governance may change during cutover.
+
+5DR engine checkpoint:
+- `233cf52e3ffd237f85c91e3c88eb38e9924e60c8`
+
+## EDGE Stocks
+
+Status: **PRODUCTION ACCEPTED / GO**
+
+Canonical production contract:
+- analytical core: `EDGE_V1`
+- user-facing contract: `EDGE_STOCKS_V1_3`
+- presentation semantics: `EFFICACY_V2`
+- fresh governed research required
+
+Required user-facing order:
+1. EDGE MASTER ASSESSMENT
+2. ACTIVE CALLS
+3. CURRENT STOCK OUTCOME
+4. DRILL-DOWN
+
+Production validation includes:
+- canonical V1.3 renderer;
+- research-backed invocation;
+- dispatch credential health;
+- probability integrity;
+- OFFICIAL vs PROVISIONAL efficacy separation;
+- meaningful interpretation for VERIFIED drill-down rows;
+- fail-closed behavior when governed research is absent;
+- trading execution disabled.
+
+Current EDGE engine checkpoint:
+- `be7d778254c5a438a6ef1527f0cc2f55a7202825`
+
+The stale supersession PR was closed because V1.3/Efficacy V2 is already canonical on `main`.
+
+## Console / cutover
+
+Current production-candidate Console checkpoint before release:
+- `09efcb30cb856faf28c762cc501150280c72ed4d`
+
+Production cutover branch:
+- `release/5dr-edge-production-go-live`
+
+Cutover change:
+- set `APP_ENV=production`.
+
+Identity mode remains `AUDIT` for this release. Multi-user enforcement is a separate, explicitly deferred workstream and must not be mixed into the 5DR + EDGE Stocks release.
+
+## GO / NO-GO rule
+
+Merge the production cutover only after:
+1. EDGE production smoke remains green;
+2. the next NSE open-session 5DR automated acceptance passes;
+3. the 5DR run shows no fabricated/stale evidence and no unexpected fallback;
+4. production deployment succeeds after cutover;
+5. post-cutover EDGE smoke and 5DR health are green.
+
+If any gate fails, keep the release unmerged or roll back to the pre-cutover Console checkpoint above. Do not weaken fail-closed behavior to obtain a green result.
