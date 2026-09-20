@@ -41,8 +41,7 @@ export async function resolveAccessActor(request:Request,env:AccessIdentityEnv):
 export const actorMetadata=(actor:AccessActor)=>({
   id:actor.id,
   role:actor.role,
-  authenticated:actor.authenticated,
-  ...(actor.email?{email:actor.email}:{})
+  authenticated:actor.authenticated
 });
 
 export function actorCanAccessStored(
