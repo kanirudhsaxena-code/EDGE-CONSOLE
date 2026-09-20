@@ -51,12 +51,16 @@ Canonical production contract:
 
 Required user-facing order:
 1. EDGE MASTER ASSESSMENT
-2. ACTIVE CALLS
-3. CURRENT STOCK OUTCOME
-4. DRILL-DOWN
+2. CURRENT STOCK OUTCOME
+3. DRILL-DOWN
+4. ACTIVE CALLS
 
 Production validation includes:
 - canonical V1.3 renderer;
+- mobile-first 5DR-style EDGE presentation with no horizontal table scrolling;
+- user-facing technical labels simplified while preserving frozen internal metrics;
+- revised visible section order approved by the user on 20 September 2026;
+- deployed EDGE production smoke run `35524187509` green on Console `71125e2662dc53dc2379c1af2326aee242a4a065`;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -73,7 +77,7 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `e03df9955ebc9256a17d70ff4eb8303baf6be66a`
+- `71125e2662dc53dc2379c1af2326aee242a4a065`
 
 Production cutover branch:
 - `release/5dr-edge-production-go-live-final`
