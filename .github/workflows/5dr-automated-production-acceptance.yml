@@ -23,7 +23,11 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
-          curl --location --fail-with-body --silent --show-error             -X POST             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Content-Type: application/json"             --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}'             "$CONSOLE_URL/api/5dr/automated-runs"             -o /tmp/start.json
+          code="$(curl --location --silent --show-error             -X POST             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Content-Type: application/json"             --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}'             "$CONSOLE_URL/api/5dr/automated-runs"             -o /tmp/start.json -w '%{http_code}')"
+          echo "start_http_code=$code"
+          cat /tmp/start.json
+          echo
+          test "$code" = "201"
           python - <<'PY'
           import json, os
           data=json.load(open('/tmp/start.json'))
