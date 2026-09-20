@@ -58,3 +58,9 @@ export function actorCanAccessStored(
 
 export const shouldScopeHistoryToActor=(actor:AccessActor,env:AccessIdentityEnv)=>
   isAccessIdentityEnforced(env)&&actor.role!=='OWNER';
+
+
+export function actorCanUseCanonicalEdge(actor:AccessActor,env:AccessIdentityEnv):boolean{
+  if(!isAccessIdentityEnforced(env))return true;
+  return actor.authenticated&&actor.role==='OWNER';
+}
