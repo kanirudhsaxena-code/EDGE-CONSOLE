@@ -20,8 +20,8 @@ jobs:
       - name: Start sandbox zero-upload 5DR run
         env:
           CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           curl --location --fail-with-body --silent --show-error             -X POST             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Content-Type: application/json"             --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}'             "$CONSOLE_URL/api/5dr/automated-runs"             -o /tmp/start.json
           python - <<'PY'
@@ -38,8 +38,8 @@ jobs:
       - name: Follow governed run to terminal state
         env:
           CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
-          CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
-          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
           : > /tmp/final.json
           for attempt in $(seq 1 30); do
