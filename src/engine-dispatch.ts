@@ -20,6 +20,47 @@ const DEFAULT_WORKFLOW='console-execute.yml';
 const DEFAULT_ACQUIRE_WORKFLOW='console-acquire.yml';
 const DEFAULT_REF='main';
 
+export type EngineDispatchHealth={
+  ok:boolean;
+  status:'READY'|'CONFIGURATION_BLOCKED'|'PERMISSION_BLOCKED'|'WORKFLOW_NOT_FOUND'|'UNAVAILABLE';
+  repository:string;
+  workflows:{acquisition:string;execution:string};
+  detail?:string;
+};
+
+export async function check5drWorkflowAccess(
+  env:EngineDispatchEnv,
+  fetcher:typeof fetch=fetch
+):Promise<EngineDispatchHealth>{
+  const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
+  const acquisition=env.FIVEDR_ACQUIRE_WORKFLOW?.trim()||DEFAULT_ACQUIRE_WORKFLOW;
+  const execution=env.FIVEDR_WORKFLOW?.trim()||DEFAULT_WORKFLOW;
+  const token=env.GITHUB_ACTIONS_TOKEN?.trim();
+  const workflows={acquisition,execution};
+  if(!token)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflows,detail:'5DR workflow dispatch credential is not configured'};
+  try{
+    for(const workflow of [acquisition,execution]){
+      const response=await fetcher(`https://api.github.com/repos/${repository}/actions/workflows/${encodeURIComponent(workflow)}`,{
+        method:'GET',
+        headers:{
+          'accept':'application/vnd.github+json',
+          'authorization':`Bearer ${token}`,
+          'user-agent':'EDGE-CONSOLE-5DR-HEALTH',
+          'x-github-api-version':'2022-11-28'
+        }
+      });
+      if(response.ok)continue;
+      if(response.status===401||response.status===403)return {ok:false,status:'PERMISSION_BLOCKED',repository,workflows,detail:'GitHub credential cannot access 5DR Actions'};
+      if(response.status===404)return {ok:false,status:'WORKFLOW_NOT_FOUND',repository,workflows,detail:'Required 5DR workflow is not accessible'};
+      return {ok:false,status:'UNAVAILABLE',repository,workflows,detail:`GitHub workflow health returned HTTP ${response.status}`};
+    }
+    return {ok:true,status:'READY',repository,workflows};
+  }catch{
+    return {ok:false,status:'UNAVAILABLE',repository,workflows,detail:'GitHub workflow health request failed'};
+  }
+}
+
+
 const safeDetail=(status:number)=>status===401||status===403
   ?'GitHub workflow dispatch authentication/permission rejected'
   :status===404
