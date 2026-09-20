@@ -1,0 +1,204 @@
+{
+  "command": "EDGE TITAN",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-TITAN-20260920T061100Z",
+    "ticker": "TITAN",
+    "command": "EDGE TITAN",
+    "created_at": "2026-09-20T06:11:00Z",
+    "research_fresh_at": "2026-09-20T06:11:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB",
+      "EXA"
+    ],
+    "sources": [
+      {
+        "source_id": "titan20_s1_corp",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/investors/corporate-announcements",
+        "title": "Titan Company Corporate Announcements",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s2_q1_official",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-08/Q1FY27%20-%20Results.pdf",
+        "title": "Titan Company Q1 FY27 Results",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-08-07T00:00:00+05:30",
+        "event_date": "2026-08-07T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s3_q1_mint",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.livemint.com/market/stock-market-news/titan-q1-results-net-profit-jumps-63-to-rs-1-777-crore-revenue-rises-40-11786099305471.html",
+        "title": "Titan Q1 results: net profit jumps 63% to Rs 1,777 crore",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-08-07T00:00:00+05:30",
+        "event_date": "2026-08-07T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s4_understock",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://understock.in/stocks/TITAN",
+        "title": "Titan Company valuation and peer comparison",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-09-09T00:00:00+05:30",
+        "event_date": "2026-09-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s5_flashfinance",
+        "provider": "EXA",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://flashfinance.news/fundamentals/company/TITAN",
+        "title": "Titan fundamentals and valuation",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": null,
+        "event_date": "2026-09-20T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s6_shareholding",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/1403/TITAN/latest/titan-company-ltd/",
+        "title": "Titan Company latest shareholding pattern",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s7_postal",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/Voting%20Results-Final_0.pdf",
+        "title": "Voting Results of Postal Ballot through remote e-voting",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-09-17T00:00:00+05:30",
+        "event_date": "2026-09-17T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s8_rating",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/SE%20Intimation%20credit%20rating.pdf",
+        "title": "CARE Ratings update",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-09-11T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s9_cp",
+        "provider": "EXA",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/SECPRedemption10092026.pdf",
+        "title": "Redemption of Commercial Paper",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-09-10T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      },
+      {
+        "source_id": "titan20_s10_psu",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.titancompany.in/sites/default/files/2026-09/Grant%20of%20PSUs_0.pdf",
+        "title": "Grant of Performance Stock Units under Scheme 2026",
+        "retrieved_at": "2026-09-20T06:11:00Z",
+        "publication_date": "2026-09-18T00:00:00+05:30",
+        "event_date": "2026-09-18T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "titan20_c1_business_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "The latest Q1 FY27 results are directionally mixed on the sequential basis used by the structured provider: consolidated total income was Rs 21,502 crore versus Rs 27,104 crore in March 2026 (down 20.67% QoQ), while net profit was Rs 1,777 crore versus Rs 1,179 crore (up 50.72% QoQ). Year on year, total income rose from Rs 16,628 crore and net profit from Rs 1,091 crore. The evidence is verified, but a single positive or negative direction is not independently established across the component inputs.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "titan20_s2_q1_official",
+          "titan20_s3_q1_mint"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan20_c2_valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Independent September 2026 references consistently show Titan trading at a substantial premium to sector or peer benchmarks, including P/E around 71-77x versus peer or industry benchmarks around 23-44x and elevated P/B and EV/EBITDA. This independently supports a negative valuation-risk direction. If the structured provider's frozen formula produces a positive valuation score from different or distorted sector inputs, that disagreement must be surfaced rather than overwritten.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "titan20_s4_understock",
+          "titan20_s5_flashfinance"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan20_c3_institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "The latest filed June 2026 ownership snapshot is mixed: promoter holding stayed at 52.90%, FII/FPI holding decreased from 15.65% to 15.39%, and mutual-fund holding increased from 8.45% to 8.73%. This verifies the ownership facts but does not establish a single institutional direction.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "titan20_s6_shareholding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan20_c4_news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Fresh issuer disclosures through 18 September 2026 show shareholder approval and grant under the 2026 performance-stock-unit scheme, reaffirmed CARE AAA Stable/A1+ ratings, and full redemption of Rs 1,000 crore of commercial paper. These are current governance/credit events and do not independently establish a bullish or bearish five-day catalyst.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "titan20_s1_corp",
+          "titan20_s7_postal",
+          "titan20_s8_rating",
+          "titan20_s9_cp",
+          "titan20_s10_psu"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      },
+      {
+        "claim_id": "titan20_c5_event_shock",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Across the fresh Titan issuer disclosures reviewed through 18 September 2026, no independently verified company-specific adverse event shock was identified. This is an event-risk validation only; live market and volatility evidence remains the structured provider's responsibility.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "titan20_s1_corp",
+          "titan20_s7_postal",
+          "titan20_s8_rating",
+          "titan20_s9_cp",
+          "titan20_s10_psu"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true,
+        "conflict_note": null
+      }
+    ],
+    "conflicts": [],
+    "limitations": [
+      "Q1 FY27 results are event-dated 7 August 2026 and are used only as the latest reported business-fundamentals evidence, not as a September catalyst.",
+      "The business-fundamentals claim explicitly separates sequential and year-on-year bases; it does not convert mixed evidence into a directional score.",
+      "The institutional claim uses the latest filed quarter ended 30 June 2026 and is not a live fund-flow measure.",
+      "Valuation benchmarks differ by source; the independent conclusion is limited to the consistent evidence of a premium, while the frozen engine remains the calculation authority for the structured provider score.",
+      "This bundle contains no manually created EDGE score, DES, Market Trust, BOT, probability, Decision Ladder, price zone, or recommendation.",
+      "Any provider-versus-research disagreement must remain visible under research reconciliation and may be excluded or fail closed according to materiality."
+    ]
+  }
+}
