@@ -334,6 +334,42 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const master = masterRows[0] as Record<string, unknown>;
   const stock = stockRows[0] as Record<string, unknown>;
   const active = activeRows[0] as Record<string, unknown>;
+  const parentRecommendationId = isNonEmptyString(active.parent_recommendation_id)
+    ? String(active.parent_recommendation_id)
+    : null;
+  let previousRecommendation: Record<string, unknown> | null = null;
+  if (parentRecommendationId) {
+    const previousRows = await sql`
+      select r.recommendation_id,r.run_timestamp,r.definitive_forecast,r.definitive_recommendation,
+             r.expected_price_zone_low,r.expected_price_zone_high,
+             l.status as lifecycle_status,l.expiry_trading_date,
+             p.current_price,p.current_return_pct,p.outcome_verdict,p.last_assessed_at
+        from recommendations r
+        left join recommendation_lifecycle l using (recommendation_id)
+        left join recommendation_performance p using (recommendation_id)
+       where r.recommendation_id = ${parentRecommendationId}
+       limit 1
+    `;
+    if (previousRows.length) {
+      const previous = previousRows[0] as Record<string, unknown>;
+      previousRecommendation = {
+        recommendation_id: String(previous.recommendation_id),
+        run_timestamp: previous.run_timestamp ?? null,
+        definitive_forecast: previous.definitive_forecast ?? null,
+        definitive_recommendation: previous.definitive_recommendation ?? null,
+        expected_price_zone: {
+          low: numberOrNull(previous.expected_price_zone_low),
+          high: numberOrNull(previous.expected_price_zone_high),
+        },
+        lifecycle_status: previous.lifecycle_status ?? null,
+        expiry_trading_date: previous.expiry_trading_date ?? null,
+        current_price: numberOrNull(previous.current_price),
+        current_return_pct: numberOrNull(previous.current_return_pct),
+        outcome_verdict: previous.outcome_verdict ?? 'OPEN',
+        last_assessed_at: previous.last_assessed_at ?? null,
+      };
+    }
+  }
   const componentRows = await sql`
     select component, raw_score, evidence_quality, availability_status, conflict_flag, notes
       from component_scores
@@ -480,6 +516,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         provisional_zone_misses: integerOrZero(stock.provisional_zone_misses),
         provisional_zone_accuracy_pct: numberOrNull(stock.provisional_zone_accuracy_pct),
         latest_checkpoint_observed_at: stock.latest_checkpoint_observed_at ?? null,
+        previous_recommendation: previousRecommendation,
       }
     },
     active_calls: allActiveRows.map((row: Record<string, unknown>) => ({
