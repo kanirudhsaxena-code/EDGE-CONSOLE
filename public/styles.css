@@ -308,6 +308,7 @@ html,body{max-width:100%;overflow-x:hidden}
 .edge-user-head h3{margin:2px 0 0;font-size:var(--fs-lg);line-height:1.25;color:var(--ink)}
 .edge-user-head p{margin:0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5}
 .edge-result-hero{display:grid;gap:5px}
+.edge-result-hero .result-kicker{font-size:var(--fs-sm);font-weight:800;letter-spacing:0;color:var(--ink)}
 .edge-result-hero h2{margin:0;font-size:var(--fs-xl);line-height:1.15;color:var(--ink);overflow-wrap:anywhere}
 .edge-result-hero p{margin:0;color:var(--text-soft);font-size:var(--fs-sm);line-height:1.5;overflow-wrap:anywhere}
 .edge-result-hero h3{margin:0;font-size:var(--fs-lg);line-height:1.2;color:var(--ink)}
