@@ -241,7 +241,7 @@ export function renderEdgeV13(report){
     return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(componentDisplayName(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(outcome)+'</span></div>'+
       '<div class="edge-explanation-block"><span>FINDING</span><p>'+esc(finding)+'</p></div>'+
       '<div class="edge-explanation-block"><span>WHY IT MATTERS</span><p>'+esc(meaning)+'</p></div>'+
-      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span><small><b>Outcome:</b> '+esc(outcome)+'</small></div></div>';
+      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span></div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
   const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>3 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
