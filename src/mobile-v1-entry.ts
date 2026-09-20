@@ -161,7 +161,7 @@ async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:
   const gate=assessAutomatedMarketEvidence(body,requestId);
   if(gate.errors.length)return json({error:'Automated market evidence validation failed',details:gate.errors},422);
   const sql=neon(env.DATABASE_URL);
-  const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+  const rows=await sql`select status,run_id,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
   if(!rows.length)return json({error:'request_id not found'},404);
   if(['COMPLETED','CANCELLED'].includes(String(rows[0].status)))return json({error:'request is not eligible for automated evidence callback'},409);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
@@ -394,6 +394,25 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
   const status=String(rows[0].status);
   const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
   const stage=String(metadata.adapter_stage??'');
+
+  if(status==='COMPLETED'){
+    const runId=rows[0].run_id?String(rows[0].run_id):null;
+    const runRows=runId?await sql`select published,learning_eligible from analysis_runs where run_id=${runId} and engine='5DR' limit 1`:[];
+    const completion=isObject(metadata.completion)?metadata.completion:{};
+    const actor=isObject(metadata.actor)?metadata.actor:{};
+    const sandbox=completion.sandbox===true||actor.role==='TESTER';
+    return json({
+      ok:true,
+      request_id:requestId,
+      status:'COMPLETED',
+      adapter_stage:stage||'COMPLETED',
+      run_id:runId,
+      published:runRows.length?runRows[0].published===true:false,
+      learning_eligible:runRows.length?runRows[0].learning_eligible===true:false,
+      sandbox,
+      idempotent:true
+    });
+  }
 
   if(status==='PROCESSING'){
     const dispatch=isObject(metadata.engine_dispatch)?metadata.engine_dispatch:{};
