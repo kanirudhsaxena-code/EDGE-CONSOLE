@@ -76,7 +76,7 @@ Current production-candidate Console checkpoint before release:
 - `e03df9955ebc9256a17d70ff4eb8303baf6be66a`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-final`
 
 Cutover change:
 - set `APP_ENV=production`.
