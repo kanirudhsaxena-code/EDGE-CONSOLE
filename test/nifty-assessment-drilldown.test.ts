@@ -26,3 +26,13 @@ test('empty current D+1 to D+5 slots fail closed instead of inventing forecast r
   assert.ok(app.includes('<b>Not verified</b>'));
   assert.ok(app.includes('Only evidence-supported ranges are shown.'));
 });
+
+
+test('pending historical forecasts and current five-day forecast are collapsed by default',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  assert.ok(app.includes('<details class="pending-forecast-block pending-forecast-details">'));
+  assert.ok(app.includes('function currentForecastDrilldown(result)'));
+  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — day-wise direction & range</summary>'));
+  assert.ok(!app.includes('<details class="pending-forecast-block pending-forecast-details" open>'));
+  assert.ok(!app.includes('<details class="current-forecast-details" open>'));
+});
