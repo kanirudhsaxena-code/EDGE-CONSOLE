@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {normalizeIntelligenceJudgment,validateIntelligenceJudgment,type IntelligenceJudgment} from '../src/intelligence-producer';
+import {INTELLIGENCE_FALLBACK_MODEL,INTELLIGENCE_MODEL,normalizeIntelligenceJudgment,produceIntelligence,validateIntelligenceJudgment,type IntelligenceJudgment} from '../src/intelligence-producer';
 
 const judgment:IntelligenceJudgment={
   verification:'VERIFIED',source_refs:['evidence:1','https://www.nseindia.com/api/marketStatus'],regime:'TREND',
@@ -57,4 +57,29 @@ test('day-wise forecast path remains required even when trade execution is weak'
   const result=validateIntelligenceJudgment(weak,new Set(judgment.source_refs));
   assert.ok(result.judgment);
   assert.equal(result.judgment?.horizon_slots['D+5'].direction,'RANGE');
+});
+
+
+test('falls back to secondary governed model only when primary inference throws',async()=>{
+  const calls:string[]=[];
+  const ai={
+    run:async(model:string)=>{
+      calls.push(model);
+      if(model===INTELLIGENCE_MODEL)throw new Error('capacity unavailable');
+      return {response:JSON.stringify(judgment)};
+    }
+  };
+  const result=await produceIntelligence(ai,{demo:true},new Set(judgment.source_refs));
+  assert.equal(result.model,INTELLIGENCE_FALLBACK_MODEL);
+  assert.ok(result.judgment);
+  assert.equal(result.errors.length,0);
+  assert.deepEqual(calls,[INTELLIGENCE_MODEL,INTELLIGENCE_FALLBACK_MODEL]);
+});
+
+test('remains fail closed if primary and fallback inference are both unavailable',async()=>{
+  const ai={run:async()=>{throw new Error('capacity unavailable')}};
+  const result=await produceIntelligence(ai,{demo:true},new Set(judgment.source_refs));
+  assert.equal(result.judgment,null);
+  assert.equal(result.normalized,null);
+  assert.ok(result.errors[0].includes('all governed intelligence inference models unavailable'));
 });
