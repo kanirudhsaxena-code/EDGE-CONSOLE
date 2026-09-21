@@ -9,7 +9,19 @@ test('EDGE NIFTY automatically resumes every governed active stage',()=>{
   assert.ok(app.includes("autoResumableStages"));
   assert.ok(app.includes("if(shouldAutoResume)"));
   assert.ok(app.includes("if(active)setTimeout(()=>loadDashboard(),5000)"));
+  assert.ok(app.includes("PUBLICATION_SYNC_PENDING"));
+  assert.ok(app.includes("requestIsNewerThanPublished"));
+  assert.ok(app.includes("publicationPending"));
   assert.ok(!app.includes("if(active&&latestReq.status==='PROCESSING')"));
+});
+
+test('EDGE NIFTY fresh invocation is explicit and never aliases a prior request',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const mobile=readFileSync('src/mobile-v1-entry.ts','utf8');
+  assert.ok(app.includes("force_new:true,client_invocation_id:crypto.randomUUID()"));
+  assert.ok(mobile.includes("const requestId=`5drreq_${crypto.randomUUID()}`"));
+  assert.ok(mobile.includes("const batchId=`auto_${crypto.randomUUID()}`"));
+  assert.ok(mobile.includes("invocation:{force_new:forceNew"));
 });
 
 test('EDGE NIFTY and EDGE Stocks expose run timestamps in the user view',()=>{
