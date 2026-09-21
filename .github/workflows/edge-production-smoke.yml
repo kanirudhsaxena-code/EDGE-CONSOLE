@@ -60,7 +60,7 @@ jobs:
           grep -Fq 'fetchExactNiftyRequest' /tmp/app.js
           ! grep -Fq 'Continue EDGE NIFTY' /tmp/app.js
           grep -Fq 'Drill down — day-wise forecast, range & outcomes' /tmp/app.js
-          grep -Fq 'Pending runs do not change accuracy or P/L until canonical selection' /tmp/app.js
+          grep -Fq 'Matured eligible' /tmp/app.js
           grep -Fq 'No evidence-supported day-specific direction/range was stored for this slot.' /tmp/app.js
           grep -Fq '5-day forecast — day-wise direction & range' /tmp/app.js
           grep -Fq 'pending-forecast-details' /tmp/app.js
