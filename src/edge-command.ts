@@ -31,6 +31,8 @@ export async function dispatchEdgeWorkflow(
   ticker: string,
   holdingState = 'UNKNOWN',
   researchBundleId?: string,
+  canonicalRequestedAt?: string,
+  canonicalAttemptSlot?: string,
 ): Promise<EdgeDispatchResult> {
   if (!token.trim()) return { ok: false, status: 503, error: 'EDGE dispatch credential is not configured' };
   const response = await fetch(
@@ -50,6 +52,8 @@ export async function dispatchEdgeWorkflow(
           ticker,
           holding_state: holdingState,
           ...(researchBundleId ? { research_bundle_id: researchBundleId } : {}),
+          ...(canonicalRequestedAt ? { canonical_requested_at: canonicalRequestedAt } : {}),
+          ...(canonicalAttemptSlot ? { canonical_attempt_slot: canonicalAttemptSlot } : {}),
         },
       }),
     },
