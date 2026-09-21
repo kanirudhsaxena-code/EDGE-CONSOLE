@@ -18,5 +18,5 @@ test('EDGE NIFTY and EDGE Stocks expose run timestamps in the user view',()=>{
   assert.ok(app.includes('Run started: '));
   assert.ok(app.includes('Run date/time: '));
   assert.ok(edge.includes('Run date/time: '));
-  assert.ok(edge.includes('Call date:'));
+  assert.ok(edge.includes('Call date/time:'));
 });
