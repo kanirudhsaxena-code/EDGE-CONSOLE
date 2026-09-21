@@ -295,8 +295,16 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const baseline = await latestEdgeRecommendation(env, ticker);
   const baselineRunId = baseline?.id ?? null;
   const dispatchedAt = new Date().toISOString();
+  const canonicalRequestedAt = canonicalAttempt
+    ? (typeof body.canonical_requested_at === 'string' && !Number.isNaN(Date.parse(body.canonical_requested_at))
+        ? new Date(body.canonical_requested_at).toISOString()
+        : dispatchedAt)
+    : undefined;
 
-  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId);
+  const dispatch = await dispatchEdgeWorkflow(
+    env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
+    canonicalRequestedAt, canonicalAttemptSlot ?? undefined
+  );
   if (!dispatch.ok) {
     return json({
       error: 'EDGE autonomous dispatch failed',
@@ -322,6 +330,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     reused_output: false,
     canonical_attempt: canonicalAttempt,
     canonical_attempt_slot: canonicalAttemptSlot,
+    canonical_requested_at: canonicalRequestedAt ?? null,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
   }, 202);
