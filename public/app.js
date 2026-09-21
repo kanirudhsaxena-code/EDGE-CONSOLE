@@ -540,7 +540,7 @@ if(edgeCommandForm){
       if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
       if(d.ticker)localStorage.setItem('edge-console-selected-stock',d.ticker);if(d.status==='ALREADY_PUBLISHED_TODAY'){
         edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+d.run_id+' · loading canonical V1.2 result…';
+        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+runDateTime(d.run_timestamp)+' · '+d.run_id+' · loading current result…';
         window.refreshEdgeLive?window.refreshEdgeLive():window.location.reload();
         return;
       }
