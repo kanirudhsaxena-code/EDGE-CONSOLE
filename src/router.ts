@@ -223,8 +223,9 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
   const ticker = resolved.ticker;
 
+  const forceNew = body.force_new === true;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
-  if (existingToday && !isObject(body.research_bundle)) {
+  if (existingToday && !forceNew && !isObject(body.research_bundle)) {
     return json({
       ok: true,
       status: 'ALREADY_PUBLISHED_TODAY',
