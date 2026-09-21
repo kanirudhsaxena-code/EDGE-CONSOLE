@@ -25,15 +25,5 @@ jobs:
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Sync EDGE GitHub dispatch secret
-        run: printf '%s' "$EDGE_GITHUB_TOKEN" | npx wrangler secret put EDGE_GITHUB_TOKEN
-        env:
-          EDGE_GITHUB_TOKEN: ${{ secrets.EDGE_GITHUB_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-      - name: Sync 5DR GitHub dispatch secret
-        run: printf '%s' "$EDGE_GITHUB_TOKEN" | npx wrangler secret put GITHUB_ACTIONS_TOKEN
-        env:
-          EDGE_GITHUB_TOKEN: ${{ secrets.EDGE_GITHUB_TOKEN }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      - name: Note preserved runtime secrets
+        run: echo "Existing Cloudflare Worker secrets are preserved across deploys; no secret rewrite is required."
