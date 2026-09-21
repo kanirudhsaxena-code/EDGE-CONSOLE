@@ -352,7 +352,7 @@ function renderAssessmentDetails(details,pending){
     const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
     maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>These rows affect the accuracy and return statistics above.</small></div>','<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'].join('')
   }
-  return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div><div class="assessment-drill-section"><div class="step-label">Current forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
+  return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div><div class="assessment-drill-section"><div class="step-label">Legacy canonical forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
 }
 function renderAssessment(container,payload){
   if(!container)return;
@@ -360,7 +360,7 @@ function renderAssessment(container,payload){
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
   const canonical=summary.canonical||null,f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending run'+(pendingCount===1?'':'s')+'</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
     canonicalAssessmentContext(canonical),
     '<div class="assessment-grid">',
       '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
