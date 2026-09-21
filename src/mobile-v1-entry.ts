@@ -513,10 +513,10 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
   if(stage==='SCREENSHOTS_READY'||stage==='AUTONOMOUS_EVIDENCE_BLOCKED'){
     const vision=await shadowVision(env,requestId);
     if(!vision.ok)return vision;
-    const research=await systemResearch(env,requestId);
-    if(!research.ok)return research;
-    return reconcileIntelligence(request,env,requestId);
+    return systemResearch(env,requestId);
   }
+
+  if(stage==='VISION_READY')return systemResearch(env,requestId);
 
   return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
