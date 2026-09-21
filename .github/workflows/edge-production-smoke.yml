@@ -48,12 +48,12 @@ jobs:
           BASE='https://edge-console.k-anirudhsaxena.workers.dev'
           AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
           curl --location --fail --silent --show-error -D /tmp/ui-headers.txt "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/?ui=edge-v2-20260920" -o /tmp/index.html
-          grep -q 'edge-live.js?v=edge-ui-v11-20260921' /tmp/index.html
-          grep -q 'styles.css?v=edge-ui-v11-20260921' /tmp/index.html
+          grep -q 'edge-live.js?v=edge-ui-v12-20260921' /tmp/index.html
+          grep -q 'styles.css?v=edge-ui-v12-20260921' /tmp/index.html
           grep -q 'EDGE NIFTY' /tmp/index.html
           grep -q 'Run EDGE NIFTY' /tmp/index.html
-          grep -q 'app.js?v=edge-ui-v11-20260921' /tmp/index.html
-          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/app.js?v=edge-ui-v11-20260921" -o /tmp/app.js
+          grep -q 'app.js?v=edge-ui-v12-20260921' /tmp/index.html
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/app.js?v=edge-ui-v12-20260921" -o /tmp/app.js
           grep -Fq 'body:JSON.stringify({command,force_new:true})' /tmp/app.js
           grep -Fq 'force_new:true,client_invocation_id:crypto.randomUUID()' /tmp/app.js
           grep -Fq 'ACTIVE_NIFTY_REQUEST_KEY' /tmp/app.js
@@ -62,6 +62,9 @@ jobs:
           grep -Fq 'Drill down — day-wise forecast, range & outcomes' /tmp/app.js
           grep -Fq 'Fresh published forecasts appear as pending immediately' /tmp/app.js
           grep -Fq 'No evidence-supported day-specific direction/range was stored for this slot.' /tmp/app.js
+          grep -Fq '5-day forecast — day-wise direction & range' /tmp/app.js
+          grep -Fq 'pending-forecast-details' /tmp/app.js
+          grep -Fq 'current-forecast-details' /tmp/app.js
           grep -qi '^cache-control:.*no-store' /tmp/ui-headers.txt
           ! grep -q 'automated-5dr-v1-20260919' /tmp/index.html
 
