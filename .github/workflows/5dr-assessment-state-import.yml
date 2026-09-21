@@ -26,21 +26,18 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Fetch, validate and import canonical assessment
+      - name: Fetch and validate canonical assessment state
         run: |
           set -euo pipefail
-          test -n "$CF_ACCESS_CLIENT_ID"
-          test -n "$CF_ACCESS_CLIENT_SECRET"
+          curl --fail-with-body --silent --show-error \
+            -H 'Accept: application/json' \
+            -H 'Cache-Control: no-cache' \
+            "$HANDOFF_URL" -o /tmp/5dr-assessment-handoff.json
           python - <<'PY'
-          import json, os, time, urllib.request, urllib.error
+          import json
           from datetime import datetime, timezone
 
-          handoff_req=urllib.request.Request(
-              os.environ["HANDOFF_URL"],
-              headers={"Accept":"application/json","Cache-Control":"no-cache"},
-          )
-          with urllib.request.urlopen(handoff_req,timeout=30) as response:
-              handoff=json.loads(response.read().decode("utf-8"))
+          handoff=json.load(open('/tmp/5dr-assessment-handoff.json',encoding='utf-8'))
           if handoff.get("schema_version")!="5DR_ASSESSMENT_HANDOFF_V1":
               raise SystemExit(f"ASSESSMENT_HANDOFF_SCHEMA_MISMATCH {handoff.get('schema_version')}")
           generated=handoff.get("generated_at")
@@ -53,33 +50,35 @@ jobs:
           assessment=handoff.get("assessment")
           if not isinstance(assessment,dict) or assessment.get("engine")!="5DR":
               raise SystemExit("ASSESSMENT_HANDOFF_INVALID_PAYLOAD")
-
-          headers={
-              "Content-Type":"application/json",
-              "Accept":"application/json",
-              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
-              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
-          }
-          url=os.environ["CONSOLE_URL"].rstrip("/")+"/api/5dr/assessment-import"
-          payload=json.dumps(assessment).encode("utf-8")
-          last_error=None
-          for attempt in range(1,13):
-              req=urllib.request.Request(url,data=payload,headers=headers,method="POST")
-              try:
-                  with urllib.request.urlopen(req,timeout=30) as response:
-                      body=response.read().decode("utf-8")
-                      print(f"assessment_import_status={response.status} attempt={attempt}")
-                      print(body)
-                      if response.status in (200,201):
-                          last_error=None
-                          break
-                      last_error=f"unexpected_status={response.status}"
-              except urllib.error.HTTPError as exc:
-                  body=exc.read().decode("utf-8","replace")
-                  last_error=f"HTTP_{exc.code} {body[:300]}"
-                  print(f"assessment_import_wait attempt={attempt} error={last_error}")
-              if attempt < 12:
-                  time.sleep(10)
-          if last_error:
-              raise SystemExit("ASSESSMENT_IMPORT_FAILED_AFTER_RETRIES "+last_error)
+          with open('/tmp/5dr-assessment-import.json','w',encoding='utf-8') as out:
+              json.dump(assessment,out,separators=(',',':'))
+          print("assessment_handoff_valid")
           PY
+      - name: Import canonical assessment through governed 5DR route
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          last_code=""
+          for attempt in $(seq 1 12); do
+            code="$(curl --location --silent --show-error \
+              -o /tmp/assessment-import-response.json -w '%{http_code}' \
+              -X POST \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H 'Content-Type: application/json' \
+              -H 'Accept: application/json' \
+              -H 'Cache-Control: no-cache' \
+              --data-binary @/tmp/5dr-assessment-import.json \
+              "$CONSOLE_URL/api/5dr/assessment-import")"
+            echo "assessment_import_status=$code attempt=$attempt"
+            cat /tmp/assessment-import-response.json || true
+            echo
+            if [ "$code" = "200" ] || [ "$code" = "201" ]; then
+              exit 0
+            fi
+            last_code="$code"
+            if [ "$attempt" -lt 12 ]; then sleep 10; fi
+          done
+          echo "ASSESSMENT_IMPORT_FAILED_AFTER_RETRIES http=$last_code"
+          exit 1
