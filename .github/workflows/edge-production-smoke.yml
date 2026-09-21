@@ -71,6 +71,22 @@ jobs:
           assert d.get('fresh_web_research_required') is True, d
           PY
 
+      - name: Prove today's LTF result loads from ticker-only Console command
+        run: |
+          set -euo pipefail
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="$(curl --location --silent --show-error -o /tmp/ltf-existing.json -w '%{http_code}'             "${AUTH[@]}" -H 'content-type: application/json'             -X POST --data '{"command":"EDGE LTF"}'             "$BASE/api/edge-stocks/invoke")"
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/ltf-existing.json'))
+          assert d.get('status')=='ALREADY_PUBLISHED_TODAY', d
+          assert d.get('ticker')=='LTF', d
+          assert d.get('run_id'), d
+          assert d.get('run_timestamp'), d
+          PY
+
       - name: Prove ticker-only EDGE invocation fails closed
         run: |
           set -euo pipefail
