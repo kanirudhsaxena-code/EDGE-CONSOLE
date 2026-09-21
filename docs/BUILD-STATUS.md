@@ -1,6 +1,6 @@
 # EDGE Console — Build Status
 
-Last updated: 20 September 2026
+Last updated: 21 September 2026
 
 ## Production priority
 
@@ -14,7 +14,7 @@ These deferred items must not block the 5DR + EDGE Stocks production cutover.
 
 ## 5DR
 
-Status: **PRODUCTION CANDIDATE — OPEN-MARKET GO GATE PENDING**
+Status: **PRODUCTION / GO — OPEN-MARKET GATE PASSED**
 
 Completed:
 - canonical 5DR V2.2.3 specification release-bound;
@@ -28,10 +28,12 @@ Completed:
 - Console CI, deployment, smoke and automated production acceptance are green on 20 September 2026;
 - 5DR CI and read-only Upstox verification are green.
 
-Remaining GO gate:
-- one real NSE open-session zero-upload run must reach terminal COMPLETED without fallback/fabrication;
-- sandbox acceptance must remain unpublished and Learning-Lab-ineligible;
-- no methodology, scoring, DES/tradeability, output semantics or Learning Lab governance may change during cutover.
+Production proof:
+- pre-cutover real NSE open-session zero-upload acceptance run `35563847508` passed;
+- post-cutover real NSE open-session zero-upload acceptance run `35568275080` passed with `acceptance_mode=FULL_LIVE_E2E`;
+- post-cutover sandbox request `5drreq_443c8973-3830-4625-8895-f3b1915de6a6` completed as run `5drrun_36600cf6-faa2-4e19-ba2d-51f0a1d18fca`;
+- sandbox boundary held: unpublished and Learning-Lab-ineligible;
+- no methodology, scoring, DES/tradeability, output semantics or Learning Lab governance changed during cutover.
 
 5DR engine checkpoint:
 - `ad2afc81e3fcaee86e9f647abcce1ec8d138ceeb`
@@ -48,9 +50,9 @@ Canonical production contract:
 
 Required user-facing order:
 1. EDGE MASTER ASSESSMENT
-2. ACTIVE CALLS
-3. CURRENT STOCK OUTCOME
-4. DRILL-DOWN
+2. CURRENT STOCK OUTCOME
+3. DRILL-DOWN
+4. ACTIVE CALLS
 
 Production validation includes:
 - canonical V1.3 renderer;
@@ -66,30 +68,42 @@ Production validation includes:
 - trading execution disabled.
 
 Current EDGE engine checkpoint:
-- `7152858f1d6eded9090fcd0d49459848e699e775`
+- `d1d8f3d531a5e4f59b1e1a9b36ce0fea7ed45d56`
+
+Latest production LTF proof:
+- autonomous publish run `35568242052` passed on 21 September 2026;
+- recommendation `EDGE-LTF-20260921-062352-AUTO` published;
+- forecast: `BASE_RANGE`;
+- probabilities: Bull 34.241%, Base 64.146%, Bear 1.613%;
+- Market Trust: 91/100, VERY HIGH;
+- expected D+5 zone: ₹305.20–₹320.40;
+- definitive recommendation: NO TRADE; NO OPTION TRADE;
+- trading execution remains disabled.
 
 The stale supersession PR was closed because V1.3/Efficacy V2 is already canonical on `main`.
 
 ## Console / cutover
 
-Current production-candidate Console checkpoint before release:
-- `05316789d21aa938c37f4b7caaceff7d322b92ac`
+Production Console checkpoint:
+- `3f8024897b6be7f3306462838ee3cd2234c42eea`
 
-Production cutover branch:
-- `release/5dr-edge-production-go-live-v7`
-
-Cutover change:
-- set `APP_ENV=production`.
+Production cutover:
+- PR #76 merged to `main`;
+- `APP_ENV=production` verified;
+- deployment run `35568226911` passed;
+- EDGE production smoke run `35568226877` rerun passed;
+- Console CI run `35568227008` passed.
 
 Identity mode remains `AUDIT` for this release. Multi-user enforcement is a separate, explicitly deferred workstream and must not be mixed into the 5DR + EDGE Stocks release.
 
-## GO / NO-GO rule
+## Production lock
 
-Merge the production cutover only after:
-1. EDGE production smoke remains green;
-2. the next NSE open-session 5DR automated acceptance passes;
-3. the 5DR run shows no fabricated/stale evidence and no unexpected fallback;
-4. production deployment succeeds after cutover;
-5. post-cutover EDGE smoke and 5DR health are green.
+All release gates passed on 21 September 2026:
+1. production deployment passed;
+2. EDGE production smoke passed after deployment;
+3. post-cutover real NSE open-session EDGE NIFTY/5DR zero-upload acceptance passed;
+4. sandbox publish/Learning-Lab boundaries held;
+5. fresh LTF autonomous publish passed on the fixed EDGE engine;
+6. `APP_ENV=production` is active.
 
-If any gate fails, keep the release unmerged or roll back to the pre-cutover Console checkpoint above. Do not weaken fail-closed behavior to obtain a green result.
+Production remains fail-closed. Trading execution remains disabled. Future methodology, scoring, recommendation-semantics or Learning Lab changes require explicit governance rather than being folded into production maintenance.
