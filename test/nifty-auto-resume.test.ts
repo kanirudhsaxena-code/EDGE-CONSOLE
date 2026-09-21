@@ -43,3 +43,16 @@ test('EDGE NIFTY and EDGE Stocks expose run timestamps in the user view',()=>{
   assert.ok(edge.includes('Run date/time: '));
   assert.ok(edge.includes('Call date/time:'));
 });
+
+
+test('EDGE NIFTY checkpoints system research before intelligence reconciliation',()=>{
+  const mobile=readFileSync('src/mobile-v1-entry.ts','utf8');
+  const app=readFileSync('public/app.js','utf8');
+  assert.ok(mobile.includes("adapter_stage:nextStage"));
+  assert.ok(mobile.includes("nextStage=allReady?'RESEARCH_RETRIEVED'"));
+  assert.ok(mobile.includes("if(stage==='RESEARCH_RETRIEVED')return reconcileIntelligence"));
+  assert.ok(mobile.includes("existingResearch.status==='RESEARCH_RETRIEVED'"));
+  assert.ok(app.includes("RESEARCH_RETRIEVED"));
+  assert.ok(mobile.includes("if(stage==='VISION_READY')return systemResearch"));
+  assert.ok(!mobile.includes("if(!research.ok)return research;\n    return reconcileIntelligence(request,env,requestId);"));
+});

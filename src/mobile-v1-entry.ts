@@ -264,8 +264,9 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   const acquisition=await acquireSystemResearch();
   const allReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
   const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',...acquisition};
-  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record})}::jsonb,updated_at=now() where request_id=${requestId}`;
-  return json({ok:allReady,request_id:requestId,system_research:record,next_step:allReady?'RESEARCH_INTERPRETATION':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
+  const nextStage=allReady?'RESEARCH_RETRIEVED':String(metadata.adapter_stage??'');
+  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record,adapter_stage:nextStage})}::jsonb,updated_at=now() where request_id=${requestId}`;
+  return json({ok:allReady,request_id:requestId,adapter_stage:nextStage,system_research:record,next_step:allReady?'RECONCILE_INTELLIGENCE':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
 }
 
 function numericValue(value:unknown):number|null{
@@ -483,10 +484,16 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
   }
   if(stage==='AUTOMATED_MARKET_DATA_BLOCKED')return json({ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,next_step:'USE_SCREENSHOT_BACKUP'},409);
   if(stage==='AUTOMATED_MARKET_DATA_READY'){
-    const research=await systemResearch(env,requestId);
-    if(!research.ok)return research;
-    return reconcileIntelligence(request,env,requestId);
+    const existingResearch=isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:{};
+    if(existingResearch.status==='RESEARCH_RETRIEVED'){
+      const checkpointed={...metadata,adapter_stage:'RESEARCH_RETRIEVED'};
+      await sql`update analysis_requests set metadata=${JSON.stringify(checkpointed)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({ok:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'RESEARCH_RETRIEVED',system_research:existingResearch,next_step:'RECONCILE_INTELLIGENCE',idempotent:true});
+    }
+    return systemResearch(env,requestId);
   }
+
+  if(stage==='RESEARCH_RETRIEVED')return reconcileIntelligence(request,env,requestId);
 
   if(stage==='NORMALIZED_READY')return dispatchNormalizedReady(env,requestId,request.url);
 
@@ -506,10 +513,10 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
   if(stage==='SCREENSHOTS_READY'||stage==='AUTONOMOUS_EVIDENCE_BLOCKED'){
     const vision=await shadowVision(env,requestId);
     if(!vision.ok)return vision;
-    const research=await systemResearch(env,requestId);
-    if(!research.ok)return research;
-    return reconcileIntelligence(request,env,requestId);
+    return systemResearch(env,requestId);
   }
+
+  if(stage==='VISION_READY')return systemResearch(env,requestId);
 
   return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
