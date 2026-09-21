@@ -289,12 +289,20 @@ document.addEventListener('click',event=>{const toggle=event.target.closest&&eve
 function pct(v){return v==null?'—':Number(v).toFixed(Number(v)%1?1:0)+'%'}
 function assessmentDayCell(label,day,zone,rec){
   const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{},r=rec&&typeof rec==='object'?rec:{};
-  const status=String(d.status||'').toUpperCase(),forecastDue=status!=='NOT DUE'&&Number(d.scorable||0)>0;
-  const hits=Number(d.hits||0),scorable=Number(d.scorable||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
+  const status=String(d.status||'').toUpperCase(),eligible=Number(d.eligible_matured??0),scorable=Number(d.scorable||0),missing=Number(d.missing_unscorable??Math.max(eligible-scorable,0));
+  const hits=Number(d.hits||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
   const dirPct=d.hit_rate_pct!=null?Number(d.hit_rate_pct):scorable?hits/scorable*100:null;
   const zonePct=z.zone_hit_rate_pct!=null?Number(z.zone_hit_rate_pct):(d.zone_hit_rate_pct!=null?Number(d.zone_hit_rate_pct):(zoneScorable?zoneHits/zoneScorable*100:null));
+  const coverage=d.coverage_pct!=null?Number(d.coverage_pct):(eligible?scorable/eligible*100:null);
   const resolved=Number(r.resolved||0),recHits=Number(r.hits||0),recMisses=Number(r.misses||0),recPct=r.hit_rate_pct!=null?Number(r.hit_rate_pct):(resolved?recHits/resolved*100:null);
-  const forecastHtml=forecastDue?'<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits</small></div>':'<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
+  let forecastHtml='';
+  if(eligible===0){
+    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
+  }else if(scorable===0){
+    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen day-path context missing</small></div>';
+  }else{
+    forecastHtml='<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' scorable</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+(missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen day-path context missing</small></div>':'');
+  }
   const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
   return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
@@ -337,17 +345,17 @@ function renderAssessment(container,payload){
   if(!container)return;
   const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[],pending=payload&&Array.isArray(payload.pending_forecasts)?payload.pending_forecasts:[];
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
-  const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},matured=Number(summary.matured_runs||0),pendingCount=Number(summary.pending_forecasts??pending.length??0);
+  const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured canonical checkpoint'+(matured===1?'':'s')+' · '+pendingCount+' pending run'+(pendingCount===1?'':'s')+'</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending run'+(pendingCount===1?'':'s')+'</small></div>',
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' matured canonical checkpoints</small></div>',
+      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
       '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' wins / '+escapeHtml(r.total||0)+' resolved canonical recommendations</small></div>',
       '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Canonical actionable calls only</small></div>',
       '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful canonical calls</small></div>',
       '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful canonical calls</small></div>',
     '</div>',
-    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns remain visible for audit and revision analysis, but they do not increase forecast, recommendation or return denominators.</p><p>Pending runs do not change accuracy or P/L until canonical selection and governed outcomes become scorable.</p></div>',
+    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns do not increase denominators.</p><p><strong>Matured eligible</strong> means the D+n trading date has passed. <strong>Scorable</strong> additionally requires the original frozen day-wise forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently unscorable because legacy frozen context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
     '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
