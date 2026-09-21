@@ -54,6 +54,9 @@ Required user-facing order:
 
 Production validation includes:
 - canonical V1.3 renderer;
+- market-metric visual v7: user-facing Direction strength, Evidence confidence and Trade setup strength moved into Today’s Market View; raw DES5/Market Trust/Execution Edge removed from Advanced Details;
+- EDGE Stocks paired highlight cards standardized: same 16px value size/weight for Range-bound and Expected 5-Day Range, no forced blank card height, tighter spacing to the probability row;
+- UI asset version edge-ui-v7-20260921 with Worker-first no-store delivery;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +73,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `05316789d21aa938c37f4b7caaceff7d322b92ac`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v7`
 
 Cutover change:
 - set `APP_ENV=production`.
