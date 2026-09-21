@@ -6,7 +6,7 @@ test('5DR assessment separates matured efficacy from pending published forecasts
   const source=readFileSync('src/index.ts','utf8');
   assert.ok(source.includes('pending_forecasts'));
   assert.ok(source.includes("not exists (select 1 from outcome_assessments oa where oa.run_id=ar.run_id)"));
-  assert.ok(source.includes('matured_runs:forecastTotal'));
+  assert.ok(source.includes('matured_runs:forecastEligible'));
   assert.ok(source.includes('assessment_as_of:row.assessed_at'));
 });
 
@@ -48,12 +48,12 @@ test('pending detection does not disappear when assessment timestamp is newer th
 test('5DR assessment labels official canonical population rather than run count',()=>{
   const app=readFileSync('public/app.js','utf8');
   const source=readFileSync('src/index.ts','utf8');
-  assert.ok(app.includes('matured canonical checkpoints'));
+  assert.ok(app.includes('matured eligible'));
   assert.ok(app.includes('resolved canonical recommendations'));
   assert.ok(app.includes('one selected DAILY_CANONICAL forecast per target trading date'));
   assert.ok(app.includes('Canonical actionable calls only'));
   assert.ok(source.includes("population_rule:String(overall.population_rule??rec.population_rule??'SELECTED_DAILY_CANONICAL_ONLY')"));
-  assert.ok(source.includes("population:'MATURED_CANONICAL_CHECKPOINTS'"));
+  assert.ok(source.includes("population:'SCORABLE_MATURED_CANONICAL_CHECKPOINTS'"));
   assert.ok(source.includes("population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS'"));
 });
 
@@ -69,4 +69,16 @@ test('NIFTY current 5-day forecast is hidden inside full analysis and uses stand
   assert.ok(css.includes('.current-forecast-details summary'));
   assert.ok(css.includes('.assessment-drill-section>.step-label'));
   assert.ok(css.includes('font-size:10px!important'));
+});
+
+
+test('5DR assessment exposes matured eligible versus scorable coverage',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const source=readFileSync('src/index.ts','utf8');
+  assert.ok(app.includes('matured eligible'));
+  assert.ok(app.includes('Matured · not scorable'));
+  assert.ok(app.includes('matured unscorable'));
+  assert.ok(source.includes('matured_eligible_checkpoints:forecastEligible'));
+  assert.ok(source.includes('missing_unscorable_checkpoints:forecastMissing'));
+  assert.ok(source.includes('scorable_coverage_pct:forecastCoverage'));
 });
