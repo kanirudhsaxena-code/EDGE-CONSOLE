@@ -8,6 +8,8 @@ test('EDGE invoke loads an existing governed autonomous result from today before
   const required=source.indexOf("Fresh ChatGPT research bundle is mandatory before EDGE dispatch");
   assert.ok(today>0);
   assert.ok(required>today);
+  assert.ok(source.includes("const forceNew = body.force_new === true"));
+  assert.ok(source.includes("if (existingToday && !forceNew && !isObject(body.research_bundle))"));
   assert.ok(source.includes("status: 'ALREADY_PUBLISHED_TODAY'"));
   assert.ok(source.includes('run_timestamp: existingToday.runTimestamp'));
 });
