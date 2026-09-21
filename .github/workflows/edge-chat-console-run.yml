@@ -49,8 +49,10 @@ jobs:
           d=json.load(open(sys.argv[1],encoding='utf-8'))
           module=str(d['module']).upper()
           capture_only=bool(d.get('capture_only'))
+          resume_existing=module=='EDGE_NIFTY' and bool(d.get('resume_existing'))
           print('CAPTURE_MODULE='+shlex.quote(module))
           print('CAPTURE_ONLY='+('true' if capture_only else 'false'))
+          print('RESUME_EXISTING='+('true' if resume_existing else 'false'))
           if capture_only:
               if module=='EDGE_NIFTY':
                   rid=str(d.get('request_id') or '').strip()
@@ -62,6 +64,10 @@ jobs:
                   print('CAPTURE_TICKER='+shlex.quote(ticker))
               expected=str(d.get('expected_result_id') or '').strip()
               if expected: print('EXPECTED_RESULT_ID='+shlex.quote(expected))
+          elif resume_existing:
+              rid=str(d.get('request_id') or '').strip()
+              assert rid,d
+              print('CAPTURE_REQUEST_ID='+shlex.quote(rid))
           elif module=='EDGE_NIFTY':
               assessment=d.get('assessment') or {
                   'objective':'BOTH',
@@ -90,17 +96,18 @@ jobs:
           if [ "$CAPTURE_ONLY" = "true" ]; then
             echo "Capture-only mode: using existing canonical Console result."
           elif [ "$CAPTURE_MODULE" = "EDGE_NIFTY" ]; then
-            code="$(curl --location --silent --show-error \
-              -X POST \
-              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-              -H "Content-Type: application/json" \
-              --data-binary @/tmp/invoke.json \
-              "$CONSOLE_URL/api/5dr/automated-runs" \
-              -o /tmp/start.json -w '%{http_code}')"
-            cat /tmp/start.json
-            test "$code" = "201"
-            python - <<'PY' > /tmp/nifty.env
+            if [ "$RESUME_EXISTING" != "true" ]; then
+              code="$(curl --location --silent --show-error \
+                -X POST \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H "Content-Type: application/json" \
+                --data-binary @/tmp/invoke.json \
+                "$CONSOLE_URL/api/5dr/automated-runs" \
+                -o /tmp/start.json -w '%{http_code}')"
+              cat /tmp/start.json
+              test "$code" = "201"
+              python - <<'PY' > /tmp/nifty.env
           import json
           d=json.load(open('/tmp/start.json'))
           assert d.get('ok') is True and d.get('sandbox') is False,d
@@ -108,37 +115,72 @@ jobs:
           assert rid,d
           print('CAPTURE_REQUEST_ID='+rid)
           PY
-            cat /tmp/nifty.env >> "$GITHUB_ENV"
-            source /tmp/nifty.env
-            for attempt in $(seq 1 75); do
-              curl --location --silent --show-error \
+              cat /tmp/nifty.env >> "$GITHUB_ENV"
+              source /tmp/nifty.env
+            else
+              echo "Resuming existing canonical EDGE NIFTY request $CAPTURE_REQUEST_ID"
+            fi
+
+            for attempt in $(seq 1 30); do
+              resume_code="$(curl --location --silent --show-error --max-time 720 \
                 -X POST \
                 -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
                 -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
                 -H "Content-Type: application/json" \
                 --data '{}' \
                 "$CONSOLE_URL/api/5dr/run-requests/$CAPTURE_REQUEST_ID/resume-processing" \
-                -o /tmp/status.json
+                -o /tmp/resume.json -w '%{http_code}' || true)"
+              echo "resume_http=$resume_code"
+
+              read_ok=false
+              for read_attempt in 1 2 3; do
+                if curl --location --fail-with-body --silent --show-error \
+                  -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                  -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                  "$CONSOLE_URL/api/5dr/run-requests/$CAPTURE_REQUEST_ID" \
+                  -o /tmp/status.json; then
+                  if python -m json.tool /tmp/status.json >/dev/null 2>&1; then
+                    read_ok=true
+                    break
+                  fi
+                fi
+                sleep 3
+              done
+              test "$read_ok" = "true"
+
               terminal="$(python - <<'PY'
           import json
           d=json.load(open('/tmp/status.json'))
-          s=str(d.get('status',''))
-          print(s)
+          req=d.get('request') or {}
+          run=d.get('run') or {}
+          status=str(req.get('status') or '')
+          print(status)
+          if status=='COMPLETED':
+              assert run.get('published') is True,d
+              assert run.get('run_id'),d
           PY
           )"
+              stage="$(python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          req=d.get('request') or {}
+          meta=req.get('metadata') or {}
+          print(str(meta.get('adapter_stage') or ''))
+          PY
+          )"
+              echo "canonical_status=$terminal adapter_stage=$stage"
               if [ "$terminal" = "COMPLETED" ]; then break; fi
               if [ "$terminal" = "FAILED" ]; then cat /tmp/status.json; exit 1; fi
-              sleep 8
+              sleep 5
             done
-            curl --location --fail-with-body --silent --show-error \
-              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-              "$CONSOLE_URL/api/5dr/run-requests/$CAPTURE_REQUEST_ID" \
-              -o /tmp/final.json
+
+            cp /tmp/status.json /tmp/final.json
             python - <<'PY' >> "$GITHUB_ENV"
           import json
           d=json.load(open('/tmp/final.json'))
+          req=d.get('request') or {}
           run=d.get('run') or {}
+          assert req.get('status')=='COMPLETED',d
           assert run.get('published') is True,d
           assert run.get('run_id'),d
           print('EXPECTED_RESULT_ID='+str(run['run_id']))
