@@ -640,3 +640,63 @@ html,body{max-width:100%;overflow-x:hidden}
   }
   .edge-highlight-card{min-height:146px!important}
 }
+
+
+/* NIFTY market metrics + Stocks paired highlights v7 */
+.nifty-signal-grid{
+  display:grid;
+  grid-template-columns:repeat(3,minmax(0,1fr));
+  gap:8px;
+  width:100%;
+  margin:10px 0 8px;
+}
+.nifty-signal-grid .decision-card{
+  min-width:0;
+  height:100%;
+}
+.edge-decision-highlights{
+  gap:8px!important;
+  margin:0!important;
+  align-items:stretch!important;
+}
+.edge-decision-highlights .edge-highlight-card{
+  min-height:0!important;
+  height:auto!important;
+  padding:12px!important;
+  gap:5px!important;
+}
+.edge-decision-highlights .edge-highlight-card span{
+  min-height:0!important;
+  margin:0!important;
+}
+.edge-decision-highlights .edge-highlight-card strong,
+.edge-decision-highlights .edge-highlight-card.range strong{
+  font-size:16px!important;
+  line-height:1.25!important;
+  font-weight:800!important;
+  margin:0!important;
+  letter-spacing:0!important;
+}
+.edge-decision-highlights .edge-highlight-card.range strong{
+  white-space:nowrap!important;
+  font-variant-numeric:tabular-nums;
+}
+.edge-decision-highlights .edge-highlight-card small{
+  margin-top:4px!important;
+}
+.edge-user-probabilities{
+  margin:8px 0 10px!important;
+}
+@media(max-width:600px){
+  .nifty-signal-grid{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+    gap:8px;
+  }
+  .nifty-signal-grid .decision-card:last-child{
+    grid-column:1/-1;
+  }
+  .edge-decision-highlights .edge-highlight-card strong,
+  .edge-decision-highlights .edge-highlight-card.range strong{
+    font-size:16px!important;
+  }
+}
