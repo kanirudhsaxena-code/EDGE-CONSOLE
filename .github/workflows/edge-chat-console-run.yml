@@ -1,0 +1,227 @@
+name: EDGE Chat · Console-rendered Production Run
+
+on:
+  push:
+    branches:
+      - 'chat-edge-*'
+    paths:
+      - 'requests/chat-run/*.json'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve governed chat request
+        id: req
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^requests/chat-run/[^/]+\.json$' | head -1)"
+          test -n "$FILE"
+          python - "$FILE" <<'PY'
+          import json,sys
+          p=sys.argv[1]
+          d=json.load(open(p,encoding='utf-8'))
+          module=str(d.get('module','')).upper()
+          assert module in {'EDGE_NIFTY','EDGE_STOCKS'}, d
+          print(module)
+          PY
+          echo "file=$FILE" >> "$GITHUB_OUTPUT"
+
+      - name: Run governed EDGE request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - "${{ steps.req.outputs.file }}" > /tmp/request.env <<'PY'
+          import json,sys,shlex
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
+          module=str(d['module']).upper()
+          capture_only=bool(d.get('capture_only'))
+          print('CAPTURE_MODULE='+shlex.quote(module))
+          print('CAPTURE_ONLY='+('true' if capture_only else 'false'))
+          if capture_only:
+              if module=='EDGE_NIFTY':
+                  rid=str(d.get('request_id') or '').strip()
+                  assert rid,d
+                  print('CAPTURE_REQUEST_ID='+shlex.quote(rid))
+              else:
+                  ticker=str(d.get('ticker') or '').strip().upper()
+                  assert ticker,d
+                  print('CAPTURE_TICKER='+shlex.quote(ticker))
+              expected=str(d.get('expected_result_id') or '').strip()
+              if expected: print('EXPECTED_RESULT_ID='+shlex.quote(expected))
+          elif module=='EDGE_NIFTY':
+              assessment=d.get('assessment') or {
+                  'objective':'BOTH',
+                  'risk_posture':'CONSERVATIVE',
+                  'capital_priority':'CAPITAL_PROTECTION'
+              }
+              payload={
+                  'sandbox':False,
+                  'force_new':True,
+                  'client_invocation_id':d.get('client_invocation_id') or 'chat-edge-nifty',
+                  'assessment':assessment
+              }
+              open('/tmp/invoke.json','w').write(json.dumps(payload))
+          else:
+              assert isinstance(d.get('command'),str) and d['command'].upper().startswith('EDGE '), d
+              bundle=d.get('research_bundle')
+              assert isinstance(bundle,dict), d
+              payload={'command':d['command'],'force_new':True,'research_bundle':bundle}
+              open('/tmp/invoke.json','w').write(json.dumps(payload))
+          PY
+          cat /tmp/request.env >> "$GITHUB_ENV"
+
+          if [ "$CAPTURE_ONLY" = "true" ]; then
+            echo "Capture-only mode: using existing canonical Console result."
+          elif [ "$CAPTURE_MODULE" = "EDGE_NIFTY" ]; then
+            code="$(curl --location --silent --show-error \
+              -X POST \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @/tmp/invoke.json \
+              "$CONSOLE_URL/api/5dr/automated-runs" \
+              -o /tmp/start.json -w '%{http_code}')"
+            cat /tmp/start.json
+            test "$code" = "201"
+            python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          d=json.load(open('/tmp/start.json'))
+          assert d.get('ok') is True and d.get('sandbox') is False,d
+          rid=(d.get('request') or {}).get('request_id')
+          assert rid,d
+          print('CAPTURE_REQUEST_ID='+rid)
+          PY
+            for attempt in $(seq 1 75); do
+              curl --location --silent --show-error \
+                -X POST \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H "Content-Type: application/json" \
+                --data '{}' \
+                "$CONSOLE_URL/api/5dr/run-requests/$CAPTURE_REQUEST_ID/resume-processing" \
+                -o /tmp/status.json
+              terminal="$(python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          s=str(d.get('status',''))
+          print(s)
+          PY
+          )"
+              if [ "$terminal" = "COMPLETED" ]; then break; fi
+              if [ "$terminal" = "FAILED" ]; then cat /tmp/status.json; exit 1; fi
+              sleep 8
+            done
+            curl --location --fail-with-body --silent --show-error \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              "$CONSOLE_URL/api/5dr/run-requests/$CAPTURE_REQUEST_ID" \
+              -o /tmp/final.json
+            python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          d=json.load(open('/tmp/final.json'))
+          run=d.get('run') or {}
+          assert run.get('published') is True,d
+          assert run.get('run_id'),d
+          print('EXPECTED_RESULT_ID='+str(run['run_id']))
+          PY
+          else
+            curl --location --fail-with-body --silent --show-error \
+              -X POST \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H "Content-Type: application/json" \
+              --data-binary @/tmp/invoke.json \
+              "$CONSOLE_URL/api/edge-stocks/invoke" \
+              -o /tmp/start.json
+            cat /tmp/start.json
+            python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          d=json.load(open('/tmp/start.json'))
+          assert d.get('ok') is True,d
+          assert d.get('status')=='DISPATCHED',d
+          assert d.get('ticker'),d
+          assert d.get('next'),d
+          print('CAPTURE_TICKER='+str(d['ticker']))
+          print('EDGE_STATUS_URL='+str(d['next']))
+          PY
+            for attempt in $(seq 1 48); do
+              curl --location --fail-with-body --silent --show-error \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                "$CONSOLE_URL$EDGE_STATUS_URL" \
+                -o /tmp/status.json
+              state="$(python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          print(str(d.get('status','')))
+          PY
+          )"
+              if [ "$state" = "COMPLETE" ]; then break; fi
+              if [ "$state" = "FAILED" ]; then cat /tmp/status.json; exit 1; fi
+              sleep 5
+            done
+            python - <<'PY' >> "$GITHUB_ENV"
+          import json
+          d=json.load(open('/tmp/status.json'))
+          assert d.get('status')=='COMPLETE',d
+          rid=d.get('recommendation_id') or d.get('new_recommendation_id')
+          if rid: print('EXPECTED_RESULT_ID='+str(rid))
+          PY
+          fi
+
+      - name: Capture live Console presentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --no-save --no-package-lock playwright-core@1.55.0
+          export CHROME_BIN="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || command -v chromium-browser)"
+          node scripts/capture-console-presentation.mjs > /tmp/chat-presentation.txt
+          test -s /tmp/chat-presentation.txt
+          echo "EDGE_CHAT_PRESENTATION_BEGIN"
+          cat /tmp/chat-presentation.txt
+          echo "EDGE_CHAT_PRESENTATION_END"
+
+      - name: Enforce Console-only presentation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          text=open('/tmp/chat-presentation.txt',encoding='utf-8').read()
+          module=os.environ['CAPTURE_MODULE']
+          if module=='EDGE_NIFTY':
+              required=['EDGE NIFTY','ASSESSMENT · TILL DATE','Today’s Market View']
+          else:
+              required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — CURRENT STOCK OUTCOME','3 — DRILL-DOWN','4 — ACTIVE CALLS']
+          missing=[x for x in required if x not in text]
+          assert not missing, {'missing_console_sections':missing}
+          print('CHAT_PRESENTATION_SOURCE=LIVE_EDGE_CONSOLE')
+          print('CHAT_PRESENTATION_VALID=TRUE')
+          PY
+
+      - name: Preserve Console presentation
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: edge-chat-console-presentation
+          path: |
+            /tmp/chat-presentation.txt
+            /tmp/start.json
+            /tmp/status.json
+            /tmp/final.json
+          retention-days: 30
+          if-no-files-found: ignore
