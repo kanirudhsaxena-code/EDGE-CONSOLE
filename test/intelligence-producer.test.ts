@@ -12,7 +12,13 @@ const judgment:IntelligenceJudgment={
   },
   market_trust_inputs:{price_confirmation:70,pvpo_confirmation:65,participation_confirmation:55,cross_engine_consistency:65,closing_confirmation:70,evidence_freshness_completeness:90},
   event_shock:'LOW',execution_inputs:{rr_score:80,premium_iv_theta_score:70,strike_expiry_fit_score:75,liquidity_spread_score:85,entry_invalidation_score:75},
-  data_adequate:true,expected_rr:2.5,horizon_slots:{'D+1':{},'D+2':{},'D+3':{},'D+4':{},'D+5':{}},limitations:[]
+  data_adequate:true,expected_rr:2.5,horizon_slots:{
+    'D+1':{direction:'BULLISH',probability:58,zone_low:23000,zone_high:23300,basis:'Price structure'},
+    'D+2':{direction:'BULLISH',probability:57,zone_low:22950,zone_high:23400,basis:'Price structure'},
+    'D+3':{direction:'RANGE',probability:55,zone_low:22900,zone_high:23450,basis:'Mixed confirmation'},
+    'D+4':{direction:'RANGE',probability:54,zone_low:22850,zone_high:23500,basis:'Mixed confirmation'},
+    'D+5':{direction:'RANGE',probability:53,zone_low:22800,zone_high:23550,basis:'Wider uncertainty'}
+  },limitations:[]
 };
 
 test('deterministically applies frozen internal directional weights',()=>{
@@ -36,4 +42,19 @@ test('rejects unavailable judgment that claims adequate data',()=>{
   const result=validateIntelligenceJudgment({...judgment,verification:'UNAVAILABLE',data_adequate:true},new Set(judgment.source_refs));
   assert.equal(result.judgment,null);
   assert.ok(result.errors.some(error=>error.includes('data_adequate')));
+});
+
+
+test('rejects publishable judgments with empty D+1 to D+5 forecast slots',()=>{
+  const empty={...judgment,horizon_slots:{'D+1':{},'D+2':{},'D+3':{},'D+4':{},'D+5':{}}};
+  const result=validateIntelligenceJudgment(empty,new Set(judgment.source_refs));
+  assert.equal(result.judgment,null);
+  assert.ok(result.errors.some(error=>error.includes('D+1')));
+});
+
+test('day-wise forecast path remains required even when trade execution is weak',()=>{
+  const weak={...judgment,data_adequate:false,expected_rr:0,execution_inputs:{rr_score:0,premium_iv_theta_score:0,strike_expiry_fit_score:0,liquidity_spread_score:0,entry_invalidation_score:0}};
+  const result=validateIntelligenceJudgment(weak,new Set(judgment.source_refs));
+  assert.ok(result.judgment);
+  assert.equal(result.judgment?.horizon_slots['D+5'].direction,'RANGE');
 });
