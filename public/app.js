@@ -313,10 +313,16 @@ function pendingForecastDayCell(label,slot){
 function renderPendingForecasts(pending){
   const rows=Array.isArray(pending)?pending:[];
   if(!rows.length)return '<div class="scorecard-context"><p>No published forecasts are currently waiting for future assessment checkpoints.</p></div>';
-  return rows.slice(0,3).map(run=>{
+  return rows.slice(0,5).map(run=>{
     const probs=run.probabilities||{},slots=run.horizon_slots||{},labels=['D+1','D+2','D+3','D+4','D+5'];
-    return '<div class="pending-forecast-block"><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This run is not included in accuracy until its governed checkpoints mature.</small></div><div class="scorecard-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></div>'
+    const title=(run.generated_at?runDateTime(run.generated_at):run.run_id||'Pending forecast')+' · '+friendlyDirection(run.directional_label);
+    return '<details class="pending-forecast-block pending-forecast-details"><summary>'+escapeHtml(title)+'</summary><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This run is not included in accuracy until its governed checkpoints mature.</small></div><div class="scorecard-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></details>'
   }).join('')
+}
+function currentForecastDrilldown(result){
+  const slots=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots:{},labels=['D+1','D+2','D+3','D+4','D+5'];
+  const populated=labels.filter(label=>slots[label]&&typeof slots[label]==='object'&&Object.keys(slots[label]).length>0).length;
+  return '<details class="current-forecast-details"><summary>5-day forecast — day-wise direction & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>Direction and expected range/zone are shown for each trading-session horizon. Unverified fields are never guessed.</p></div><div class="scorecard-days current-forecast-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></details>'
 }
 function renderAssessmentDetails(details,pending){
   const labels=['D+1','D+2','D+3','D+4','D+5'];
@@ -503,6 +509,7 @@ function render5dr(run,request,outcomeAssessment){
       '</div>',
       '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
       '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
+      currentForecastDrilldown(result),
       '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
       '<div class="analysis-detail" data-analysis-detail hidden>',
       '<details class="why-details" open><summary>Why this view?</summary>',
