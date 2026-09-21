@@ -11,6 +11,16 @@ function escapeHtml(v){return String(v??'').replaceAll('&','&amp;').replaceAll('
 function friendlyEngineStatus(status){const map={EVIDENCE_GATE_READY:'Ready',ACTIVE:'Ready',FOUNDATION:'Setup in progress',INTEGRATION_PENDING:'Setup in progress',READY:'Ready'};return map[String(status)]||String(status||'Status unavailable').replaceAll('_',' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
 function friendlyDirection(value){const map={BULL:'Bullish',BEAR:'Bearish',RANGE:'Range-bound'};return map[String(value)]||String(value||'—')}
 function confidenceLabel(value){const n=Number(value);if(!Number.isFinite(n))return'Unavailable';if(n>=75)return'High';if(n>=50)return'Moderate';return'Low'}
+function directionStrengthSummary(value){
+  const n=Number(value);if(!Number.isFinite(n))return{value:'Unavailable',detail:'Directional evidence could not be measured.'};
+  const a=Math.abs(n),strength=a>=60?'Strong':a>=30?'Moderate':'Weak',lean=n>0?'bullish':n<0?'bearish':'neutral';
+  return{value:strength+' · '+n.toFixed(1),detail:'How strongly the evidence leans '+lean+'. Scores below 30 are not strong enough for the direction gate.'}
+}
+function tradeSetupStrengthSummary(value){
+  const n=Number(value);if(!Number.isFinite(n))return{value:'Unavailable',detail:'Trade setup quality could not be measured.'};
+  const label=n>=80?'Strong':n>=65?'Trade-ready':n>=45?'Moderate':'Weak';
+  return{value:label+' · '+n.toFixed(0)+'/100',detail:'How usable the entry, stop, target and reward/risk setup is. 65/100 is the current execution gate.'}
+}
 function blockerText(code){const map={DATA_INADEQUATE:'Not enough reliable evidence',MARKET_TRUST_LT_50:'Market confidence is too low',DES5_LT_30:'Directional strength is too weak',EXECUTION_EDGE_LT_65:'Trade setup quality is too weak',RR_LT_2:'Potential reward is not high enough for the risk',EVENT_KILL_SWITCH:'A major event-risk safeguard is active'};return map[String(code)]||String(code||'').replaceAll('_',' ').toLowerCase()}
 function friendlyFailureMessage(raw){
   const text=String(raw||'').toLowerCase();
@@ -420,6 +430,7 @@ function render5dr(run,request,outcomeAssessment){
   const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},components=normalized.component_scores||{},trust=normalized.market_trust_inputs||{},execution=normalized.execution_inputs||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
   fiveDrState.textContent='Result ready';
   const action=tradeable?'A trade setup currently meets the EDGE NIFTY gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
+  const directionStrength=directionStrengthSummary(result.des5),tradeSetupStrength=tradeSetupStrengthSummary(result.execution_edge);
   const why=governedWhy(meta,normalized,result);
   const changes=userChangeConditions(why,normalized,result);
   const blockersPlain=blockers.map(blockerText);
@@ -428,9 +439,14 @@ function render5dr(run,request,outcomeAssessment){
       '<div class="result-kicker">Today’s Market View</div>',
       '<h2>'+escapeHtml(direction)+'</h2>',
       '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
+      '<div class="nifty-signal-grid">',
+        '<div class="decision-card"><span>Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>How reliable and internally consistent the evidence is for this market view.</small></div>',
+        '<div class="decision-card"><span>Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
+      '</div>',
       '<div class="decision-grid">',
-        '<div class="decision-card"><span>Confidence</span><strong>'+escapeHtml(confidence)+'</strong><small>'+escapeHtml(result.market_trust??'—')+'/100</small></div>',
         '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'Current gates passed':'Current gates are not met')+'</small></div>',
+        '<div class="decision-card"><span>Market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
       '</div>',
       '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
       '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
@@ -449,9 +465,6 @@ function render5dr(run,request,outcomeAssessment){
       '<details class="change-details"><summary>What could change the view?</summary><p class="change-intro">These are the market developments that would actually make the current assessment stronger, weaker or tradeable:</p><ul>'+changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></details>',
       '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. This forecast will be scored after its D+1 to D+5 outcomes are available. That scorecard measures forecast/recommendation performance; it is separate from the run assessment above.')+'</p></details>',
       '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
-        '<div><span>DES5</span><strong>'+escapeHtml(result.des5??'—')+'</strong></div>',
-        '<div><span>Market Trust</span><strong>'+escapeHtml(result.market_trust??'—')+' · '+escapeHtml(result.market_trust_band||'—')+'</strong></div>',
-        '<div><span>Execution Edge</span><strong>'+escapeHtml(result.execution_edge??'—')+'</strong></div>',
         '<div><span>Framework</span><strong>'+escapeHtml(run.framework_version)+'</strong></div>',
         '<div><span>Run ID</span><strong>'+escapeHtml(run.run_id)+'</strong></div>',
         '<div><span>Source mode</span><strong>'+escapeHtml(run.provenance_mode)+'</strong></div>',
