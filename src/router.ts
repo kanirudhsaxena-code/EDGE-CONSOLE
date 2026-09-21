@@ -696,6 +696,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const effectiveConviction = Math.min(Math.abs(des) / 100, 1) * (marketTrust / 100);
   const overrideCode = active.active_override == null ? null : String(active.active_override);
 
+  const canonicalRows = await sql`
+    select canonical_key,target_trading_date,forecast_horizon,selection_status,canonical_type,
+           selected_recommendation_id,selected_at,selection_reason
+      from edge_canonical_selections
+     where ticker = ${symbol}
+     order by target_trading_date desc, selected_at desc
+     limit 1
+  `;
+  const canonical = canonicalRows.length ? canonicalRows[0] as Record<string, unknown> : null;
+
   const payload = {
     contract_version: 'EDGE_STOCKS_V1_3',
     presentation_contract: 'EFFICACY_V2',
@@ -704,6 +714,21 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    canonical_governance: canonical ? {
+      canonical_key: canonical.canonical_key,
+      target_trading_date: canonical.target_trading_date,
+      forecast_horizon: canonical.forecast_horizon,
+      selection_status: canonical.selection_status,
+      canonical_type: canonical.canonical_type,
+      selected_recommendation_id: canonical.selected_recommendation_id,
+      selected_at: canonical.selected_at,
+      selection_reason: canonical.selection_reason,
+      current_run_is_selected: String(canonical.selected_recommendation_id ?? '') === String(active.recommendation_id),
+    } : {
+      selection_status: 'NOT_AVAILABLE',
+      canonical_type: 'NOT_AVAILABLE',
+      current_run_is_selected: false,
+    },
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',
