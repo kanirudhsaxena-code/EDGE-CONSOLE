@@ -545,3 +545,105 @@ html,body{max-width:100%;overflow-x:hidden}
   .module-name,.why-card>strong,.stock-factor-head>strong,.edge-drill-head>strong,.active-call-card strong{font-size:16px!important}
   .result-copy,.edge-user-head p,.why-card p,.edge-explanation-block p,.stock-section-copy,.edge-user-metric small,.assessment-metric small,.decision-card small,.execution-metric small,.execution-support-grid small,.execution-detail-grid small,.active-call-card small,.change-details li,.change-intro,.scorecard-context p{font-size:12px!important}
 }
+
+
+/* Unified direction + probability standard v6 — EDGE NIFTY + EDGE Stocks */
+:root{
+  --ui-direction-size:28px;
+  --ui-prob-label-size:12px;
+  --ui-prob-value-size:18px;
+  --ui-prob-box-height:86px;
+  --ui-prob-gap:10px;
+}
+.simple-result>h2,
+.edge-highlight-card.direction strong{
+  font-size:var(--ui-direction-size)!important;
+  line-height:1.08!important;
+  font-weight:800!important;
+  letter-spacing:0!important;
+  color:var(--ui-heading)!important;
+  margin:0!important;
+}
+.edge-highlight-card.range strong{
+  font-size:22px!important;
+  line-height:1.15!important;
+  font-weight:800!important;
+  letter-spacing:0!important;
+  color:var(--ui-heading)!important;
+  font-variant-numeric:tabular-nums;
+}
+.probability-line,
+.edge-user-probabilities{
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  gap:var(--ui-prob-gap)!important;
+  width:100%!important;
+  margin:14px 0!important;
+  align-items:stretch!important;
+}
+.probability-line span,
+.edge-user-probabilities span{
+  min-width:0!important;
+  min-height:var(--ui-prob-box-height)!important;
+  padding:12px 8px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:7px!important;
+  border-radius:14px!important;
+  text-align:center!important;
+  font-size:var(--ui-prob-label-size)!important;
+  line-height:1.2!important;
+  font-weight:500!important;
+  color:var(--ui-muted)!important;
+  overflow-wrap:anywhere!important;
+}
+.probability-line strong,
+.edge-user-probabilities strong{
+  display:block!important;
+  margin:0!important;
+  font-size:var(--ui-prob-value-size)!important;
+  line-height:1.1!important;
+  font-weight:800!important;
+  letter-spacing:0!important;
+  font-variant-numeric:tabular-nums;
+}
+.edge-decision-highlights{
+  align-items:stretch!important;
+}
+.edge-highlight-card{
+  min-height:150px!important;
+  padding:14px!important;
+  gap:8px!important;
+}
+.edge-highlight-card span{
+  min-height:30px;
+  display:flex;
+  align-items:flex-start;
+}
+@media(max-width:600px){
+  :root{
+    --ui-direction-size:24px;
+    --ui-prob-label-size:12px;
+    --ui-prob-value-size:18px;
+    --ui-prob-box-height:88px;
+    --ui-prob-gap:8px;
+  }
+  .probability-line,
+  .edge-user-probabilities{
+    grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  }
+  .probability-line span,
+  .edge-user-probabilities span{
+    padding:10px 6px!important;
+    min-height:var(--ui-prob-box-height)!important;
+  }
+  .edge-highlight-card{
+    min-height:154px!important;
+    padding:12px!important;
+  }
+  .edge-highlight-card.range strong{
+    font-size:20px!important;
+  }
+}
