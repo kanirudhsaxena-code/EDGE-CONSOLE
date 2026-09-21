@@ -46,6 +46,15 @@ try{
     if(expectedId){
       await page.waitForFunction(id=>document.body.textContent?.includes(id),expectedId,{timeout:30000}).catch(()=>{});
     }
+    await page.evaluate(()=>{
+      const summary=document.querySelector('#fiveDrSummary');
+      if(!summary)return;
+      const detail=summary.querySelector('[data-analysis-detail]');
+      if(detail)detail.hidden=false;
+      summary.querySelectorAll('details').forEach(node=>{ node.open=true; });
+      const toggle=summary.querySelector('[data-analysis-toggle]');
+      if(toggle)toggle.textContent='Hide full analysis';
+    });
     const parts=await page.evaluate(()=>{
       const eyebrow=document.querySelector('#selectedModuleEyebrow')?.textContent?.trim()||'';
       const title=document.querySelector('#selectedModuleTitle')?.textContent?.trim()||'';
