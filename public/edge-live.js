@@ -195,13 +195,19 @@ export function renderEdgeV13(report){
   const zoneHits=Number(stock.provisional_zone_hits??0);
   const zoneScorable=Number(stock.provisional_zone_scorable??0);
   const official=Number(stock.official_scorable_recommendations??0);
+  const gov=r.canonical_governance||{};
+  const govType=human(gov.canonical_type||'Not available');
+  const govTarget=gov.target_trading_date?new Date(String(gov.target_trading_date)).toLocaleDateString('en-IN'):'—';
+  const govSelected=gov.current_run_is_selected===true;
+  const govMissed=String(gov.canonical_type||'').toUpperCase()==='CANONICAL_MISSED'||String(gov.selection_status||'').toUpperCase()==='CANONICAL_MISSED';
+  const canonicalCard='<div class="scorecard-context canonical-status-card"><span>Official canonical status</span><strong>'+esc(govType)+' · '+esc(govTarget)+'</strong><p>'+(govMissed?'No qualifying canonical was selected for this target. The displayed stock call remains informational/tracked and does not create a new official efficacy observation.':(govSelected?'This displayed recommendation is the selected canonical for its target key and is eligible for official efficacy when mature.':'The displayed run is not the selected canonical for the latest governed target; it does not add to official efficacy.'))+'</p></div>';
 
   const previousCard=previous
     ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Move since that earlier call: '+esc(pct(previous.current_return_pct))+(String(previous.outcome_verdict||previous.lifecycle_status||'').toUpperCase()==='OPEN'?' · still provisional':'') )+'</small></div></div>'
     : '<div class="edge-previous-call single"><div><span>Previous call</span><strong>None yet</strong><small>This stock does not yet have an earlier EDGE call to compare.</small></div></div>';
 
   const section1='<section class="edge-user-section" data-edge-section="master-assessment">'+
-    '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Past calls are checked against what actually happened. More completed checks make the performance record more meaningful.</p></div>'+
+    '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Only selected canonical recommendations enter official efficacy. Operational reruns remain visible for audit but cannot inflate the sample.</p></div>'+
     previousCard+
     '<div class="edge-key-grid">'+
       metricCard('Early forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' direction checks were correct so far. This remains provisional until the calls mature.'):'No completed forecast checks yet.')+
@@ -219,6 +225,7 @@ export function renderEdgeV13(report){
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
     '<div class="edge-result-hero"><div class="result-kicker">2 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
+    canonicalCard+
     '<div class="edge-decision-highlights">'+
       '<div class="edge-highlight-card direction"><span>5-DAY DIRECTION</span><strong>'+esc(userForecastLabel(d.definitive_forecast))+'</strong><small>Current price '+money(d.current_price)+'</small></div>'+
       '<div class="edge-highlight-card range"><span>EXPECTED 5-DAY RANGE</span><strong>'+esc(d.expected_price_zone?.low==null&&d.expected_price_zone?.high==null?'—':money(d.expected_price_zone?.low)+' – '+money(d.expected_price_zone?.high))+'</strong><small>Expected trading area over D+5; this is not a guaranteed target.</small></div>'+
