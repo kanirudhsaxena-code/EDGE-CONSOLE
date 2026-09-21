@@ -2,6 +2,10 @@ name: 5DR Canonical Handoff State
 
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/5dr-canonical-handoff-state.yml'
   schedule:
     - cron: '0,15,30,45 3-11 * * 1-5'
 
