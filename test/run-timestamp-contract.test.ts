@@ -14,6 +14,19 @@ test('EDGE invoke loads an existing governed autonomous result from today before
   assert.ok(source.includes('run_timestamp: existingToday.runTimestamp'));
 });
 
+test('Console buttons explicitly request fresh runs and reject output reuse',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const router=readFileSync('src/router.ts','utf8');
+  const mobile=readFileSync('src/mobile-v1-entry.ts','utf8');
+  assert.ok(app.includes("body:JSON.stringify({command,force_new:true})"));
+  assert.ok(app.includes("force_new:true,client_invocation_id:crypto.randomUUID()"));
+  assert.ok(app.includes('Fresh EDGE run was requested, but the server attempted to reuse an earlier result'));
+  assert.ok(router.includes('latestFreshEdgeResearchBundle'));
+  assert.ok(router.includes('fresh_run: true'));
+  assert.ok(router.includes('reused_output: false'));
+  assert.ok(mobile.includes('fresh_run:true,reused_output:false'));
+});
+
 test('EDGE Stocks report timestamp is the recommendation run timestamp, not page-open time',()=>{
   const source=readFileSync('src/router.ts','utf8');
   assert.ok(source.includes("generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString()"));
