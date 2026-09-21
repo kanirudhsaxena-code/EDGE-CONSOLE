@@ -207,6 +207,42 @@ async function fiveDrCanonicalHandoff(env: Env): Promise<Response> {
   });
 }
 
+
+async function fiveDrAssessmentImport(request: Request, env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
+  let body: unknown;
+  try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
+  if (
+    !isObject(body) || String(body.engine || '') !== '5DR' ||
+    !isNonEmptyString(body.forecast_id) || !isNonEmptyString(body.assessed_at) ||
+    !isObject(body.metrics)
+  ) return json({ error: 'Invalid assessment import payload' }, 422);
+
+  const sql = neon(env.DATABASE_URL);
+  const sourceId = String(body.forecast_id);
+  const assessedAt = String(body.assessed_at);
+  const existing = await sql`
+    select id
+      from assessment_rollups
+     where engine='5DR'
+       and source_id=${sourceId}
+       and assessed_at=${assessedAt}::timestamptz
+     limit 1
+  `;
+  if (existing.length) return json({ ok: true, duplicate: true, source_id: sourceId });
+
+  await sql`
+    insert into assessment_rollups (engine,source_id,assessed_at,headline,score,metrics)
+    values (
+      '5DR',${sourceId},${assessedAt}::timestamptz,
+      ${isNonEmptyString(body.outcome) ? String(body.outcome) : null},
+      ${typeof body.score === 'number' ? body.score : null},
+      ${JSON.stringify(body.metrics)}::jsonb
+    )
+  `;
+  return json({ ok: true, source_id: sourceId }, 201);
+}
+
 async function edgeStocksDispatchHealth(env: Env): Promise<Response> {
   const result = await checkEdgeWorkflowAccess(env.EDGE_GITHUB_TOKEN ?? '');
   return json({
@@ -902,6 +938,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
   if (url.pathname === '/api/5dr/canonical-handoff' && request.method === 'GET') return fiveDrCanonicalHandoff(env);
+  if (url.pathname === '/api/5dr/assessment-import' && request.method === 'POST') return fiveDrAssessmentImport(request, env);
   if (url.pathname.startsWith('/api/edge-stocks/') && isAccessIdentityEnforced(env)) {
     const testerGate=await testerEdgeSandboxGate(request,env);
     if(testerGate)return testerGate;

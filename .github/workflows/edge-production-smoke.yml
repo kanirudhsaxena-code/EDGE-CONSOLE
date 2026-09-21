@@ -25,13 +25,18 @@ jobs:
             if curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Cache-Control: no-cache' \
               'https://edge-console.k-anirudhsaxena.workers.dev/edge-live.js?v=${{ github.sha }}' \
               -o /tmp/edge-live.js \
+              && curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Cache-Control: no-cache' \
+              'https://edge-console.k-anirudhsaxena.workers.dev/?ui=edge-v17-${{ github.sha }}' \
+              -o /tmp/deployed-index.html \
               && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js \
               && grep -q 'edge-user-output' /tmp/edge-live.js \
+              && grep -q 'Official canonical status' /tmp/edge-live.js \
               && grep -q 'Outcome checks recorded' /tmp/edge-live.js \
               && grep -q '5-DAY DIRECTION' /tmp/edge-live.js \
               && grep -q 'EXPECTED 5-DAY RANGE' /tmp/edge-live.js \
               && grep -q 'Price, Volume, Premium & Open Interest' /tmp/edge-live.js \
-              && grep -q 'WHY IT MATTERS' /tmp/edge-live.js; then
+              && grep -q 'WHY IT MATTERS' /tmp/edge-live.js \
+              && grep -q 'edge-ui-v17-20260921' /tmp/deployed-index.html; then
               exit 0
             fi
             sleep 10
