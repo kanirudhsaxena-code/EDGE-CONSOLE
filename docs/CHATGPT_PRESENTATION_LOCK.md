@@ -32,3 +32,5 @@ Visual CSS cannot be reproduced inside ChatGPT, but the rendered Console informa
 This control changes presentation only. It does not modify analytical methodology, probabilities, DES, Market Trust, BOT, Decision Ladder, recommendation semantics, efficacy, persistence or Learning Lab governance.
 
 CI requirement: any change that breaks the Console DOM capture selectors or mandatory section validation must fail before merge.
+
+Capture-only validation is supported for existing canonical runs, so presentation tests do not need to create duplicate forecasts.
