@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 test('5DR assessment separates matured efficacy from pending published forecasts',()=>{
   const source=readFileSync('src/index.ts','utf8');
   assert.ok(source.includes('pending_forecasts'));
-  assert.ok(source.includes("generated_at>${row.assessed_at}"));
+  assert.ok(source.includes("not exists (select 1 from outcome_assessments oa where oa.run_id=ar.run_id)"));
   assert.ok(source.includes('matured_runs:forecastTotal'));
   assert.ok(source.includes('assessment_as_of:row.assessed_at'));
 });
@@ -35,4 +35,11 @@ test('pending historical forecasts and current five-day forecast are collapsed b
   assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — day-wise direction & range</summary>'));
   assert.ok(!app.includes('<details class="pending-forecast-block pending-forecast-details" open>'));
   assert.ok(!app.includes('<details class="current-forecast-details" open>'));
+});
+
+
+test('pending detection does not disappear when assessment timestamp is newer than the live run',()=>{
+  const source=readFileSync('src/index.ts','utf8');
+  assert.ok(!source.includes('generated_at>${row.assessed_at}'));
+  assert.ok(source.includes('outcome_assessments oa'));
 });
