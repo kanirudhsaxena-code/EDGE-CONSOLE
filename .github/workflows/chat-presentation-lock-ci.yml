@@ -1,0 +1,31 @@
+name: EDGE Chat Presentation Lock CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'public/app.js'
+      - 'public/edge-live.js'
+      - 'public/index.html'
+      - 'scripts/capture-console-presentation.mjs'
+      - '.github/workflows/edge-chat-console-run.yml'
+      - 'test/chat-console-render-lock.test.ts'
+  push:
+    branches:
+      - 'fix/chat-console-render-lock'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm install --no-audit --no-fund
+      - run: npm run typecheck
+      - run: npm test
