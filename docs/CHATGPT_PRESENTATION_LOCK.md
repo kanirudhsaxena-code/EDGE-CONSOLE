@@ -30,3 +30,5 @@ Visual CSS cannot be reproduced inside ChatGPT, but the rendered Console informa
 - EDGE Stocks: the full canonical EDGE Stocks renderer, including master assessment, current stock outcome, drill-down and active calls.
 
 This control changes presentation only. It does not modify analytical methodology, probabilities, DES, Market Trust, BOT, Decision Ladder, recommendation semantics, efficacy, persistence or Learning Lab governance.
+
+CI requirement: any change that breaks the Console DOM capture selectors or mandatory section validation must fail before merge.
