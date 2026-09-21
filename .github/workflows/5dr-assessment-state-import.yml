@@ -61,7 +61,7 @@ jobs:
               "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
           }
           req=urllib.request.Request(
-              os.environ["CONSOLE_URL"].rstrip("/")+"/api/assessment-import",
+              os.environ["CONSOLE_URL"].rstrip("/")+"/api/5dr/assessment-import",
               data=json.dumps(assessment).encode("utf-8"),
               headers=headers,
               method="POST",
