@@ -298,19 +298,42 @@ function assessmentDayCell(label,day,zone,rec){
   const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
   return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
-function renderAssessmentDetails(details){
-  if(!details.length)return '<p class="assessment-empty-copy">No matured outcome records yet. The current forecast will enter this scorecard only as governed checkpoints mature.</p>';
-  const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
+function slotValue(slot,keys){for(const key of keys){if(slot&&slot[key]!=null&&slot[key]!=='')return slot[key]}return null}
+function pendingForecastDayCell(label,slot){
+  const has=slot&&typeof slot==='object'&&Object.keys(slot).length>0;
+  if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported day-specific direction/range was stored for this slot.</small></div></div>';
+  const direction=slotValue(slot,['direction','bias','directional_label','forecast']);
+  const probability=slotValue(slot,['probability','direction_probability','confidence']);
+  const low=slotValue(slot,['zone_low','range_low','expected_zone_low','low']);
+  const high=slotValue(slot,['zone_high','range_high','expected_zone_high','high']);
+  const date=slotValue(slot,['trading_date','date','target_date']);
+  const zoneText=(low!=null||high!=null)?((low??'—')+' – '+(high??'—')):'Not verified';
+  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b><small>'+(probability!=null?escapeHtml(probability)+'% probability':'No slot probability stored')+'</small></div><div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div></div>'
+}
+function renderPendingForecasts(pending){
+  const rows=Array.isArray(pending)?pending:[];
+  if(!rows.length)return '<div class="scorecard-context"><p>No published forecasts are currently waiting for future assessment checkpoints.</p></div>';
+  return rows.slice(0,3).map(run=>{
+    const probs=run.probabilities||{},slots=run.horizon_slots||{},labels=['D+1','D+2','D+3','D+4','D+5'];
+    return '<div class="pending-forecast-block"><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This run is not included in accuracy until its governed checkpoints mature.</small></div><div class="scorecard-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></div>'
+  }).join('')
+}
+function renderAssessmentDetails(details,pending){
   const labels=['D+1','D+2','D+3','D+4','D+5'];
-  return ['<div class="scorecard-context"><span>Last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString():'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>Recommendation results are attributed once, to the D+n horizon on which the call first resolves.</small></div>','<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'].join('')
+  let maturedHtml='<p class="assessment-empty-copy">No matured outcome records yet.</p>';
+  if(details.length){
+    const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
+    maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>These rows affect the accuracy and return statistics above.</small></div>','<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'].join('')
+  }
+  return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div><div class="assessment-drill-section"><div class="step-label">Current forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
 }
 function renderAssessment(container,payload){
   if(!container)return;
-  const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[];
+  const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[],pending=payload&&Array.isArray(payload.pending_forecasts)?payload.pending_forecasts:[];
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
-  const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},matured=Number(summary.matured_runs||0);
+  const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},matured=Number(summary.matured_runs||0),pendingCount=Number(summary.pending_forecasts??pending.length??0);
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured checkpoint'+(matured===1?'':'s')+'</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured · '+pendingCount+' pending</small></div>',
     '<div class="assessment-grid">',
       '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' assessed</small></div>',
       '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' hits / '+escapeHtml(r.total||0)+' assessed</small></div>',
@@ -318,7 +341,8 @@ function renderAssessment(container,payload){
       '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful calls</small></div>',
       '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful calls</small></div>',
     '</div>',
-    '<details class="assessment-detail-row"><summary>Day-wise & zone-wise details</summary><div class="assessment-history">'+renderAssessmentDetails(details)+'</div></details>'
+    '<div class="scorecard-context assessment-pending-note"><p>Fresh published forecasts appear as pending immediately, but do not change accuracy or P/L until their D+1…D+5 outcomes become scorable.</p></div>',
+    '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
 async function loadAssessment(engine,container){
