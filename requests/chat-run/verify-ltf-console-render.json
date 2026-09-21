@@ -1,0 +1,5 @@
+{
+  "module": "EDGE_STOCKS",
+  "capture_only": true,
+  "ticker": "LTF"
+}
