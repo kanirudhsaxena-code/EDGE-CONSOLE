@@ -48,8 +48,8 @@ jobs:
           BASE='https://edge-console.k-anirudhsaxena.workers.dev'
           AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
           curl --location --fail --silent --show-error -D /tmp/ui-headers.txt "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/?ui=edge-v2-20260920" -o /tmp/index.html
-          grep -q 'edge-live.js?v=edge-ui-v5-20260921' /tmp/index.html
-          grep -q 'styles.css?v=edge-ui-v5-20260921' /tmp/index.html
+          grep -q 'edge-live.js?v=edge-ui-v6-20260921' /tmp/index.html
+          grep -q 'styles.css?v=edge-ui-v6-20260921' /tmp/index.html
           grep -q 'EDGE NIFTY' /tmp/index.html
           grep -q 'Run EDGE NIFTY' /tmp/index.html
           grep -qi '^cache-control:.*no-store' /tmp/ui-headers.txt
