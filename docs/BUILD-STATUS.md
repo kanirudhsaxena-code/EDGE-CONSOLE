@@ -54,6 +54,9 @@ Required user-facing order:
 
 Production validation includes:
 - canonical V1.3 renderer;
+- decision typography v6: standardized Direction / 5-Day Range value size, standardized Bull/Base/Bear and Up/Sideways/Down label/value sizes, equal probability tile geometry, equal spacing/padding on mobile;
+- UI asset version edge-ui-v6-20260921 with Worker-first no-store delivery;
+- EDGE production smoke run `35560292943` rerun passed on Console `337939281e2ea6099402c01c069f532a4367c03d`;
 - research-backed invocation;
 - dispatch credential health;
 - probability integrity;
@@ -70,10 +73,10 @@ The stale supersession PR was closed because V1.3/Efficacy V2 is already canonic
 ## Console / cutover
 
 Current production-candidate Console checkpoint before release:
-- `09efcb30cb856faf28c762cc501150280c72ed4d`
+- `337939281e2ea6099402c01c069f532a4367c03d`
 
 Production cutover branch:
-- `release/5dr-edge-production-go-live`
+- `release/5dr-edge-production-go-live-v6`
 
 Cutover change:
 - set `APP_ENV=production`.
