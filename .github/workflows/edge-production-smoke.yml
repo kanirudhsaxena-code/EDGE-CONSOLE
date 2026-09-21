@@ -97,7 +97,12 @@ jobs:
           code="$(curl --location --silent --show-error -o /tmp/ltf-existing.json -w '%{http_code}'             "${AUTH[@]}" -H 'content-type: application/json'             -X POST --data '{"command":"EDGE LTF"}'             "$BASE/api/edge-stocks/invoke")"
           test "$code" = "200"
 
-          curl --location --fail --silent --show-error "${AUTH[@]}"             "$BASE/api/edge-stocks/report?ticker=LTF"             -o /tmp/ltf-report.json
+          report_code="$(curl --location --silent --show-error -w '%{http_code}' "${AUTH[@]}" "$BASE/api/edge-stocks/report?ticker=LTF" -o /tmp/ltf-report.json)"
+          if [ "$report_code" != "200" ]; then
+            echo "EDGE LTF report HTTP $report_code"
+            cat /tmp/ltf-report.json
+            exit 1
+          fi
 
           python - <<'PY'
           import json
