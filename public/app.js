@@ -40,7 +40,7 @@ function diagnosticSummary(raw,status){
   const clean=String(raw||'').replace(/\s+/g,' ').trim();
   return '<details class="diagnostic-details"><summary>System details</summary><div class="diagnostic-body"><p><strong>Status:</strong> '+escapeHtml(status||'Stopped')+'</p><p>'+escapeHtml(clean||'No technical diagnostic was recorded.')+'</p></div></details>'
 }
-function stageLabel(stage,status){if(status==='COMPLETED')return'Result ready';const map={AUTOMATED_MARKET_DATA_PENDING:'Fetching automated market data',AUTOMATED_MARKET_DATA_READY:'Checking market conditions',AUTOMATED_MARKET_DATA_BLOCKED:'Automated data unavailable · screenshot backup available',EVIDENCE_READY:'Screenshots received',SCREENSHOTS_READY:'Reading screenshot backup',VISION_READY:'Reading screenshot backup',RESEARCH_RETRIEVED:'Checking market conditions',AUTONOMOUS_EVIDENCE_READY:'Checking market conditions',INTELLIGENCE_READY:'Combining evidence',NORMALIZED_READY:'Running EDGE NIFTY',PROCESSING:'Running EDGE NIFTY'};return map[String(stage)]||'Preparing analysis'}
+function stageLabel(stage,status){if(status==='COMPLETED')return'Result ready';const map={AUTOMATED_MARKET_DATA_PENDING:'Fetching automated market data',AUTOMATED_MARKET_DATA_READY:'Checking market conditions',AUTOMATED_MARKET_DATA_BLOCKED:'Automated data unavailable · screenshot backup available',EVIDENCE_READY:'Screenshots received',SCREENSHOTS_READY:'Reading screenshot backup',VISION_READY:'Reading screenshot backup',RESEARCH_RETRIEVED:'Checking market conditions',AUTONOMOUS_EVIDENCE_READY:'Checking market conditions',INTELLIGENCE_READY:'Combining evidence',NORMALIZED_READY:'Running EDGE NIFTY',PROCESSING:'Running EDGE NIFTY',PUBLICATION_SYNC_PENDING:'Publishing fresh result'};return map[String(stage)]||'Preparing analysis'}
 const DECISION_PREFS_KEY='edge-console-5dr-decision-setup-v1';
 function loadDecisionPrefs(){try{const saved=JSON.parse(localStorage.getItem(DECISION_PREFS_KEY)||'{}');if(decisionObjective&&saved.objective)decisionObjective.value=saved.objective;if(riskPosture&&saved.risk_posture)riskPosture.value=saved.risk_posture;if(capitalPriority&&saved.capital_priority)capitalPriority.value=saved.capital_priority}catch{}}
 function saveDecisionPrefs(){try{localStorage.setItem(DECISION_PREFS_KEY,JSON.stringify({objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'}))}catch{}}
@@ -253,7 +253,7 @@ function userChangeConditions(why,normalized,result){
   return items
 }
 function fileKey(file){return[file.name,file.size,file.lastModified].join('::')}function appendUniqueFiles(existing,incoming){const seen=new Set(existing.map(fileKey));for(const file of incoming){const key=fileKey(file);if(!seen.has(key)){existing.push(file);seen.add(key)}}}function selectedFiles(){return{price:[...selectedPriceFiles],derivatives:[...selectedDerivativesFiles]}}function validateFiles(files){const e=[];if(files.length>MAX_FILES)e.push('Maximum 20 files are allowed in one run.');files.forEach(f=>{if(!ALLOWED_TYPES.has(f.type))e.push(f.name+': unsupported file type.');if(f.size<=0||f.size>MAX_FILE_BYTES)e.push(f.name+': file must be 10 MB or smaller.')});return e}function fileNames(files){return files.length?files.map((file,index)=>'<span>'+(index+1)+'. '+escapeHtml(file.name)+'</span>').join(''):'<span class="muted">None selected</span>'}function renderFileSelection(){const f=selectedFiles(),all=[...f.price,...f.derivatives],errors=[...((all.length&& !f.price.length)?['NIFTY chart screenshot is required for manual backup.']:[]),...((all.length&& !f.derivatives.length)?['Options / OI screenshot is required for manual backup.']:[]),...validateFiles(all)];if(!all.length){fileSelection.className='file-selection muted';fileSelection.textContent='No screenshots selected · automated evidence will be used.';setUploadStatus('','');return}const total=all.reduce((s,x)=>s+x.size,0);fileSelection.className='file-selection';fileSelection.innerHTML=['<strong>Manual backup selected</strong>','<span>'+f.price.length+' chart · '+f.derivatives.length+' derivatives/OI file(s) · '+escapeHtml(readableBytes(total))+' total</span>','<strong>NIFTY charts</strong>',fileNames(f.price),'<strong>Options / OI</strong>',fileNames(f.derivatives),'<span class="muted">Because screenshot files are selected, this run will use HYBRID backup mode instead of the normal automated path.</span>'].join('');errors.length?setUploadStatus(errors[0],'error'):setUploadStatus('Manual screenshot backup is ready.','ready')}priceFiles.addEventListener('change',()=>{appendUniqueFiles(selectedPriceFiles,Array.from(priceFiles.files||[]));priceFiles.value='';renderFileSelection()});derivativesFiles.addEventListener('change',()=>{appendUniqueFiles(selectedDerivativesFiles,Array.from(derivativesFiles.files||[]));derivativesFiles.value='';renderFileSelection()});
-function currentAssessment(){return{objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'}}async function createRunRequest(batchId){const assessment=currentAssessment();const r=await fetch('/api/5dr/run-requests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch_id:batchId,evidence_categories:REQUIRED_USER_CATEGORIES,assessment})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Could not create 5DR run request.');return d.request}async function createAutomatedRun(){const h=await fetch('/api/5dr/dispatch-health',{cache:'no-store'}),hd=await h.json().catch(()=>({}));if(!h.ok||hd.ok!==true){const detail=hd.detail||hd.error||'5DR automation permission is not ready.';throw new Error(detail+' Automated 5DR is blocked before run creation; screenshot backup remains available.')}const r=await fetch('/api/5dr/automated-runs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({assessment:currentAssessment()})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||(d.dispatch_health&&d.dispatch_health.detail)||(d.acquisition_dispatch&&d.acquisition_dispatch.detail)||'Could not start automated 5DR run.');return d.request}
+function currentAssessment(){return{objective:decisionObjective?.value||'BOTH',risk_posture:riskPosture?.value||'CONSERVATIVE',capital_priority:capitalPriority?.value||'CAPITAL_PROTECTION'}}async function createRunRequest(batchId){const assessment=currentAssessment();const r=await fetch('/api/5dr/run-requests',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({batch_id:batchId,evidence_categories:REQUIRED_USER_CATEGORIES,assessment})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Could not create 5DR run request.');return d.request}async function createAutomatedRun(){const h=await fetch('/api/5dr/dispatch-health',{cache:'no-store'}),hd=await h.json().catch(()=>({}));if(!h.ok||hd.ok!==true){const detail=hd.detail||hd.error||'5DR automation permission is not ready.';throw new Error(detail+' Automated 5DR is blocked before run creation; screenshot backup remains available.')}const r=await fetch('/api/5dr/automated-runs',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({assessment:currentAssessment(),force_new:true,client_invocation_id:crypto.randomUUID()})}),d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||(d.dispatch_health&&d.dispatch_health.detail)||(d.acquisition_dispatch&&d.acquisition_dispatch.detail)||'Could not start automated 5DR run.');return d.request}
 function extractStageError(data){if(data&&typeof data.error==='string'&&data.error)return data.error;if(data&&Array.isArray(data.blockers)&&data.blockers.length){const blocker=data.blockers[0]||{};if(Array.isArray(blocker.limitations)&&blocker.limitations.length)return String(blocker.limitations[0]);if(typeof blocker.reason==='string'&&blocker.reason)return blocker.reason}if(data&&data.intelligence_reconciliation&&Array.isArray(data.intelligence_reconciliation.errors)&&data.intelligence_reconciliation.errors.length)return String(data.intelligence_reconciliation.errors[0]);if(data&&data.gate&&typeof data.gate.error==='string')return data.gate.error;if(data&&typeof data.message==='string'&&data.message)return data.message;return''}
 async function runStage(requestId,suffix,label){setUploadStatus(label,'working');let r;try{r=await fetch('/api/5dr/run-requests/'+encodeURIComponent(requestId)+'/'+suffix,{method:'POST',cache:'no-store'})}catch(e){throw new Error('Network/Worker request failed before an HTTP response was received'+(e&&e.message?': '+e.message:''))}const raw=await r.text().catch(()=> '');let d={};if(raw){try{d=JSON.parse(raw)}catch{}}if(!r.ok){const detail=extractStageError(d);if(detail)throw new Error(detail+' [HTTP '+r.status+']');const excerpt=raw.replace(/\s+/g,' ').trim().slice(0,300);throw new Error('5DR stage '+suffix+' returned HTTP '+r.status+(r.statusText?' '+r.statusText:'')+(excerpt?' · '+excerpt:''))}return d}
 async function process5drRequest(requestId){return runStage(requestId,'resume-processing','Resuming EDGE NIFTY from its persisted governed stage…')}
@@ -485,7 +485,11 @@ async function loadDashboard(){
 
     let f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
     let latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
-    let active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
+    const requestStartedAt=latestReq?Date.parse(String(latestReq.created_at||latestReq.updated_at||'')):NaN;
+    const publishedAt=f.run?Date.parse(String(f.run.generated_at||f.run.freshness_at||'')):NaN;
+    const requestIsNewerThanPublished=Boolean(latestReq)&&(!f.run||(Number.isFinite(requestStartedAt)&&Number.isFinite(publishedAt)&&requestStartedAt>publishedAt));
+    const requestRunMismatch=Boolean(latestReq)&&(!f.run||!latestReq.run_id||latestReq.run_id!==f.run.run_id);
+    let active=Boolean(latestReq)&&requestRunMismatch&&(latestReq.status!=='COMPLETED'||requestIsNewerThanPublished);
     const activeStage=latestReq&&latestReq.metadata?String(latestReq.metadata.adapter_stage||''):'';
     const autoResumableStages=new Set(['AUTOMATED_MARKET_DATA_PENDING','AUTOMATED_MARKET_DATA_READY','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED','INTELLIGENCE_READY','NORMALIZATION_BLOCKED','NORMALIZED_READY']);
     const shouldAutoResume=active&&latestReq&&['READY_FOR_ENGINE','PROCESSING'].includes(String(latestReq.status))&&(String(latestReq.status)==='PROCESSING'||autoResumableStages.has(activeStage));
@@ -496,11 +500,22 @@ async function loadDashboard(){
         if(rd&&rd.status==='COMPLETED'){
           f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
           active=false;
-        }else active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
+        }else{
+          const refreshedStarted=latestReq?Date.parse(String(latestReq.created_at||latestReq.updated_at||'')):NaN;
+          const refreshedPublished=f.run?Date.parse(String(f.run.generated_at||f.run.freshness_at||'')):NaN;
+          const refreshedRequestNewer=Boolean(latestReq)&&(!f.run||(Number.isFinite(refreshedStarted)&&Number.isFinite(refreshedPublished)&&refreshedStarted>refreshedPublished));
+          active=Boolean(latestReq)&&(!f.run||!latestReq.run_id||latestReq.run_id!==f.run.run_id)&&(latestReq.status!=='COMPLETED'||refreshedRequestNewer);
+        }
       }catch(e){console.error('EDGE NIFTY auto-resume failed',e)}
     }
     let matchedRequest=null,oa=null;
-    if(active)render5dr(null,latestReq,null);
+    if(active){
+      const publicationPending=latestReq&&latestReq.status==='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
+      if(publicationPending){
+        const pendingMeta={...(latestReq.metadata||{}),adapter_stage:'PUBLICATION_SYNC_PENDING'};
+        render5dr(null,{...latestReq,status:'PROCESSING',metadata:pendingMeta},null);
+      }else render5dr(null,latestReq,null);
+    }
     else if(f.run&&f.run.run_id){
       matchedRequest=await fetch('/api/5dr/run-request?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
       oa=await fetch('/api/5dr/outcome-assessment?run_id='+encodeURIComponent(f.run.run_id),{cache:'no-store'}).then(r=>r.json()).then(d=>d.assessment||null).catch(()=>null);
@@ -543,19 +558,11 @@ if(edgeCommandForm){
     edgeCommandStatus.className='upload-status working';
     edgeCommandStatus.textContent='Dispatching to the governed EDGE autonomous publisher…';
     try{
-      const r=await fetch('/api/edge-stocks/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({command})});
+      const r=await fetch('/api/edge-stocks/invoke',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({command,force_new:true})});
       const d=await r.json().catch(()=>({}));
       if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
       if(d.ticker)localStorage.setItem('edge-console-selected-stock',d.ticker);if(d.status==='ALREADY_PUBLISHED_TODAY'){
-        edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='Loading today’s published EDGE '+d.ticker+' result…';
-        if(window.refreshEdgeLive){
-          await window.refreshEdgeLive();
-          clearEdgeCommandStatus();
-        }else{
-          window.location.reload();
-        }
-        return;
+        throw new Error('Fresh EDGE run was requested, but the server attempted to reuse an earlier result. The older result was not accepted as this run.');
       }
       edgeCommandStatus.textContent='Dispatched '+d.ticker+' · monitoring for governed publication…';
       const completed=await pollEdgeInvocation(d.next);
