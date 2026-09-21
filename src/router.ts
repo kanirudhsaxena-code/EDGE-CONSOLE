@@ -151,6 +151,62 @@ async function failRequest(request: Request, env: Env, requestId: string): Promi
 }
 
 
+async function fiveDrCanonicalHandoff(env: Env): Promise<Response> {
+  if (!env.DATABASE_URL) return json({ error: 'Database is not configured', code: 'DATABASE_NOT_CONFIGURED' }, 503);
+  const sql = neon(env.DATABASE_URL);
+  const rows = await sql`
+    select ar.run_id,ar.generated_at,ar.freshness_at,ar.framework_version,ar.contract_version,
+           ar.status,ar.provenance_mode,ar.published,ar.result,
+           req.request_id,req.provenance_mode as request_provenance_mode,req.metadata
+      from analysis_runs ar
+      left join lateral (
+        select request_id,provenance_mode,metadata
+          from analysis_requests
+         where engine='5DR' and run_id=ar.run_id
+         order by updated_at desc
+         limit 1
+      ) req on true
+     where ar.engine='5DR' and ar.published=true
+     order by ar.generated_at desc
+     limit 20
+  `;
+  const runs = rows.map((row:any) => {
+    const metadata = isObject(row.metadata) ? row.metadata as JsonRecord : {};
+    const intelligence = isObject(metadata.intelligence_handoff) ? metadata.intelligence_handoff as JsonRecord : {};
+    const normalized = isObject(intelligence.normalized) ? intelligence.normalized : null;
+    const market = isObject(metadata.automated_market_evidence) ? metadata.automated_market_evidence : {};
+    return {
+      run: {
+        run_id: row.run_id,
+        generated_at: row.generated_at,
+        freshness_at: row.freshness_at,
+        framework_version: row.framework_version,
+        contract_version: row.contract_version,
+        status: row.status,
+        provenance_mode: row.provenance_mode,
+        published: row.published === true,
+        result: row.result,
+      },
+      request: {
+        request_id: row.request_id ?? null,
+        provenance_mode: row.request_provenance_mode ?? null,
+        metadata: {
+          intelligence_handoff: normalized ? { normalized } : {},
+          automated_market_evidence: market,
+          invocation: isObject(metadata.invocation) ? metadata.invocation : {},
+          canonical_attempt: isObject(metadata.canonical_attempt) ? metadata.canonical_attempt : null,
+        },
+      },
+    };
+  });
+  return json({
+    schema_version: '5DR_CONSOLE_HANDOFF_V1',
+    generated_at: new Date().toISOString(),
+    source: 'EDGE_CONSOLE_PUBLISHED_RUNS',
+    runs,
+  });
+}
+
 async function edgeStocksDispatchHealth(env: Env): Promise<Response> {
   const result = await checkEdgeWorkflowAccess(env.EDGE_GITHUB_TOKEN ?? '');
   return json({
@@ -820,6 +876,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/5dr/canonical-handoff' && request.method === 'GET') return fiveDrCanonicalHandoff(env);
   if (url.pathname.startsWith('/api/edge-stocks/') && isAccessIdentityEnforced(env)) {
     const testerGate=await testerEdgeSandboxGate(request,env);
     if(testerGate)return testerGate;

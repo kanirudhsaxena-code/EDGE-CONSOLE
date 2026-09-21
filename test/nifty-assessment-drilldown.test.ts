@@ -82,3 +82,14 @@ test('5DR assessment exposes matured eligible versus scorable coverage',()=>{
   assert.ok(source.includes('missing_unscorable_checkpoints:forecastMissing'));
   assert.ok(source.includes('scorable_coverage_pct:forecastCoverage'));
 });
+
+
+test('5DR canonical handoff is a dedicated sanitized governed endpoint',()=>{
+  const router=readFileSync('src/router.ts','utf8');
+  const workflow=readFileSync('.github/workflows/5dr-canonical-handoff-state.yml','utf8');
+  assert.ok(router.includes("'/api/5dr/canonical-handoff'"));
+  assert.ok(router.includes("schema_version: '5DR_CONSOLE_HANDOFF_V1'"));
+  assert.ok(router.includes('intelligence_handoff: normalized ? { normalized } : {}'));
+  assert.ok(workflow.includes('/api/5dr/canonical-handoff'));
+  assert.ok(!workflow.includes('/api/runs/latest?engine=5DR'));
+});
