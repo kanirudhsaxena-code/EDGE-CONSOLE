@@ -131,3 +131,10 @@ test('5DR assessment import tolerates same-push Worker deployment race but fails
   assert.ok(workflow.includes('ASSESSMENT_IMPORT_FAILED_AFTER_RETRIES'));
   assert.ok(workflow.includes('--data-binary @/tmp/5dr-assessment-import.json'));
 });
+
+
+test('5DR assessment summary selects latest imported rollup rather than highest semantic assessed_at',()=>{
+  const source=readFileSync('src/index.ts','utf8');
+  assert.ok(source.includes("assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1"));
+  assert.ok(!source.includes("assessment_rollups where engine='5DR' order by assessed_at desc,id desc limit 1"));
+});
