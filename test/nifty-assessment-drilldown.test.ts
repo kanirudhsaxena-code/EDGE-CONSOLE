@@ -126,7 +126,8 @@ test('production smoke waits for v17 canonical UI before validation',()=>{
 
 test('5DR assessment import tolerates same-push Worker deployment race but fails closed',()=>{
   const workflow=readFileSync('.github/workflows/5dr-assessment-state-import.yml','utf8');
-  assert.ok(workflow.includes('for attempt in range(1,13)'));
-  assert.ok(workflow.includes('time.sleep(10)'));
+  assert.ok(workflow.includes('for attempt in $(seq 1 12)'));
+  assert.ok(workflow.includes('if [ "$attempt" -lt 12 ]; then sleep 10; fi'));
   assert.ok(workflow.includes('ASSESSMENT_IMPORT_FAILED_AFTER_RETRIES'));
+  assert.ok(workflow.includes('--data-binary @/tmp/5dr-assessment-import.json'));
 });
