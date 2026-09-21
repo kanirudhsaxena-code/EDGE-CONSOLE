@@ -421,7 +421,7 @@ function render5dr(run,request,outcomeAssessment){
     const meta=request&&request.metadata?request.metadata:{},stage=meta.adapter_stage||'—',status=request?request.status:'READY';
     fiveDrState.textContent=request?stageLabel(stage,status):'Ready';
     const progress=stageLabel(stage,status);
-    const resume=request&&((['READY_FOR_ENGINE','FAILED'].includes(status)&&['SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED','INTELLIGENCE_READY','NORMALIZATION_BLOCKED','NORMALIZED_READY'].includes(stage))||(status==='PROCESSING'&&stage==='NORMALIZED_READY'))?
+    const resume=request&&((['READY_FOR_ENGINE','FAILED'].includes(status)&&['AUTOMATED_MARKET_DATA_PENDING','AUTOMATED_MARKET_DATA_READY','SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED','INTELLIGENCE_READY','NORMALIZATION_BLOCKED','NORMALIZED_READY'].includes(stage))||(status==='PROCESSING'&&stage==='NORMALIZED_READY'))?
       '<div class="simple-action"><button id="resume5drRequest" class="primary" type="button" data-request-id="'+escapeHtml(request.request_id)+'">'+(status==='PROCESSING'?'Check result':status==='FAILED'?'Retry EDGE NIFTY':'Continue EDGE NIFTY')+'</button><p id="resume5drStatus" class="muted">'+(status==='PROCESSING'?'EDGE NIFTY is running. Check again for the completed result.':'Continue from where the run stopped. The governed run state and evidence are already saved.')+'</p></div>':'';
     const technical=request?'<details class="tech-details"><summary>Advanced details</summary><div class="tech-body"><div><span>Request</span><strong>'+escapeHtml(request.request_id)+'</strong></div><div><span>Internal stage</span><strong>'+escapeHtml(stage)+'</strong></div><div><span>Status</span><strong>'+escapeHtml(status)+'</strong></div><div><span>Evidence files</span><strong>'+escapeHtml(meta.evidence_file_count||'—')+'</strong></div></div></details>':'';
     const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run assessment</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><h2>'+escapeHtml(progress)+'</h2><p class="run-timestamp">Run started: '+escapeHtml(runDateTime(request?.created_at||request?.updated_at||request?.submitted_at))+'</p><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
@@ -486,12 +486,18 @@ async function loadDashboard(){
     let f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
     let latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);
     let active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
-    if(active&&latestReq.status==='PROCESSING'){
+    const activeStage=latestReq&&latestReq.metadata?String(latestReq.metadata.adapter_stage||''):'';
+    const autoResumableStages=new Set(['AUTOMATED_MARKET_DATA_PENDING','AUTOMATED_MARKET_DATA_READY','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED','INTELLIGENCE_READY','NORMALIZATION_BLOCKED','NORMALIZED_READY']);
+    const shouldAutoResume=active&&latestReq&&['READY_FOR_ENGINE','PROCESSING'].includes(String(latestReq.status))&&(String(latestReq.status)==='PROCESSING'||autoResumableStages.has(activeStage));
+    if(shouldAutoResume){
       try{
         const rr=await fetch('/api/5dr/run-requests/'+encodeURIComponent(latestReq.request_id)+'/resume-processing',{method:'POST',cache:'no-store'}),rd=await rr.json();
-        if(rd&&rd.status==='COMPLETED'){f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||null).catch(()=>null);active=false}
-        else if(rd&&rd.status==='FAILED'){latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||latestReq).catch(()=>latestReq)}
-      }catch(e){console.error('5DR result sync failed',e)}
+        latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||latestReq).catch(()=>latestReq);
+        if(rd&&rd.status==='COMPLETED'){
+          f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
+          active=false;
+        }else active=latestReq&&latestReq.status!=='COMPLETED'&&(!f.run||latestReq.run_id!==f.run.run_id);
+      }catch(e){console.error('EDGE NIFTY auto-resume failed',e)}
     }
     let matchedRequest=null,oa=null;
     if(active)render5dr(null,latestReq,null);
@@ -505,6 +511,7 @@ async function loadDashboard(){
     const ipoSnap=ipoData.snapshot||null,ipoPayload=ipoSnap&&ipoSnap.payload?ipoSnap.payload:null;
     renderIpoSnapshot(ipoSummary,ipoPayload?[{run_id:'IPO-SNAPSHOT-'+String(ipoSnap.captured_at||''),generated_at:ipoSnap.captured_at,framework_version:ipoPayload.framework_version||'1.1',result:{...ipoPayload,current_issues:ipoPayload.issues||[]}}]:[]);
     await loadRecentResults(activeModule);
+    if(active)setTimeout(()=>loadDashboard(),5000);
   }catch(e){
     console.error(e);health.textContent='Offline';fiveDrState.textContent='ERROR';fiveDrSummary.innerHTML='<div class="generic-empty">Unable to load EDGE NIFTY integration status.</div>';renderIpoSnapshot(ipoSummary,[]);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'
   }
