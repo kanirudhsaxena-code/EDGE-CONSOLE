@@ -14,13 +14,19 @@ export function effectiveRunReleasePolicy(
   requestedPublished:boolean,
   requestedLearningEligible:boolean
 ){
-  const actor=storedActorFromMetadata(requestMetadata);
-  const tester=actor?.role==='TESTER';
+  const metadata=requestMetadata&&typeof requestMetadata==='object'&&!Array.isArray(requestMetadata)
+    ?requestMetadata as Record<string,unknown>
+    :{};
+  const actor=storedActorFromMetadata(metadata);
+  const sandboxRequested=metadata.sandbox_requested===true;
+  const identityEnforced=metadata.identity_enforced===true;
+  const testerSandbox=identityEnforced&&actor?.role==='TESTER';
+  const sandbox=sandboxRequested||testerSandbox;
   return {
-    sandbox:tester,
-    published:tester?false:requestedPublished,
-    learning_eligible:tester?false:requestedLearningEligible,
-    completion_status:tester?'SANDBOX':'PUBLISHED'
+    sandbox,
+    published:sandbox?false:requestedPublished,
+    learning_eligible:sandbox?false:requestedLearningEligible,
+    completion_status:sandbox?'SANDBOX':'PUBLISHED'
   } as const;
 }
 
