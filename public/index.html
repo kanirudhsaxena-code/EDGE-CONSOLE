@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#f4f7fb" />
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=edge-ui-v8-20260921" />
+  <link rel="stylesheet" href="/styles.css?v=edge-ui-v9-20260921" />
 </head>
 <body>
   <main class="shell">
@@ -42,7 +42,7 @@
 
     <section id="edgeStocksPanel" class="module-panel" hidden>
       <div id="stocksAssessmentSummary" class="assessment-summary-card" hidden></div>
-      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><form id="edgeCommandForm" class="run edge-command-form"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. This triggers the governed autonomous EDGE publisher; it does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="stocksSummary" class="stack"></div></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><form id="edgeCommandForm" class="run edge-command-form"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. Every press starts a new governed EDGE analysis using currently valid fresh research; it never reuses an earlier result as the new run. It does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="stocksSummary" class="stack"></div></div>
     </section>
 
     <section id="edgeIpoPanel" class="module-panel" hidden>
@@ -103,12 +103,12 @@
         </div>
       </details>
       <div id="fileSelection" class="file-selection muted">No screenshots selected · automated evidence will be used.</div><div id="uploadStatus" class="upload-status" aria-live="polite"></div>
-      <p class="muted">Next: EDGE Console acquires market evidence, checks wider conditions and runs the governed EDGE NIFTY engine automatically.</p>
+      <p class="muted">Next: every press starts a new governed EDGE NIFTY request, acquires fresh market evidence, checks wider conditions and runs the frozen EDGE NIFTY engine automatically.</p>
       <button id="uploadEvidenceButton" type="submit" class="primary">Run EDGE NIFTY</button>
     </form>
   </dialog>
-  <script type="module" src="/app.js?v=edge-ui-v8-20260921"></script>
-  <script type="module" src="/resume.js?v=edge-ui-v8-20260921"></script>
-  <script type="module" src="/edge-live.js?v=edge-ui-v8-20260921"></script>
+  <script type="module" src="/app.js?v=edge-ui-v9-20260921"></script>
+  <script type="module" src="/resume.js?v=edge-ui-v9-20260921"></script>
+  <script type="module" src="/edge-live.js?v=edge-ui-v9-20260921"></script>
 </body>
 </html>

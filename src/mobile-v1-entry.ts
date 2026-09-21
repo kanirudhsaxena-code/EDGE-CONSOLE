@@ -123,6 +123,8 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
   let body:unknown={};try{body=await request.json()}catch{}
   const sandboxRequested=isObject(body)&&body.sandbox===true;
+  const forceNew=!isObject(body)||body.force_new!==false;
+  const clientInvocationId=isObject(body)&&typeof body.client_invocation_id==='string'&&body.client_invocation_id.trim()?body.client_invocation_id.trim():null;
   const runActor=sandboxRequested?{id:actor.authenticated?actor.id:'sandbox_acceptance',role:'TESTER' as const,authenticated:actor.authenticated}:actor;
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
@@ -139,6 +141,7 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     evidence_file_count:0,
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
+    invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString()},
     adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
@@ -152,7 +155,7 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ok:true,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
+  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
 }
 
 async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{

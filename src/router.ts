@@ -196,6 +196,25 @@ async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id:
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
+async function latestFreshEdgeResearchBundle(env: Env, ticker: string): Promise<{ bundleId: string } | null> {
+  if (!env.EDGE_DATABASE_URL) return null;
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select bundle_id,payload
+      from edge_research_bundles
+     where ticker = ${ticker}
+       and status = 'READY'
+       and research_fresh_at >= now() - interval '24 hours'
+     order by research_fresh_at desc, inserted_at desc
+     limit 10
+  `;
+  for (const row of rows) {
+    const payload = row.payload;
+    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id) };
+  }
+  return null;
+}
+
 async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise<{ id: string; runTimestamp: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -240,7 +259,24 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     });
   }
 
-  if (!isObject(body.research_bundle)) {
+  let researchBundleId: string | undefined;
+  if (isObject(body.research_bundle)) {
+    const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
+    if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
+    researchBundleId = saved.bundleId;
+  } else if (forceNew) {
+    const fresh = await latestFreshEdgeResearchBundle(env, ticker);
+    researchBundleId = fresh?.bundleId;
+    if (!researchBundleId) {
+      return json({
+        error: 'A fresh governed EDGE run was requested, but no valid ChatGPT research bundle from the last 24 hours is available for this ticker',
+        code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
+        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        ticker,
+        fresh_run_requested: true
+      }, 409);
+    }
+  } else {
     return json({
       error: 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch',
       code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
@@ -248,20 +284,18 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       ticker
     }, 409);
   }
-  const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
-  if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
 
   const baseline = await latestEdgeRecommendation(env, ticker);
   const baselineRunId = baseline?.id ?? null;
   const dispatchedAt = new Date().toISOString();
 
-  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', saved.bundleId);
+  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId);
   if (!dispatch.ok) {
     return json({
       error: 'EDGE autonomous dispatch failed',
       detail: dispatch.error,
       ticker,
-      research_bundle_id: saved.bundleId,
+      research_bundle_id: researchBundleId,
       code: dispatch.status === 503 ? 'EDGE_DISPATCH_NOT_CONFIGURED' : 'EDGE_DISPATCH_FAILED',
     }, dispatch.status === 401 || dispatch.status === 403 ? 502 : dispatch.status);
   }
@@ -274,9 +308,11 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
     ticker,
     command: command.raw,
-    research_bundle_id: saved.bundleId,
+    research_bundle_id: researchBundleId,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
+    fresh_run: true,
+    reused_output: false,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
   }, 202);
