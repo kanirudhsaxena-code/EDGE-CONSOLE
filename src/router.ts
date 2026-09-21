@@ -223,6 +223,23 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   if (!resolved.ticker) return json({ error: resolved.error }, resolved.status ?? 422);
   const ticker = resolved.ticker;
 
+  const forceNew = body.force_new === true;
+  const existingToday = await todaysAutonomousRecommendation(env, ticker);
+  if (existingToday && !forceNew && !isObject(body.research_bundle)) {
+    return json({
+      ok: true,
+      status: 'ALREADY_PUBLISHED_TODAY',
+      engine: 'EDGE_STOCKS',
+      contract_version: 'EDGE_STOCKS_V1_3',
+      ticker,
+      command: command.raw,
+      run_id: existingToday.id,
+      run_timestamp: existingToday.runTimestamp,
+      report_url: `/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+      trading_enabled: false
+    });
+  }
+
   if (!isObject(body.research_bundle)) {
     return json({
       error: 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch',
@@ -474,7 +491,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     framework_version: 'EDGE_V1',
     ticker: symbol,
     run_id: String(active.recommendation_id),
-    generated_at: new Date().toISOString(),
+    generated_at: active.run_timestamp ?? new Date().toISOString(),
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',

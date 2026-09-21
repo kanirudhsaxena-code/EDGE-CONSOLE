@@ -120,9 +120,15 @@ test('assessment and decision labels are user-friendly',()=>{
   assert.ok(!html.includes('Captured / due checkpoints'));
 });
 
-test('active calls show the actual stored call date',()=>{
+test('EDGE Stocks result shows the actual run date/time',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('Call date:'));
+  assert.ok(html.includes('Run date/time:'));
+  assert.match(html,/18 Sep(?:t)? 2026/);
+});
+
+test('active calls show the actual stored call date/time',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Call date/time:'));
   assert.match(html,/17 Sep(?:t)? 2026/);
 });
 
