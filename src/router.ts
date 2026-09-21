@@ -491,7 +491,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     framework_version: 'EDGE_V1',
     ticker: symbol,
     run_id: String(active.recommendation_id),
-    generated_at: active.run_timestamp ?? new Date().toISOString(),
+    generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',
