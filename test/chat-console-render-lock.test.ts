@@ -44,3 +44,15 @@ test('EDGE NIFTY runner advances then reads canonical persisted state',()=>{
   assert.match(workflow,/RESUME_EXISTING/);
   assert.doesNotMatch(workflow,/d=json\.load\(open\('\/tmp\/resume\.json'\)\)/);
 });
+
+
+test('EDGE NIFTY Chat capture expands full analysis before reading Console text',()=>{
+  assert.match(capture,/querySelector\('\[data-analysis-detail\]'\)/);
+  assert.match(capture,/detail\.hidden=false/);
+  assert.match(capture,/querySelectorAll\('details'\)\.forEach/);
+  assert.match(capture,/node\.open=true/);
+  assert.match(workflow,/5-day forecast — day-wise direction & range/);
+  assert.match(workflow,/Why this view\?/);
+  assert.match(workflow,/What could change the view\?/);
+  assert.match(workflow,/Future performance scorecard/);
+});
