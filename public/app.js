@@ -499,7 +499,10 @@ async function loadDashboard(){
         latestReq=await fetch('/api/5dr/run-requests/latest',{cache:'no-store'}).then(r=>r.json()).then(d=>d.request||latestReq).catch(()=>latestReq);
         if(rd&&rd.status==='COMPLETED'){
           f=await fetch('/api/5dr/latest',{cache:'no-store'}).then(r=>r.json());
-          active=false;
+          const completedStarted=latestReq?Date.parse(String(latestReq.created_at||latestReq.updated_at||'')):NaN;
+          const completedPublished=f.run?Date.parse(String(f.run.generated_at||f.run.freshness_at||'')):NaN;
+          const completedRequestNewer=Boolean(latestReq)&&(!f.run||(Number.isFinite(completedStarted)&&Number.isFinite(completedPublished)&&completedStarted>completedPublished));
+          active=Boolean(latestReq)&&(!f.run||!latestReq.run_id||latestReq.run_id!==f.run.run_id)&&completedRequestNewer;
         }else{
           const refreshedStarted=latestReq?Date.parse(String(latestReq.created_at||latestReq.updated_at||'')):NaN;
           const refreshedPublished=f.run?Date.parse(String(f.run.generated_at||f.run.freshness_at||'')):NaN;
@@ -544,7 +547,7 @@ async function pollEdgeInvocation(nextUrl){
     if(!r.ok)throw new Error(d.error||'Could not check EDGE invocation status.');
     if(d.status==='COMPLETE')return d;
     edgeCommandStatus.className='upload-status working';
-    edgeCommandStatus.textContent='Governed EDGE run dispatched · waiting for a newly published V1.2 recommendation…';
+    edgeCommandStatus.textContent='Governed EDGE run dispatched · waiting for a newly published V1.3 recommendation…';
     await sleep(5000);
   }
   return null;
