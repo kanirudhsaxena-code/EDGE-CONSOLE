@@ -89,6 +89,32 @@ test('drill-down shows each outcome only once as the outcome badge',()=>{
   assert.ok(html.includes('score-pill negative'));
 });
 
+test('drill-down prefers exact published finding over audit jargon',()=>{
+  const current=structuredClone(report);
+  current.drilldown[0].finding='FY26 PAT rose 14% YoY to Rs 3,003 crore and the retail book rose 26% YoY.';
+  current.drilldown[0].interpretation='Verified income-statement growth evidence produced governed fundamentals score +1. Independent ChatGPT web research validated this component using 2 sources. Research direction(s): POSITIVE.';
+  const html=renderEdgeV13(current);
+  assert.ok(html.includes('FY26 PAT rose 14% YoY to Rs 3,003 crore'));
+  assert.ok(!html.includes('governed fundamentals score'));
+  assert.ok(!html.includes('Independent ChatGPT web research'));
+  assert.ok(!html.includes('Research direction(s)'));
+});
+
+test('unverified institutional behaviour explains the missing evidence plainly',()=>{
+  const current=structuredClone(report);
+  current.drilldown.push({
+    component:'INSTITUTIONAL_BEHAVIOUR',
+    score_or_level:'N/A',
+    verification_status:'NOT_VERIFIED',
+    key_outcome:'NOT VERIFIED',
+    interpretation:'Supporting provider evidence was excluded because fresh independent ChatGPT web validation was unavailable.'
+  });
+  const html=renderEdgeV13(current);
+  assert.ok(html.includes('did not contain independently verified FII, DII or mutual-fund holding/flow evidence'));
+  assert.ok(html.includes('left Institutional Behaviour unscored'));
+  assert.ok(!html.includes('Supporting provider evidence was excluded'));
+});
+
 test('current outcome makes direction and five-day range the primary visual highlights',()=>{
   const html=renderEdgeV13(report);
   assert.ok(html.includes('5-DAY DIRECTION'));
