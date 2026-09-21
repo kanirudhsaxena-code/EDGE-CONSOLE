@@ -522,6 +522,7 @@ loadDashboard();
 // Canonical EDGE Stocks prompt-driven command surface retained from production main.
 const edgeCommandForm=document.getElementById('edgeCommandForm'),edgeCommandInput=document.getElementById('edgeCommandInput'),edgeCommandButton=document.getElementById('edgeCommandButton'),edgeCommandStatus=document.getElementById('edgeCommandStatus');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+const clearEdgeCommandStatus=()=>{edgeCommandStatus.className='upload-status';edgeCommandStatus.textContent='';};
 async function pollEdgeInvocation(nextUrl){
   for(let i=0;i<24;i++){
     const r=await fetch(nextUrl,{cache:'no-store'}),d=await r.json().catch(()=>({}));
@@ -547,16 +548,26 @@ if(edgeCommandForm){
       if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
       if(d.ticker)localStorage.setItem('edge-console-selected-stock',d.ticker);if(d.status==='ALREADY_PUBLISHED_TODAY'){
         edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+runDateTime(d.run_timestamp)+' · '+d.run_id+' · loading current result…';
-        window.refreshEdgeLive?window.refreshEdgeLive():window.location.reload();
+        edgeCommandStatus.textContent='Loading today’s published EDGE '+d.ticker+' result…';
+        if(window.refreshEdgeLive){
+          await window.refreshEdgeLive();
+          clearEdgeCommandStatus();
+        }else{
+          window.location.reload();
+        }
         return;
       }
       edgeCommandStatus.textContent='Dispatched '+d.ticker+' · monitoring for governed publication…';
       const completed=await pollEdgeInvocation(d.next);
       if(completed){
         edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='EDGE '+completed.ticker+' complete · '+completed.run_id+' · loading canonical V1.2 result…';
-        window.location.reload();
+        edgeCommandStatus.textContent='EDGE '+completed.ticker+' complete · loading published result…';
+        if(window.refreshEdgeLive){
+          await window.refreshEdgeLive();
+          clearEdgeCommandStatus();
+        }else{
+          window.location.reload();
+        }
       }else{
         edgeCommandStatus.className='upload-status ready';
         edgeCommandStatus.textContent='Dispatch accepted, but no newer governed recommendation has published yet. The runner may have failed closed; check again after the governed run window.';
