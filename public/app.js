@@ -339,15 +339,15 @@ function renderAssessment(container,payload){
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
   const f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},matured=Number(summary.matured_runs||0),pendingCount=Number(summary.pending_forecasts??pending.length??0);
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured · '+pendingCount+' pending</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+matured+' matured canonical checkpoint'+(matured===1?'':'s')+' · '+pendingCount+' pending run'+(pendingCount===1?'':'s')+'</small></div>',
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' assessed</small></div>',
-      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' hits / '+escapeHtml(r.total||0)+' assessed</small></div>',
-      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Absolute cumulative model return</small></div>',
-      '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful calls</small></div>',
-      '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful calls</small></div>',
+      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' matured canonical checkpoints</small></div>',
+      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' wins / '+escapeHtml(r.total||0)+' resolved canonical recommendations</small></div>',
+      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Canonical actionable calls only</small></div>',
+      '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful canonical calls</small></div>',
+      '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful canonical calls</small></div>',
     '</div>',
-    '<div class="scorecard-context assessment-pending-note"><p>Fresh published forecasts appear as pending immediately, but do not change accuracy or P/L until their D+1…D+5 outcomes become scorable.</p></div>',
+    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns remain visible for audit and revision analysis, but they do not increase forecast, recommendation or return denominators.</p><p>Pending runs do not change accuracy or P/L until canonical selection and governed outcomes become scorable.</p></div>',
     '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
