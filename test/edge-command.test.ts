@@ -65,3 +65,24 @@ test('workflow access check is non-mutating', async () => {
     globalThis.fetch = original;
   }
 });
+
+
+test('canonical EDGE dispatch carries request timestamp and slot to governed workflow', async () => {
+  const original = globalThis.fetch;
+  let body:any = null;
+  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    body = JSON.parse(String(init?.body));
+    return new Response(null, { status: 204 });
+  };
+  try {
+    const result = await dispatchEdgeWorkflow(
+      'secret-token','LTF','UNKNOWN','EDGE-RESEARCH-LTF-X',
+      '2026-09-22T03:25:00.000Z','08:55'
+    );
+    assert.equal(result.ok,true);
+    assert.equal(body.inputs.canonical_requested_at,'2026-09-22T03:25:00.000Z');
+    assert.equal(body.inputs.canonical_attempt_slot,'08:55');
+  } finally {
+    globalThis.fetch = original;
+  }
+});

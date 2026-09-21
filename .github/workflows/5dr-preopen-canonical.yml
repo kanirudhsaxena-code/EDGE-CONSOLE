@@ -1,0 +1,91 @@
+name: EDGE NIFTY Pre-open Canonical Attempts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10,20,25 3 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-nifty-preopen-canonical-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Launch and advance governed pre-open run
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          python - <<'PY'
+          import json, os, time, urllib.request
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          base=os.environ["CONSOLE_URL"].rstrip("/")
+          headers={
+              "Content-Type":"application/json",
+              "Accept":"application/json",
+              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
+              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
+          }
+          now=datetime.now(ZoneInfo("Asia/Kolkata"))
+          slot=now.strftime("%H:%M")
+          body={
+              "force_new":True,
+              "canonical_attempt":True,
+              "canonical_attempt_slot":slot,
+              "client_invocation_id":f"preopen-{now:%Y%m%d-%H%M}",
+          }
+          req=urllib.request.Request(
+              base+"/api/5dr/automated-runs",
+              data=json.dumps(body).encode(),
+              headers=headers,
+              method="POST",
+          )
+          with urllib.request.urlopen(req,timeout=30) as response:
+              payload=json.loads(response.read().decode())
+          request_id=((payload.get("request") or {}).get("request_id"))
+          if not request_id:
+              raise SystemExit(f"PREOPEN_RUN_CREATE_FAILED {payload}")
+          print(f"request_id={request_id} slot={slot}")
+
+          for attempt in range(48):
+              time.sleep(8)
+              resume=urllib.request.Request(
+                  base+f"/api/5dr/run-requests/{request_id}/resume-processing",
+                  data=b"{}",
+                  headers=headers,
+                  method="POST",
+              )
+              try:
+                  with urllib.request.urlopen(resume,timeout=30) as response:
+                      state=json.loads(response.read().decode())
+              except Exception as exc:
+                  print(f"resume_attempt={attempt+1} transport_error={type(exc).__name__}")
+                  continue
+              status=str(state.get("status") or "")
+              stage=str(state.get("adapter_stage") or "")
+              print(f"resume_attempt={attempt+1} status={status} stage={stage}")
+              if status=="COMPLETED":
+                  print(json.dumps({
+                      "status":"PREOPEN_RUN_COMPLETED",
+                      "request_id":request_id,
+                      "run_id":state.get("run_id"),
+                      "slot":slot,
+                      "completed_at":datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
+                  },sort_keys=True))
+                  raise SystemExit(0)
+              if status=="FAILED":
+                  raise SystemExit(f"PREOPEN_RUN_FAILED request_id={request_id} stage={stage}")
+          raise SystemExit(f"PREOPEN_RUN_TIMEOUT request_id={request_id}")
+          PY

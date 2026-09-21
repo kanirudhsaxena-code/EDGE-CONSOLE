@@ -139,6 +139,8 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   const sandboxRequested=isObject(body)&&body.sandbox===true;
   const forceNew=!isObject(body)||body.force_new!==false;
   const clientInvocationId=isObject(body)&&typeof body.client_invocation_id==='string'&&body.client_invocation_id.trim()?body.client_invocation_id.trim():null;
+  const canonicalAttempt=isObject(body)&&body.canonical_attempt===true;
+  const canonicalAttemptSlot=isObject(body)&&typeof body.canonical_attempt_slot==='string'?body.canonical_attempt_slot.trim():null;
   const runActor=sandboxRequested?{id:actor.authenticated?actor.id:'sandbox_acceptance',role:'TESTER' as const,authenticated:actor.authenticated}:actor;
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
@@ -157,7 +159,8 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     evidence_file_count:0,
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
-    invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString()},
+    invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot},
+    canonical_attempt:canonicalAttempt?{type:'PREOPEN_CANONICAL_ATTEMPT',slot:canonicalAttemptSlot,requested_at:new Date().toISOString()}:null,
     adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)

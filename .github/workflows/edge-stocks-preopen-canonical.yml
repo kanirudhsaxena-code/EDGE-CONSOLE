@@ -1,0 +1,126 @@
+name: EDGE Stocks Pre-open Canonical Attempts
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '10,20,25 3 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: edge-stocks-preopen-canonical-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Attempt governed pre-open runs for active stock lineages
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          python - <<'PY'
+          import json, os, time, urllib.parse, urllib.request, urllib.error
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          IST=ZoneInfo("Asia/Kolkata")
+          base=os.environ["CONSOLE_URL"].rstrip("/")
+          headers={
+              "Content-Type":"application/json",
+              "Accept":"application/json",
+              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
+              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
+          }
+
+          def request_json(url,method="GET",payload=None):
+              req=urllib.request.Request(
+                  url,
+                  data=None if payload is None else json.dumps(payload).encode("utf-8"),
+                  headers=headers,
+                  method=method,
+              )
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as response:
+                      return response.status,json.loads(response.read().decode("utf-8"))
+              except urllib.error.HTTPError as exc:
+                  raw=exc.read().decode("utf-8","replace")
+                  try: body=json.loads(raw)
+                  except Exception: body={"error":raw[:1000]}
+                  return exc.code,body
+
+          status,targets_payload=request_json(base+"/api/edge-stocks/canonical-targets")
+          if status!=200:
+              raise SystemExit(f"CANONICAL_TARGETS_FAILED http={status} body={targets_payload}")
+          targets=targets_payload.get("canonical_targets")
+          if not isinstance(targets,list):
+              raise SystemExit("CANONICAL_TARGETS_INVALID")
+
+          now=datetime.now(IST)
+          requested_at=now.isoformat()
+          slot=now.strftime("%H:%M")
+          dispatched={}
+          skipped=[]
+          for target in targets:
+              ticker=str((target or {}).get("ticker") or "").strip().upper()
+              if not ticker:
+                  continue
+              body={
+                  "command":f"EDGE {ticker}",
+                  "force_new":True,
+                  "canonical_attempt":True,
+                  "canonical_attempt_slot":slot,
+                  "canonical_requested_at":requested_at,
+              }
+              code,result=request_json(base+"/api/edge-stocks/invoke","POST",body)
+              if code==202 and result.get("status")=="DISPATCHED":
+                  dispatched[ticker]={
+                      "after":result.get("dispatched_at"),
+                      "research_bundle_id":result.get("research_bundle_id"),
+                  }
+                  print(f"canonical_dispatch ticker={ticker} slot={slot} status=DISPATCHED")
+              elif code==409 and result.get("code")=="EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED":
+                  skipped.append({"ticker":ticker,"reason":"RESEARCH_REFRESH_REQUIRED"})
+                  print(f"canonical_dispatch ticker={ticker} slot={slot} status=RESEARCH_REFRESH_REQUIRED")
+              else:
+                  skipped.append({"ticker":ticker,"reason":result.get("code") or result.get("error") or f"HTTP_{code}"})
+                  print(f"canonical_dispatch ticker={ticker} slot={slot} status=BLOCKED code={code}")
+
+          deadline=time.monotonic()+240
+          completed={}
+          while dispatched and time.monotonic()<deadline:
+              for ticker,state in list(dispatched.items()):
+                  after=state.get("after")
+                  if not after:
+                      skipped.append({"ticker":ticker,"reason":"MISSING_DISPATCH_TIMESTAMP"})
+                      dispatched.pop(ticker,None)
+                      continue
+                  qs=urllib.parse.urlencode({"ticker":ticker,"after":after})
+                  code,result=request_json(base+"/api/edge-stocks/invoke/status?"+qs)
+                  if code==200 and result.get("status")=="COMPLETE":
+                      completed[ticker]=result.get("run_id")
+                      dispatched.pop(ticker,None)
+                      print(f"canonical_result ticker={ticker} status=COMPLETE run_id={result.get('run_id')}")
+              if dispatched:
+                  time.sleep(8)
+
+          for ticker in list(dispatched):
+              skipped.append({"ticker":ticker,"reason":"NOT_COMPLETED_WITHIN_ATTEMPT_WINDOW"})
+              print(f"canonical_result ticker={ticker} status=PENDING_OR_MISSED")
+          print(json.dumps({
+              "status":"EDGE_STOCKS_PREOPEN_ATTEMPT_COMPLETE",
+              "slot":slot,
+              "requested_at":requested_at,
+              "targets":len(targets),
+              "completed":completed,
+              "skipped":skipped,
+              "trading_enabled":False,
+          },sort_keys=True))
+          PY

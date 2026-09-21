@@ -196,21 +196,22 @@ async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id:
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
-async function latestFreshEdgeResearchBundle(env: Env, ticker: string): Promise<{ bundleId: string } | null> {
+async function latestFreshEdgeResearchBundle(env: Env, ticker: string, maxAgeMinutes = 24 * 60): Promise<{ bundleId: string; researchFreshAt: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
+  const cutoff = new Date(Date.now() - Math.max(1, maxAgeMinutes) * 60_000).toISOString();
   const rows = await sql`
-    select bundle_id,payload
+    select bundle_id,payload,research_fresh_at
       from edge_research_bundles
      where ticker = ${ticker}
        and status = 'READY'
-       and research_fresh_at >= now() - interval '24 hours'
+       and research_fresh_at >= ${cutoff}
      order by research_fresh_at desc, inserted_at desc
      limit 10
   `;
   for (const row of rows) {
     const payload = row.payload;
-    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id) };
+    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id), researchFreshAt: row.research_fresh_at };
   }
   return null;
 }
@@ -243,6 +244,8 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const ticker = resolved.ticker;
 
   const forceNew = body.force_new === true;
+  const canonicalAttempt = body.canonical_attempt === true;
+  const canonicalAttemptSlot = typeof body.canonical_attempt_slot === 'string' ? body.canonical_attempt_slot.trim() : null;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
   if (existingToday && !forceNew && !isObject(body.research_bundle)) {
     return json({
@@ -265,15 +268,19 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
     researchBundleId = saved.bundleId;
   } else if (forceNew) {
-    const fresh = await latestFreshEdgeResearchBundle(env, ticker);
+    const fresh = await latestFreshEdgeResearchBundle(env, ticker, canonicalAttempt ? 90 : 24 * 60);
     researchBundleId = fresh?.bundleId;
     if (!researchBundleId) {
       return json({
-        error: 'A fresh governed EDGE run was requested, but no valid ChatGPT research bundle from the last 24 hours is available for this ticker',
-        code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
+        error: canonicalAttempt
+          ? 'A pre-open canonical EDGE run requires a valid ChatGPT research bundle refreshed within the last 90 minutes'
+          : 'A fresh governed EDGE run was requested, but no valid ChatGPT research bundle from the last 24 hours is available for this ticker',
+        code: canonicalAttempt ? 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED' : 'EDGE_RESEARCH_BUNDLE_REQUIRED',
         contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
         ticker,
-        fresh_run_requested: true
+        fresh_run_requested: true,
+        canonical_attempt: canonicalAttempt,
+        canonical_attempt_slot: canonicalAttemptSlot
       }, 409);
     }
   } else {
@@ -288,8 +295,16 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const baseline = await latestEdgeRecommendation(env, ticker);
   const baselineRunId = baseline?.id ?? null;
   const dispatchedAt = new Date().toISOString();
+  const canonicalRequestedAt = canonicalAttempt
+    ? (typeof body.canonical_requested_at === 'string' && !Number.isNaN(Date.parse(body.canonical_requested_at))
+        ? new Date(body.canonical_requested_at).toISOString()
+        : dispatchedAt)
+    : undefined;
 
-  const dispatch = await dispatchEdgeWorkflow(env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId);
+  const dispatch = await dispatchEdgeWorkflow(
+    env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
+    canonicalRequestedAt, canonicalAttemptSlot ?? undefined
+  );
   if (!dispatch.ok) {
     return json({
       error: 'EDGE autonomous dispatch failed',
@@ -313,9 +328,38 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     dispatched_at: dispatchedAt,
     fresh_run: true,
     reused_output: false,
+    canonical_attempt: canonicalAttempt,
+    canonical_attempt_slot: canonicalAttemptSlot,
+    canonical_requested_at: canonicalRequestedAt ?? null,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
   }, 202);
+}
+
+async function edgeStocksCanonicalTargets(env: Env): Promise<Response> {
+  if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select distinct r.ticker,r.forecast_horizon,
+           max(erb.research_fresh_at) as latest_research_fresh_at
+      from recommendations r
+      join recommendation_lifecycle l using(recommendation_id)
+      left join recommendation_research_bundle rrb using(recommendation_id)
+      left join edge_research_bundles erb using(bundle_id)
+     where l.status='OPEN'
+     group by r.ticker,r.forecast_horizon
+     order by r.ticker,r.forecast_horizon
+  `;
+  return json({
+    canonical_targets: rows.map(row => ({
+      ticker: String(row.ticker).toUpperCase(),
+      forecast_horizon: String(row.forecast_horizon),
+      latest_research_fresh_at: row.latest_research_fresh_at ?? null,
+    })),
+    selection_key: 'ticker + target_trading_date + governed_horizon',
+    research_max_age_minutes: 90,
+    trading_enabled: false,
+  });
 }
 
 async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string): Promise<Response> {
@@ -784,6 +828,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   const researchBundle = url.pathname.match(/^\/api\/edge-stocks\/research-bundles\/([^/]+)$/);
   if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
   if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
+  if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');

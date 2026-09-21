@@ -1,0 +1,69 @@
+name: Import 5DR Canonical Assessment State
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '25 3-11 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: import-5dr-canonical-assessment
+  cancel-in-progress: true
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      HANDOFF_URL: https://raw.githubusercontent.com/kanirudhsaxena-code/5DR-V2/state/assessment-handoff/runtime/5dr-assessment-handoff.json
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Fetch, validate and import canonical assessment
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          python - <<'PY'
+          import json, os, urllib.request
+          from datetime import datetime, timezone
+
+          handoff_req=urllib.request.Request(
+              os.environ["HANDOFF_URL"],
+              headers={"Accept":"application/json","Cache-Control":"no-cache"},
+          )
+          with urllib.request.urlopen(handoff_req,timeout=30) as response:
+              handoff=json.loads(response.read().decode("utf-8"))
+          if handoff.get("schema_version")!="5DR_ASSESSMENT_HANDOFF_V1":
+              raise SystemExit(f"ASSESSMENT_HANDOFF_SCHEMA_MISMATCH {handoff.get('schema_version')}")
+          generated=handoff.get("generated_at")
+          if not isinstance(generated,str):
+              raise SystemExit("ASSESSMENT_HANDOFF_MISSING_GENERATED_AT")
+          generated_at=datetime.fromisoformat(generated.replace("Z","+00:00"))
+          age=(datetime.now(timezone.utc)-generated_at.astimezone(timezone.utc)).total_seconds()
+          if age < -300 or age > 7200:
+              raise SystemExit(f"ASSESSMENT_HANDOFF_STALE age_seconds={int(age)}")
+          assessment=handoff.get("assessment")
+          if not isinstance(assessment,dict) or assessment.get("engine")!="5DR":
+              raise SystemExit("ASSESSMENT_HANDOFF_INVALID_PAYLOAD")
+
+          headers={
+              "Content-Type":"application/json",
+              "Accept":"application/json",
+              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
+              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
+          }
+          req=urllib.request.Request(
+              os.environ["CONSOLE_URL"].rstrip("/")+"/api/assessment-import",
+              data=json.dumps(assessment).encode("utf-8"),
+              headers=headers,
+              method="POST",
+          )
+          with urllib.request.urlopen(req,timeout=30) as response:
+              body=response.read().decode("utf-8")
+              print(f"assessment_import_status={response.status}")
+              print(body)
+          PY
