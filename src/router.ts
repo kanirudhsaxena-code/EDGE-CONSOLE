@@ -408,6 +408,20 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
      where recommendation_id = ${String(active.recommendation_id)}
      order by component
   `;
+  const researchRows = await sql`
+    select erb.payload
+      from recommendation_research_bundle rrb
+      join edge_research_bundles erb using (bundle_id)
+     where rrb.recommendation_id = ${String(active.recommendation_id)}
+     order by rrb.linked_at desc
+     limit 1
+  `;
+  const researchPayload = researchRows.length && isObject(researchRows[0].payload)
+    ? researchRows[0].payload as Record<string, unknown>
+    : {};
+  const researchClaims = Array.isArray(researchPayload.claims)
+    ? researchPayload.claims.filter(isObject)
+    : [];
 
   const des = numberOrNull(active.des);
   const marketTrust = numberOrNull(active.resolved_market_trust_score);
@@ -465,6 +479,67 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       'This governed component is contributing to the overall EDGE direction and conviction.';
     return `Legacy active run: the original narrative field was not persisted. The immutable verified component score is ${Number.isFinite(score) ? score.toFixed(0) : 'N/A'} (${tone}); ${consequence}`;
   };
+  const componentKey = (value: unknown): string => String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
+  const researchFinding = (componentRaw: unknown): string | undefined => {
+    const component = componentKey(componentRaw);
+    const statements = researchClaims
+      .filter((claim: Record<string, unknown>) =>
+        componentKey(claim.evidence_category) === component &&
+        String(claim.verification_status || '').toUpperCase() === 'VERIFIED' &&
+        isNonEmptyString(claim.statement)
+      )
+      .map((claim: Record<string, unknown>) => String(claim.statement).trim());
+    return [...new Set(statements)].join(' ') || undefined;
+  };
+  const plainFinding = (
+    componentRaw: unknown,
+    scoreRaw: unknown,
+    verification: string,
+    notes: { key_outcome?: string; interpretation?: string },
+  ): string => {
+    const component = componentKey(componentRaw);
+    const fromResearch = researchFinding(component);
+    if (fromResearch) return fromResearch;
+
+    if (verification !== 'VERIFIED') {
+      if (component.includes('INSTITUTIONAL')) {
+        return 'This run did not contain independently verified FII, DII or mutual-fund holding/flow evidence, so EDGE left Institutional Behaviour unscored.';
+      }
+      if (component.includes('VALUATION')) {
+        return 'This run did not contain independently verified valuation evidence that met the EDGE evidence gate, so valuation was left unscored.';
+      }
+      return 'This run did not contain enough verified evidence to score this factor.';
+    }
+
+    const n = Number(scoreRaw);
+    const raw = String(notes.interpretation || '');
+    const patternMatch = raw.match(/(?:pattern is|pattern as)\s+([A-Z0-9_ -]+)/i);
+    const pattern = patternMatch ? patternMatch[1].trim().replace(/_/g,' ').toLowerCase() : '';
+
+    if (component.includes('PRICE_STRUCTURE')) {
+      if (pattern === 'range' || n === 0) return 'The latest price structure is range-bound, with no confirmed directional break.';
+      if (n > 0) return 'The latest price structure is trending higher and supports the five-day setup.';
+      return 'The latest price structure is trending lower and weakens the five-day setup.';
+    }
+    if (component.includes('SPECIFIC_CHART_PATTERN') || component.includes('CHART_PATTERN')) {
+      if (pattern === 'range' || n === 0) return 'Daily candles are still range-bound; no breakout or breakdown pattern is confirmed.';
+      return pattern
+        ? 'Daily candles show a '+pattern+' pattern.'
+        : 'Daily candles show a verified directional chart pattern.';
+    }
+    if (component.includes('PV_PVPO') || component === 'PVPO' || component === 'PV') {
+      if (n > 0) return 'Price and volume are confirming the current move; options open interest is used only as secondary confirmation when available.';
+      if (n < 0) return 'Price and volume are weakening the current move; options open interest is used only as secondary confirmation when available.';
+      return 'Price and volume are not giving a clear directional confirmation; options open interest is secondary confirmation only.';
+    }
+    if (component.includes('RELATIVE_STRENGTH')) {
+      if (n > 0) return 'The stock is outperforming NIFTY 50 over the EDGE comparison window.';
+      if (n < 0) return 'The stock is underperforming NIFTY 50 over the EDGE comparison window.';
+      return 'The stock is showing no meaningful relative-performance edge versus NIFTY 50.';
+    }
+    return notes.interpretation || notes.key_outcome || scoreLabel(scoreRaw);
+  };
+
   const drilldown = componentRows.map((row: Record<string, unknown>) => {
     const verification = componentVerificationStatus(row.availability_status, row.evidence_quality);
     const notes = parseNotes(row.notes);
@@ -476,6 +551,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       score_or_level: row.raw_score ?? 'N/A',
       verification_status: verification,
       key_outcome: keyOutcome,
+      finding: plainFinding(row.component,row.raw_score,verification,notes),
       interpretation,
       narrative_source: reconstructed ? 'LEGACY_SCORE_RECONSTRUCTION' : 'PERSISTED_EVIDENCE_NARRATIVE',
     };
