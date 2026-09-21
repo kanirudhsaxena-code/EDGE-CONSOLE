@@ -149,8 +149,15 @@ function componentMeaning(raw){
   return 'This governed factor contributes to the overall EDGE direction and confidence.';
 }
 function drillFinding(row){
+  const published=String(row?.finding||'').trim();
+  if(published)return published;
   const verified=String(row?.verification_status||'NOT_VERIFIED')==='VERIFIED';
-  if(!verified)return 'The available evidence for this factor is not sufficiently verified, so EDGE does not use it as a confident user-facing finding.';
+  if(!verified){
+    const component=String(row?.component||'').toUpperCase();
+    if(component.includes('INSTITUTIONAL'))return 'This run did not contain independently verified FII, DII or mutual-fund holding/flow evidence, so EDGE left Institutional Behaviour unscored.';
+    if(component.includes('VALUATION'))return 'This run did not contain independently verified valuation evidence that met the EDGE evidence gate, so valuation was left unscored.';
+    return 'This run did not contain enough verified evidence to score this factor.';
+  }
   const raw=String(row?.interpretation||'').trim();
   const legacy=row?.narrative_source==='LEGACY_SCORE_RECONSTRUCTION'||/legacy active run|original narrative field was not persisted|immutable verified component score/i.test(raw);
   if(legacy){
