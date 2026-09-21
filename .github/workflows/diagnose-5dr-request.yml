@@ -1,0 +1,23 @@
+name: Diagnose 5DR Request
+on:
+  push:
+    branches:
+      - 'diag-5dr-*'
+permissions:
+  contents: read
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Read exact request
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$CONSOLE_URL/api/5dr/run-requests/5drreq_fa684f6a-3e9a-40e9-a9f0-2476977f9fb6"
