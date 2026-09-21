@@ -48,8 +48,21 @@ jobs:
           import json,sys,shlex
           d=json.load(open(sys.argv[1],encoding='utf-8'))
           module=str(d['module']).upper()
+          capture_only=bool(d.get('capture_only'))
           print('CAPTURE_MODULE='+shlex.quote(module))
-          if module=='EDGE_NIFTY':
+          print('CAPTURE_ONLY='+('true' if capture_only else 'false'))
+          if capture_only:
+              if module=='EDGE_NIFTY':
+                  rid=str(d.get('request_id') or '').strip()
+                  assert rid,d
+                  print('CAPTURE_REQUEST_ID='+shlex.quote(rid))
+              else:
+                  ticker=str(d.get('ticker') or '').strip().upper()
+                  assert ticker,d
+                  print('CAPTURE_TICKER='+shlex.quote(ticker))
+              expected=str(d.get('expected_result_id') or '').strip()
+              if expected: print('EXPECTED_RESULT_ID='+shlex.quote(expected))
+          elif module=='EDGE_NIFTY':
               assessment=d.get('assessment') or {
                   'objective':'BOTH',
                   'risk_posture':'CONSERVATIVE',
@@ -71,7 +84,9 @@ jobs:
           PY
           cat /tmp/request.env >> "$GITHUB_ENV"
 
-          if [ "$CAPTURE_MODULE" = "EDGE_NIFTY" ]; then
+          if [ "$CAPTURE_ONLY" = "true" ]; then
+            echo "Capture-only mode: using existing canonical Console result."
+          elif [ "$CAPTURE_MODULE" = "EDGE_NIFTY" ]; then
             code="$(curl --location --silent --show-error \
               -X POST \
               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
