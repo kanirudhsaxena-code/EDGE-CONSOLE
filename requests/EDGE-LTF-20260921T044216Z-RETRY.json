@@ -1,0 +1,139 @@
+{
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-LTF-20260921T043806Z",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-09-21T04:38:06Z",
+    "research_fresh_at": "2026-09-21T04:38:06Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf21_s1_newsroom",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance News Room",
+        "retrieved_at": "2026-09-21T04:38:06Z",
+        "publication_date": "2026-09-09T00:00:00+05:30",
+        "event_date": "2026-09-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf21_s2_investors",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors/details",
+        "title": "L&T Finance Investor Details - FY2026-27",
+        "retrieved_at": "2026-09-21T04:38:06Z",
+        "publication_date": "2026-06-30T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf21_s3_fy26",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/docs/default-source/default-document-library/press-release/q4fy26-and-fy26-financial-results-press-release-mainlines-1.pdf",
+        "title": "L&T Finance Q4FY26 and FY26 Financial Results Press Release",
+        "retrieved_at": "2026-09-21T04:38:06Z",
+        "publication_date": "2026-04-24T00:00:00+05:30",
+        "event_date": "2026-04-24T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf21_s4_disclosures",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd",
+        "title": "L&T Finance Statutory Disclosures",
+        "retrieved_at": "2026-09-21T04:38:06Z",
+        "publication_date": "2026-09-10T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf21_s5_rbi",
+        "provider": "CHATGPT_WEB",
+        "authority": "REGULATORY",
+        "url": "https://m.rbi.org.in/Scripts/NotificationUser.aspx?Id=10001&Mode=0",
+        "title": "Reserve Bank of India Current Rates and August 2026 Monetary Policy context",
+        "retrieved_at": "2026-09-21T04:38:06Z",
+        "publication_date": "2026-08-05T00:00:00+05:30",
+        "event_date": "2026-08-05T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf21_c1_fundamentals",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance entered FY27 after reporting FY26 consolidated PAT of Rs 3,003 crore before the Labour Code effect, up 14% YoY, a retail book of Rs 1,19,508 crore up 26% YoY, and annual retail disbursements of Rs 83,213 crore up 39% YoY. The company has also published Q1FY27 consolidated results and an investor presentation for the quarter ended June 30, 2026. This supports a positive structural business-fundamentals direction, while live price and near-term trading direction remain the production engine's responsibility.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf21_s2_investors",
+          "ltf21_s3_fy26"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf21_c2_digital_catalyst",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "On September 9, 2026, L&T Finance announced a partnership with Pine Labs to introduce agentic commerce and payments on the L&T Finance PLANET app. This is a current strategic/digital-distribution catalyst, but its near-term financial contribution is not yet quantified.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf21_s1_newsroom"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf21_c3_funding",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Recent September 2026 statutory disclosures show continuing commercial-paper issuance activity, including offer letters dated September 7-10, 2026. This confirms ongoing liability-market access but does not by itself establish a bullish or bearish five-day stock catalyst.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf21_s4_disclosures"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf21_c4_macro",
+        "evidence_category": "SECTOR_MACRO",
+        "statement": "The RBI's August 2026 policy context shows the policy repo rate at 5.25%. For an NBFC such as L&T Finance this is material to funding and lending economics, but the net near-term effect on LTF is not independently one-directional from this evidence alone.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf21_s5_rbi"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf21_c5_event_shock",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "The recent official company sources reviewed for this run show operating, digital-partnership and funding disclosures rather than a verified company-specific adverse shock. This claim is limited to the reviewed sources and must not override live market or volatility evidence.",
+        "materiality": "LOW",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf21_s1_newsroom",
+          "ltf21_s4_disclosures"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The latest numeric financial figures cited are FY26 results; Q1FY27 documents are confirmed as published, but this research bundle does not infer unverified Q1 line-item figures.",
+      "The September Pine Labs announcement is strategically positive but its near-term earnings impact is not quantified.",
+      "Commercial-paper disclosures confirm funding-market activity but are not interpreted as a directional stock signal.",
+      "The RBI policy-rate context is sector-level evidence and does not replace LTF-specific live market data.",
+      "This bundle contains no manually created EDGE score, DES, Market Trust, BOT, probability, Decision Ladder, price zone, or recommendation.",
+      "Live price, volume and other structured market evidence remain the autonomous provider/engine responsibility."
+    ]
+  }
+}
