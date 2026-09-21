@@ -94,6 +94,8 @@ jobs:
                       "metadata":{
                           "intelligence_handoff":{"normalized":normalized} if normalized is not None else {},
                           "automated_market_evidence":market if market is not None else {},
+                          "invocation":metadata.get("invocation") if isinstance(metadata.get("invocation"),dict) else {},
+                          "canonical_attempt":metadata.get("canonical_attempt") if isinstance(metadata.get("canonical_attempt"),dict) else None,
                       },
                   },
               })
