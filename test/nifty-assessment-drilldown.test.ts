@@ -93,3 +93,15 @@ test('5DR canonical handoff is a dedicated sanitized governed endpoint',()=>{
   assert.ok(workflow.includes('/api/5dr/canonical-handoff'));
   assert.ok(!workflow.includes('/api/runs/latest?engine=5DR'));
 });
+
+
+test('5DR assessment exposes latest canonical regime and does not promise rerun scoring',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const source=readFileSync('src/index.ts','utf8');
+  assert.ok(app.includes('Official canonical · latest governed target'));
+  assert.ok(app.includes('Legacy migration population'));
+  assert.ok(app.includes('Post-governance timing regime'));
+  assert.ok(app.includes('This operational run affects official accuracy only if it becomes the selected canonical'));
+  assert.ok(source.includes('canonical=isObject(m.canonical_selection)?m.canonical_selection:null'));
+  assert.ok(source.includes('canonical_selection:canonical'));
+});
