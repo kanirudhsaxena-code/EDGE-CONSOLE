@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { renderEdgeV13 } from '../public/edge-live.js';
 import { validateEdgeStocksResult } from '../src/edge-stocks';
 
@@ -198,4 +199,13 @@ test('validator rejects obsolete presentation order',()=>{
 
 test('current approved presentation contract validates cleanly',()=>{
   assert.equal(validateEdgeStocksResult(report).length,0);
+});
+
+
+test('EDGE Stocks renderer exposes canonical governance status',()=>{
+  const js=readFileSync('public/edge-live.js','utf8');
+  assert.ok(js.includes('Official canonical status'));
+  assert.ok(js.includes('Only selected canonical recommendations enter official efficacy'));
+  assert.ok(js.includes('No qualifying canonical was selected for this target'));
+  assert.ok(js.includes('current_run_is_selected'));
 });
