@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { renderEdgeV13 } from '../public/edge-live.js';
 import { validateEdgeStocksResult } from '../src/edge-stocks';
 
