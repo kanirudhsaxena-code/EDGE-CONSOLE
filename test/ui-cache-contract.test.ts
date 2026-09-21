@@ -2,10 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-test('Console HTML forces the approved EDGE UI v12 assets',()=>{
+test('Console HTML forces the approved EDGE UI v13 assets',()=>{
   const html=readFileSync('public/index.html','utf8');
-  assert.ok(html.includes('styles.css?v=edge-ui-v12-20260921'));
-  assert.ok(html.includes('edge-live.js?v=edge-ui-v12-20260921'));
+  assert.ok(html.includes('styles.css?v=edge-ui-v13-20260921'));
+  assert.ok(html.includes('edge-live.js?v=edge-ui-v13-20260921'));
   assert.ok(!html.includes('automated-5dr-v1-20260919'));
   assert.ok(html.includes('EDGE NIFTY'));
   assert.ok(html.includes('Run EDGE NIFTY'));
