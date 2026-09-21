@@ -138,3 +138,14 @@ test('5DR assessment summary selects latest imported rollup rather than highest 
   assert.ok(source.includes("assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1"));
   assert.ok(!source.includes("assessment_rollups where engine='5DR' order by assessed_at desc,id desc limit 1"));
 });
+
+
+test('legacy pending assessment population keeps only last valid run per IST run-date',()=>{
+  const source=readFileSync('src/index.ts','utf8');
+  const app=readFileSync('public/app.js','utf8');
+  assert.ok(source.includes("partition by (ar.generated_at at time zone 'Asia/Kolkata')::date"));
+  assert.ok(source.includes("where legacy_rank=1"));
+  assert.ok(source.includes("ar.generated_at < timestamptz '2026-09-21 18:30:00+00'"));
+  assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
+  assert.ok(app.includes('pending legacy canonical'));
+});
