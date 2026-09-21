@@ -53,5 +53,6 @@ test('EDGE NIFTY checkpoints system research before intelligence reconciliation'
   assert.ok(mobile.includes("if(stage==='RESEARCH_RETRIEVED')return reconcileIntelligence"));
   assert.ok(mobile.includes("existingResearch.status==='RESEARCH_RETRIEVED'"));
   assert.ok(app.includes("RESEARCH_RETRIEVED"));
+  assert.ok(mobile.includes("if(stage==='VISION_READY')return systemResearch"));
   assert.ok(!mobile.includes("if(!research.ok)return research;\n    return reconcileIntelligence(request,env,requestId);"));
 });
