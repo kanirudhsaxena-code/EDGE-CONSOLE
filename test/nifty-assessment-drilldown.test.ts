@@ -105,3 +105,20 @@ test('5DR assessment exposes latest canonical regime and does not promise rerun 
   assert.ok(source.includes('canonical=isObject(m.canonical_selection)?m.canonical_selection:null'));
   assert.ok(source.includes('canonical_selection:canonical'));
 });
+
+
+test('5DR assessment import uses governed 5DR route family',()=>{
+  const router=readFileSync('src/router.ts','utf8');
+  const workflow=readFileSync('.github/workflows/5dr-assessment-state-import.yml','utf8');
+  assert.ok(router.includes("'/api/5dr/assessment-import'"));
+  assert.ok(router.includes('fiveDrAssessmentImport(request, env)'));
+  assert.ok(workflow.includes('/api/5dr/assessment-import'));
+  assert.ok(!workflow.includes('/api/assessment-import'));
+});
+
+test('production smoke waits for v17 canonical UI before validation',()=>{
+  const workflow=readFileSync('.github/workflows/edge-production-smoke.yml','utf8');
+  assert.ok(workflow.includes('Official canonical status'));
+  assert.ok(workflow.includes('edge-ui-v17-20260921'));
+  assert.ok(workflow.includes('/tmp/deployed-index.html'));
+});
