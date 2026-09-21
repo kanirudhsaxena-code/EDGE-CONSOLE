@@ -70,6 +70,20 @@ async function sessionInfo(request:Request,env:Env):Promise<Response>{
   });
 }
 
+async function exact5drRequest(request:Request,env:Env,requestId:string):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(isAccessIdentityEnforced(env)&&!actor.authenticated)return json({error:'Authenticated Console identity is required'},401);
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`select request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,run_id,metadata,error,created_at,updated_at from analysis_requests where engine='5DR' and request_id=${requestId} limit 1`;
+  if(!rows.length)return json({request:null,run:null,error:'request_id not found'},404);
+  const metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  if(isAccessIdentityEnforced(env)&&actor.role!=='OWNER'&&!actorCanAccessStored(actor,metadata.actor,env))return json({error:'This run belongs to a different Console user'},403);
+  const runId=rows[0].run_id?String(rows[0].run_id):null;
+  const runRows=runId?await sql`select run_id,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,published,learning_eligible from analysis_runs where engine='5DR' and run_id=${runId} limit 1`:[];
+  return json({request:rows[0],run:runRows[0]??null});
+}
+
 async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
   if(!isAccessIdentityEnforced(env))return null;
   const actor=await resolveAccessActor(request,env);
@@ -504,6 +518,8 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
+  const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
+  if(exactRequest&&request.method==='GET')return exact5drRequest(request,env,decodeURIComponent(exactRequest[1]));
   const scopedRead=await scoped5drRead(request,env);if(scopedRead)return scopedRead;
   if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);

@@ -9,10 +9,21 @@ test('EDGE NIFTY automatically resumes every governed active stage',()=>{
   assert.ok(app.includes("autoResumableStages"));
   assert.ok(app.includes("if(shouldAutoResume)"));
   assert.ok(app.includes("if(active)setTimeout(()=>loadDashboard(),5000)"));
-  assert.ok(app.includes("PUBLICATION_SYNC_PENDING"));
-  assert.ok(app.includes("requestIsNewerThanPublished"));
-  assert.ok(app.includes("publicationPending"));
-  assert.ok(!app.includes("if(active&&latestReq.status==='PROCESSING')"));
+  assert.ok(app.includes("ACTIVE_NIFTY_REQUEST_KEY"));
+  assert.ok(app.includes("fetchExactNiftyRequest"));
+  assert.ok(app.includes("rememberActiveNiftyRequest"));
+  assert.ok(app.includes("if(active)setTimeout(()=>loadDashboard(),5000)"));
+  assert.ok(!app.includes("Continue EDGE NIFTY"));
+  assert.ok(!app.includes("resume5drRequest"));
+});
+
+test('EDGE NIFTY tracks the exact request launched by this browser, not the global newest request',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const mobile=readFileSync('src/mobile-v1-entry.ts','utf8');
+  assert.ok(app.includes("edge-console-active-nifty-request-v1"));
+  assert.ok(app.includes("/api/5dr/run-requests/'+encodeURIComponent(requestId)"));
+  assert.ok(mobile.includes("async function exact5drRequest"));
+  assert.ok(mobile.includes("request_id=${requestId}"));
 });
 
 test('EDGE NIFTY fresh invocation is explicit and never aliases a prior request',()=>{
