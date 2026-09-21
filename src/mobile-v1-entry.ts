@@ -137,6 +137,8 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   const batchId=`auto_${crypto.randomUUID()}`;
   let metadata:Record<string,unknown>={
     actor:actorMetadata(runActor),
+    identity_enforced:isAccessIdentityEnforced(env),
+    sandbox_requested:sandboxRequested,
     decision_setup:setup.value,
     evidence_file_count:0,
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
@@ -402,8 +404,7 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
     const runId=rows[0].run_id?String(rows[0].run_id):null;
     const runRows=runId?await sql`select published,learning_eligible from analysis_runs where run_id=${runId} and engine='5DR' limit 1`:[];
     const completion=isObject(metadata.completion)?metadata.completion:{};
-    const actor=isObject(metadata.actor)?metadata.actor:{};
-    const sandbox=completion.sandbox===true||actor.role==='TESTER';
+    const sandbox=completion.sandbox===true;
     return json({
       ok:true,
       request_id:requestId,
