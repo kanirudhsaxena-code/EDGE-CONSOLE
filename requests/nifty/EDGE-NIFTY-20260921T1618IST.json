@@ -1,0 +1,10 @@
+{
+  "sandbox": false,
+  "force_new": true,
+  "client_invocation_id": "chat-edge-nifty-20260921-1618-ist",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  }
+}
