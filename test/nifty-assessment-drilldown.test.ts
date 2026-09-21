@@ -43,3 +43,16 @@ test('pending detection does not disappear when assessment timestamp is newer th
   assert.ok(!source.includes('generated_at>${row.assessed_at}'));
   assert.ok(source.includes('outcome_assessments oa'));
 });
+
+
+test('5DR assessment labels official canonical population rather than run count',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const source=readFileSync('src/index.ts','utf8');
+  assert.ok(app.includes('matured canonical checkpoints'));
+  assert.ok(app.includes('resolved canonical recommendations'));
+  assert.ok(app.includes('one selected DAILY_CANONICAL forecast per target trading date'));
+  assert.ok(app.includes('Canonical actionable calls only'));
+  assert.ok(source.includes("population_rule:String(overall.population_rule??rec.population_rule??'SELECTED_DAILY_CANONICAL_ONLY')"));
+  assert.ok(source.includes("population:'MATURED_CANONICAL_CHECKPOINTS'"));
+  assert.ok(source.includes("population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS'"));
+});
