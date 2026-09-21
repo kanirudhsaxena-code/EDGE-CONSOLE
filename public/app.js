@@ -7,7 +7,7 @@ function setActiveModule(module){if(!MODULE_CONFIG[module])return;activeModule=m
 moduleTiles.forEach(tile=>tile.addEventListener('click',()=>setActiveModule(tile.dataset.module)));
 document.getElementById('runButton')?.addEventListener('click',()=>dialog.showModal());
 document.getElementById('closeRunDialog')?.addEventListener('click',()=>dialog.close());
-function escapeHtml(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}function readableBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB'}function setUploadStatus(m,s){uploadStatus.className='upload-status'+(s?' '+s:'');uploadStatus.textContent=m||''}
+function escapeHtml(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}function runDateTime(v){if(!v)return'—';const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString('en-IN',{timeZone:'Asia/Kolkata',day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:true})}function readableBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB'}function setUploadStatus(m,s){uploadStatus.className='upload-status'+(s?' '+s:'');uploadStatus.textContent=m||''}
 function friendlyEngineStatus(status){const map={EVIDENCE_GATE_READY:'Ready',ACTIVE:'Ready',FOUNDATION:'Setup in progress',INTEGRATION_PENDING:'Setup in progress',READY:'Ready'};return map[String(status)]||String(status||'Status unavailable').replaceAll('_',' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
 function friendlyDirection(value){const map={BULL:'Bullish',BEAR:'Bearish',RANGE:'Range-bound'};return map[String(value)]||String(value||'—')}
 function confidenceLabel(value){const n=Number(value);if(!Number.isFinite(n))return'Unavailable';if(n>=75)return'High';if(n>=50)return'Moderate';return'Low'}
@@ -408,11 +408,11 @@ function renderGenericModule(engine,target,runsData){
 async function loadRecentResults(module){
   if(!runs||!runsNote)return;
   try{
-    if(module==='EDGE_IPO'){const d=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()),snap=d.snapshot||null;if(!snap){runs.innerHTML='<div class="generic-empty">No IPO EDGE snapshot available.</div>';runsNote.textContent='0 recent';return}runs.innerHTML='<article class="run history-row"><strong>IPO EDGE snapshot</strong><span class="muted">'+escapeHtml(new Date(snap.captured_at).toLocaleString())+'</span></article>';runsNote.textContent='1 current snapshot';return}
-    if(module==='EDGE_STOCKS'){const ticker=localStorage.getItem('edge-console-selected-stock')||'LTF',d=await fetch('/api/edge-stocks/history?ticker='+encodeURIComponent(ticker),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.recommendations)?d.recommendations:[];if(!list.length){runs.innerHTML='<div class="generic-empty">No published EDGE Stocks recommendations for '+escapeHtml(ticker)+'.</div>';runsNote.textContent='0 recent';return}runs.innerHTML=list.map(r=>'<article class="run history-row"><strong>'+escapeHtml(ticker)+' · '+escapeHtml(String(r.definitive_forecast||'—').replaceAll('_',' '))+'</strong><span class="muted">'+escapeHtml(new Date(r.run_timestamp).toLocaleString())+' · '+escapeHtml(r.outcome_verdict||r.status||'OPEN')+(r.current_return_pct!=null?' · '+escapeHtml(Number(r.current_return_pct).toFixed(1))+'%':'')+'</span></article>').join('');runsNote.textContent=list.length+' recent';return}
+    if(module==='EDGE_IPO'){const d=await fetch('/api/ipo-edge/snapshot',{cache:'no-store'}).then(r=>r.json()),snap=d.snapshot||null;if(!snap){runs.innerHTML='<div class="generic-empty">No IPO EDGE snapshot available.</div>';runsNote.textContent='0 recent';return}runs.innerHTML='<article class="run history-row"><strong>IPO EDGE snapshot</strong><span class="muted">'+escapeHtml(runDateTime(snap.captured_at))+'</span></article>';runsNote.textContent='1 current snapshot';return}
+    if(module==='EDGE_STOCKS'){const ticker=localStorage.getItem('edge-console-selected-stock')||'LTF',d=await fetch('/api/edge-stocks/history?ticker='+encodeURIComponent(ticker),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.recommendations)?d.recommendations:[];if(!list.length){runs.innerHTML='<div class="generic-empty">No published EDGE Stocks recommendations for '+escapeHtml(ticker)+'.</div>';runsNote.textContent='0 recent';return}runs.innerHTML=list.map(r=>'<article class="run history-row"><strong>'+escapeHtml(ticker)+' · '+escapeHtml(String(r.definitive_forecast||'—').replaceAll('_',' '))+'</strong><span class="muted">'+escapeHtml(runDateTime(r.run_timestamp))+' · '+escapeHtml(r.outcome_verdict||r.status||'OPEN')+(r.current_return_pct!=null?' · '+escapeHtml(Number(r.current_return_pct).toFixed(1))+'%':'')+'</span></article>').join('');runsNote.textContent=list.length+' recent';return}
     const d=await fetch('/api/runs/latest?engine='+encodeURIComponent(module),{cache:'no-store'}).then(r=>r.json()),list=Array.isArray(d.runs)?d.runs:[];
     if(!list.length){runs.innerHTML='<div class="generic-empty">No published results for this module yet.</div>';runsNote.textContent='0 recent';return}
-    runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'EDGE NIFTY result':'EDGE Stocks result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'
+    runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'EDGE NIFTY result':'EDGE Stocks result')+'</strong><span class="muted">'+escapeHtml(runDateTime(r.generated_at))+'</span></article>').join('');runsNote.textContent=list.length+' recent'
   }catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
 }
 function render5dr(run,request,outcomeAssessment){
@@ -423,7 +423,7 @@ function render5dr(run,request,outcomeAssessment){
     const resume=request&&((['READY_FOR_ENGINE','FAILED'].includes(status)&&['SCREENSHOTS_READY','AUTONOMOUS_EVIDENCE_BLOCKED','AUTONOMOUS_EVIDENCE_READY','INTELLIGENCE_BLOCKED','INTELLIGENCE_READY','NORMALIZATION_BLOCKED','NORMALIZED_READY'].includes(stage))||(status==='PROCESSING'&&stage==='NORMALIZED_READY'))?
       '<div class="simple-action"><button id="resume5drRequest" class="primary" type="button" data-request-id="'+escapeHtml(request.request_id)+'">'+(status==='PROCESSING'?'Check result':status==='FAILED'?'Retry EDGE NIFTY':'Continue EDGE NIFTY')+'</button><p id="resume5drStatus" class="muted">'+(status==='PROCESSING'?'EDGE NIFTY is running. Check again for the completed result.':'Continue from where the run stopped. The governed run state and evidence are already saved.')+'</p></div>':'';
     const technical=request?'<details class="tech-details"><summary>Advanced details</summary><div class="tech-body"><div><span>Request</span><strong>'+escapeHtml(request.request_id)+'</strong></div><div><span>Internal stage</span><strong>'+escapeHtml(stage)+'</strong></div><div><span>Status</span><strong>'+escapeHtml(status)+'</strong></div><div><span>Evidence files</span><strong>'+escapeHtml(meta.evidence_file_count||'—')+'</strong></div></div></details>':'';
-    const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run assessment</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><h2>'+escapeHtml(progress)+'</h2><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
+    const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run assessment</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><div class="run-timestamp">Run time · '+escapeHtml(runDateTime(request?.created_at||request?.updated_at))+'</div><h2>'+escapeHtml(progress)+'</h2><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
     return;
   }
   const result=run.result||{},prob=result.probabilities||{},blockers=Array.isArray(result.tradeability_blockers)?result.tradeability_blockers:[],direction=friendlyDirection(result.directional_label),confidence=confidenceLabel(result.market_trust),tradeable=result.tradeable===true;
@@ -437,6 +437,7 @@ function render5dr(run,request,outcomeAssessment){
   fiveDrSummary.innerHTML=[
     '<article class="simple-result direction-'+escapeHtml(String(result.directional_label||'RANGE').toLowerCase())+'">',
       '<div class="result-kicker">Today’s Market View</div>',
+      '<div class="run-timestamp">Run time · '+escapeHtml(runDateTime(run.generated_at||run.created_at))+'</div>',
       '<h2>'+escapeHtml(direction)+'</h2>',
       '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
       '<div class="nifty-signal-grid">',
@@ -519,7 +520,7 @@ async function pollEdgeInvocation(nextUrl){
     if(!r.ok)throw new Error(d.error||'Could not check EDGE invocation status.');
     if(d.status==='COMPLETE')return d;
     edgeCommandStatus.className='upload-status working';
-    edgeCommandStatus.textContent='Governed EDGE run dispatched · waiting for a newly published V1.2 recommendation…';
+    edgeCommandStatus.textContent='Governed EDGE run dispatched · waiting for a newly published governed recommendation…';
     await sleep(5000);
   }
   return null;
@@ -538,7 +539,7 @@ if(edgeCommandForm){
       if(!r.ok)throw new Error(d.detail?((d.error||'EDGE dispatch failed')+' · '+d.detail):(d.error||'EDGE dispatch failed'));
       if(d.ticker)localStorage.setItem('edge-console-selected-stock',d.ticker);if(d.status==='ALREADY_PUBLISHED_TODAY'){
         edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+d.run_id+' · loading canonical V1.2 result…';
+        edgeCommandStatus.textContent='Today’s governed EDGE '+d.ticker+' result already exists · '+d.run_id+' · '+runDateTime(d.run_timestamp)+' · loading current result…';
         window.refreshEdgeLive?window.refreshEdgeLive():window.location.reload();
         return;
       }
@@ -546,7 +547,7 @@ if(edgeCommandForm){
       const completed=await pollEdgeInvocation(d.next);
       if(completed){
         edgeCommandStatus.className='upload-status success';
-        edgeCommandStatus.textContent='EDGE '+completed.ticker+' complete · '+completed.run_id+' · loading canonical V1.2 result…';
+        edgeCommandStatus.textContent='EDGE '+completed.ticker+' complete · '+completed.run_id+' · loading current result…';
         window.location.reload();
       }else{
         edgeCommandStatus.className='upload-status ready';
