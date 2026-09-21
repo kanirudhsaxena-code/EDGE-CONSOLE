@@ -212,6 +212,25 @@ async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
+async function latestReusableEdgeResearchBundle(env: Env, ticker: string): Promise<{ bundleId: string; payload: unknown } | null> {
+  if (!env.EDGE_DATABASE_URL) return null;
+  const sql = neon(env.EDGE_DATABASE_URL);
+  const rows = await sql`
+    select bundle_id,payload
+      from edge_research_bundles
+     where ticker = ${ticker}
+       and status = 'READY'
+       and research_fresh_at >= now() - interval '24 hours'
+     order by research_fresh_at desc
+     limit 5
+  `;
+  for (const row of rows) {
+    const payload = row.payload;
+    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id), payload };
+  }
+  return null;
+}
+
 async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   let body: unknown;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
@@ -224,12 +243,31 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const ticker = resolved.ticker;
 
   if (!isObject(body.research_bundle)) {
-    return json({
-      error: 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch',
-      code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
-      contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-      ticker
-    }, 409);
+    const today = await todaysAutonomousRecommendation(env, ticker);
+    if (today) {
+      return json({
+        ok: true,
+        status: 'ALREADY_PUBLISHED_TODAY',
+        engine: 'EDGE_STOCKS',
+        ticker,
+        run_id: today.id,
+        run_timestamp: today.runTimestamp,
+        report_url: `/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+        trading_enabled: false
+      });
+    }
+    const reusable = await latestReusableEdgeResearchBundle(env, ticker);
+    if (reusable) {
+      body.research_bundle = reusable.payload;
+    } else {
+      return json({
+        error: 'Fresh ChatGPT research is required before a new EDGE run can be dispatched',
+        code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
+        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        ticker,
+        next_step: 'Create a fresh governed ChatGPT research bundle, then retry the EDGE command.'
+      }, 409);
+    }
   }
   const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
   if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
@@ -474,6 +512,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     framework_version: 'EDGE_V1',
     ticker: symbol,
     run_id: String(active.recommendation_id),
+    run_timestamp: active.run_timestamp ?? null,
     generated_at: new Date().toISOString(),
     presentation: {
       standard_table_count: 4,
