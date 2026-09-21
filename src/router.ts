@@ -324,7 +324,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const sql = neon(env.EDGE_DATABASE_URL);
   const masterRows = await sql`select * from v_edge_master_report limit 1`;
   const stockRows = await sql`select * from v_edge_stock_report where ticker = ${symbol} limit 1`;
-  if (!masterRows.length) return json({ error: 'EDGE master assessment unavailable' }, 409);
+  if (!masterRows.length) return json({ error: 'EDGE master assessment unavailable', code: 'EDGE_MASTER_ASSESSMENT_UNAVAILABLE' }, 409);
   if (!stockRows.length) return json({ error: 'Ticker not found in EDGE stock assessment', ticker: symbol }, 404);
 
   const activeRows = await sql`
@@ -425,10 +425,10 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     !isNonEmptyString(decisionLadder) || !isNonEmptyString(forecastHorizon) ||
     !isNonEmptyString(primaryAction) || !isNonEmptyString(definitiveForecast)
   ) {
-    return json({ error: 'EDGE Stocks V1.3 publication blocked: governed decision fields missing', ticker: symbol }, 409);
+    return json({ error: 'EDGE Stocks V1.3 publication blocked: governed decision fields missing', code: 'EDGE_GOVERNED_DECISION_FIELDS_MISSING', ticker: symbol }, 409);
   }
   if (!componentRows.length) {
-    return json({ error: 'EDGE Stocks V1.3 publication blocked: drill-down is empty', ticker: symbol }, 409);
+    return json({ error: 'EDGE Stocks V1.3 publication blocked: drill-down is empty', code: 'EDGE_DRILLDOWN_EMPTY', ticker: symbol }, 409);
   }
 
   const parseNotes = (value: unknown): { key_outcome?: string; interpretation?: string } => {
@@ -605,7 +605,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   };
 
   const errors = validateEdgeStocksResult(payload);
-  if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
+  if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', code: 'EDGE_SEMANTIC_CONTRACT_FAILED', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }
 
