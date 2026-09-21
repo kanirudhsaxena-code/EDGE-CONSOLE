@@ -16,7 +16,7 @@ test('EDGE invoke loads an existing governed autonomous result from today before
 
 test('EDGE Stocks report timestamp is the recommendation run timestamp, not page-open time',()=>{
   const source=readFileSync('src/router.ts','utf8');
-  assert.ok(source.includes('generated_at: active.run_timestamp ?? new Date().toISOString()'));
+  assert.ok(source.includes("generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString()"));
 });
 
 test('EDGE NIFTY and EDGE Stocks primary results visibly include date/time',()=>{
