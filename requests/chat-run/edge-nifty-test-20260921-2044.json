@@ -1,0 +1,9 @@
+{
+  "module": "EDGE_NIFTY",
+  "client_invocation_id": "chat-edge-nifty-test-20260921-2044-ist",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  }
+}
