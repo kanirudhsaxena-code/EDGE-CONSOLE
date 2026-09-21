@@ -11,6 +11,7 @@ const report = {
   ticker:'TCS',
   run_id:'EDGE-TCS-20260918-TEST',
   generated_at:'2026-09-18T18:00:00Z',
+  run_timestamp:'2026-09-18T11:15:00Z',
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
@@ -120,10 +121,16 @@ test('assessment and decision labels are user-friendly',()=>{
   assert.ok(!html.includes('Captured / due checkpoints'));
 });
 
-test('active calls show the actual stored call date',()=>{
+test('active calls show the actual stored call date and time',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('Call date:'));
+  assert.ok(html.includes('Call time:'));
   assert.match(html,/17 Sep(?:t)? 2026/);
+});
+
+test('current EDGE Stocks result shows the actual run timestamp',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Run time ·'));
+  assert.match(html,/18 Sep(?:t)? 2026/);
 });
 
 test('what-could-change stays collapsed until the user opens it',()=>{
