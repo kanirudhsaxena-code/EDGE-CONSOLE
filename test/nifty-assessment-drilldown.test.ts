@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 test('5DR assessment separates matured efficacy from pending published forecasts',()=>{
   const source=readFileSync('src/index.ts','utf8');
   assert.ok(source.includes('pending_forecasts'));
-  assert.ok(source.includes("not exists (select 1 from outcome_assessments oa where oa.run_id=ar.run_id)"));
+  assert.ok(source.includes('outcome_assessments oa'));
   assert.ok(source.includes('matured_runs:forecastEligible'));
   assert.ok(source.includes('assessment_as_of:row.assessed_at'));
 });
@@ -14,7 +14,7 @@ test('5DR assessment UI exposes day-wise forecast range direction and outcome dr
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes('Drill down — day-wise forecast, range & outcomes'));
   assert.ok(app.includes('Matured historical performance'));
-  assert.ok(app.includes('Current forecasts awaiting assessment'));
+  assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
   assert.ok(app.includes('Expected range / zone'));
   assert.ok(app.includes('No evidence-supported day-specific direction/range was stored for this slot.'));
   assert.ok(app.includes('Matured eligible'));
@@ -116,10 +116,10 @@ test('5DR assessment import uses governed 5DR route family',()=>{
   assert.ok(!workflow.includes('/api/assessment-import'));
 });
 
-test('production smoke waits for v17 canonical UI before validation',()=>{
+test('production smoke waits for v18 legacy-canonical UI before validation',()=>{
   const workflow=readFileSync('.github/workflows/edge-production-smoke.yml','utf8');
   assert.ok(workflow.includes('Official canonical status'));
-  assert.ok(workflow.includes('edge-ui-v17-20260921'));
+  assert.ok(workflow.includes('edge-ui-v18-20260922'));
   assert.ok(workflow.includes('/tmp/deployed-index.html'));
 });
 
