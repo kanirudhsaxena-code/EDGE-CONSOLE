@@ -17,7 +17,7 @@ test('5DR assessment UI exposes day-wise forecast range direction and outcome dr
   assert.ok(app.includes('Current forecasts awaiting assessment'));
   assert.ok(app.includes('Expected range / zone'));
   assert.ok(app.includes('No evidence-supported day-specific direction/range was stored for this slot.'));
-  assert.ok(app.includes('Pending runs do not change accuracy or P/L until canonical selection'));
+  assert.ok(app.includes('Matured eligible'));
 });
 
 test('empty current D+1 to D+5 slots fail closed instead of inventing forecast ranges',()=>{
