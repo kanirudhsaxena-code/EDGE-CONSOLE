@@ -56,3 +56,17 @@ test('5DR assessment labels official canonical population rather than run count'
   assert.ok(source.includes("population:'MATURED_CANONICAL_CHECKPOINTS'"));
   assert.ok(source.includes("population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS'"));
 });
+
+
+test('NIFTY current 5-day forecast sits below analysis toggle and uses standard mobile typography',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  const css=readFileSync('public/styles.css','utf8');
+  const toggle=app.indexOf('data-analysis-toggle>View full analysis');
+  const forecast=app.indexOf('currentForecastDrilldown(result)',toggle);
+  const analysis=app.indexOf('data-analysis-detail hidden',forecast);
+  const why=app.indexOf('Why this view?',analysis);
+  assert.ok(toggle>=0 && forecast>toggle && analysis>forecast && why>analysis);
+  assert.ok(css.includes('.current-forecast-details summary'));
+  assert.ok(css.includes('.assessment-drill-section>.step-label'));
+  assert.ok(css.includes('font-size:10px!important'));
+});
