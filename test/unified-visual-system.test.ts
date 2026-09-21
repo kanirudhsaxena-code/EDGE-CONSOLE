@@ -51,3 +51,5 @@ test('Stocks direction and five-day range use the same compact visual geometry',
   assert.ok(css.includes('.edge-user-probabilities{'));
   assert.ok(css.includes('margin:8px 0 10px!important'));
 });
+
+// v7 live-review gate: NIFTY metrics + Stocks highlight geometry.
