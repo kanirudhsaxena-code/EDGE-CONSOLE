@@ -1,0 +1,125 @@
+name: 5DR Canonical Handoff State
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '0,15,30,45 3-11 * * 1-5'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: 5dr-canonical-handoff-state
+  cancel-in-progress: true
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Export governed published 5DR handoff
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          python - <<'PY'
+          import json, os, urllib.parse, urllib.request
+          from datetime import datetime, timezone
+
+          base=os.environ["CONSOLE_URL"].rstrip("/")
+          headers={
+              "Accept":"application/json",
+              "Cache-Control":"no-cache",
+              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
+              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
+          }
+
+          def get_json(url):
+              req=urllib.request.Request(url,headers=headers,method="GET")
+              with urllib.request.urlopen(req,timeout=30) as response:
+                  raw=response.read()
+                  content_type=response.headers.get("content-type","")
+              if "json" not in content_type.lower():
+                  raise SystemExit(f"NON_JSON_CONSOLE_RESPONSE {url} {content_type}")
+              payload=json.loads(raw.decode("utf-8"))
+              if not isinstance(payload,dict):
+                  raise SystemExit(f"INVALID_CONSOLE_JSON {url}")
+              return payload
+
+          data=get_json(base+"/api/runs/latest?engine=5DR")
+          runs=data.get("runs")
+          if not isinstance(runs,list):
+              raise SystemExit("Console did not return runs array")
+
+          exported=[]
+          for run in runs:
+              if not isinstance(run,dict) or run.get("published") is not True or not run.get("run_id"):
+                  continue
+              result=run.get("result")
+              if not isinstance(result,dict):
+                  continue
+              request_payload=get_json(base+"/api/5dr/run-request?"+urllib.parse.urlencode({"run_id":run["run_id"]}))
+              request=request_payload.get("request") if isinstance(request_payload,dict) else None
+              request=request if isinstance(request,dict) else {}
+              metadata=request.get("metadata") if isinstance(request.get("metadata"),dict) else {}
+              intelligence=metadata.get("intelligence_handoff") if isinstance(metadata.get("intelligence_handoff"),dict) else {}
+              normalized=intelligence.get("normalized") if isinstance(intelligence.get("normalized"),dict) else None
+              market=metadata.get("automated_market_evidence") if isinstance(metadata.get("automated_market_evidence"),dict) else None
+              exported.append({
+                  "run":{
+                      "run_id":run.get("run_id"),
+                      "generated_at":run.get("generated_at"),
+                      "freshness_at":run.get("freshness_at"),
+                      "framework_version":run.get("framework_version"),
+                      "contract_version":run.get("contract_version"),
+                      "status":run.get("status"),
+                      "provenance_mode":run.get("provenance_mode"),
+                      "published":True,
+                      "result":result,
+                  },
+                  "request":{
+                      "request_id":request.get("request_id"),
+                      "provenance_mode":request.get("provenance_mode"),
+                      "metadata":{
+                          "intelligence_handoff":{"normalized":normalized} if normalized is not None else {},
+                          "automated_market_evidence":market if market is not None else {},
+                      },
+                  },
+              })
+
+          handoff={
+              "schema_version":"5DR_CONSOLE_HANDOFF_V1",
+              "generated_at":datetime.now(timezone.utc).isoformat().replace("+00:00","Z"),
+              "source":"EDGE_CONSOLE_PUBLISHED_RUNS",
+              "runs":exported,
+          }
+          with open("/tmp/5dr-canonical-handoff.json","w",encoding="utf-8") as handle:
+              json.dump(handoff,handle,sort_keys=True,separators=(",",":"))
+              handle.write("\n")
+          print(f"handoff_runs={len(exported)}")
+          PY
+      - name: Publish handoff to isolated state branch
+        run: |
+          set -euo pipefail
+          git fetch origin state/5dr-handoff
+          rm -rf /tmp/5dr-handoff-state
+          git worktree add /tmp/5dr-handoff-state origin/state/5dr-handoff
+          cd /tmp/5dr-handoff-state
+          mkdir -p runtime
+          cp /tmp/5dr-canonical-handoff.json runtime/5dr-canonical-handoff.json
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime/5dr-canonical-handoff.json
+          if git diff --cached --quiet; then
+            echo "handoff_state_unchanged"
+            exit 0
+          fi
+          git commit -m "Update governed 5DR Console handoff [skip ci]"
+          git push origin HEAD:state/5dr-handoff
