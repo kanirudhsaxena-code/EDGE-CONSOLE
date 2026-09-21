@@ -15,3 +15,15 @@ test('NIFTY and Stocks share one visual typography and colour system',()=>{
   assert.ok(css.includes('.module-tile[data-module="5DR"] .module-name::before'));
   assert.ok(css.includes('.module-tile[data-module="EDGE_STOCKS"] .module-name::before'));
 });
+
+test('decision headings and probability tiles use one standard geometry',()=>{
+  const css=readFileSync('public/styles.css','utf8');
+  assert.ok(css.includes('--ui-decision-value-size:22px'));
+  assert.ok(css.includes('--ui-probability-label-size:12px'));
+  assert.ok(css.includes('--ui-probability-value-size:17px'));
+  assert.ok(css.includes('--ui-probability-tile-height:88px'));
+  assert.ok(css.includes('.simple-result>h2,'));
+  assert.ok(css.includes('.edge-highlight-card.range strong'));
+  assert.ok(css.includes('grid-template-columns:repeat(3,minmax(0,1fr))!important'));
+  assert.ok(css.includes('min-height:var(--ui-probability-tile-height)!important'));
+});
