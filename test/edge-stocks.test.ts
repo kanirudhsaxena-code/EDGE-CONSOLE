@@ -28,8 +28,8 @@ const valid = {
   active_calls:[],
   current_stock_outcome:{
     des:-3.5,directional_agreement:52.1,effective_conviction:.0243,
-    market_trust:{score:69.474,band:'MODERATE'},
-    bot:{score:68.941,grade:'B'},
+    market_trust:{score:69.474,band:'MODERATE',subscores:{evidence_quality:75,freshness:70,completeness:65,directional_agreement:52.1,market_confirmation:72}},
+    bot:{score:68.941,grade:'B',subscores:{forecast_edge:50,market_trust:69.474,structure_pattern_quality:72,pv_pvpo_confirmation:65,catalyst_asymmetry:60,execution_quality:70}},
     risk_override:{status:'CLEAR',code:null},
     expected_price_zone:{low:2162.5,high:2240.86},
     execution:{instrument:'NONE'},
@@ -40,7 +40,7 @@ const valid = {
     decision_ladder:'INVESTIGATION'
   },
   drilldown:[
-    {component:'PRICE_STRUCTURE',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
+    {component:'PRICE_STRUCTURE',score_or_level:-1,original_weight:18,normalized_direction:-.5,normalized_weight:18,weighted_contribution:-9,evidence_quality:'HIGH',verification_status:'VERIFIED',conflict_flag:false,key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
   ]
 };
 
