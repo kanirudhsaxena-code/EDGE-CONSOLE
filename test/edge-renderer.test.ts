@@ -73,8 +73,9 @@ test('user-facing EDGE renderer uses cards rather than horizontally scrolling ta
 
 test('drill-down uses finding, explanation and outcome without fabricating legacy detail',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('FINDING'));
-  assert.ok(html.includes('WHY IT MATTERS'));
+  assert.ok(html.includes('WHAT WE SAW'));
+  assert.ok(html.includes('WHAT IT MEANS'));
+  assert.ok(html.includes('WHY IT MATTERS NOW'));
   assert.ok(!html.includes('<b>Outcome:</b>'));
   assert.ok(html.includes('This older run preserved a verified component score of 1 (positive)'));
   assert.ok(html.includes('did not preserve the detailed source narrative'));
@@ -136,14 +137,14 @@ test('assessment and decision labels are user-friendly',()=>{
   const html=renderEdgeV13(report);
   assert.ok(html.includes('Outcome checks recorded'));
   assert.ok(html.includes('Cumulative model P/L'));
-  assert.ok(html.includes('Early forecast tracking'));
+  assert.ok(html.includes('Provisional forecast tracking'));
   assert.ok(html.includes('Official recommendation accuracy'));
-  assert.ok(html.includes('Audit-only model score. It is not your portfolio return'));
+  assert.ok(html.includes('Standardized model units only · never inferred user P/L.'));
   assert.ok(html.includes('Evidence confidence'));
   assert.ok(html.includes('High evidence confidence does not mean bullish'));
-  assert.ok(html.includes('Signals pointing the same way'));
-  assert.ok(html.includes('Overall conviction after checks'));
-  assert.ok(html.includes('Extra safety block'));
+  assert.ok(html.includes('Directional Agreement'));
+  assert.ok(html.includes('Effective Conviction'));
+  assert.ok(html.includes('Risk Override'));
   assert.ok(!html.includes('Captured / due checkpoints'));
 });
 
