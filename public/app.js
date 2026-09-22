@@ -22,6 +22,76 @@ function tradeSetupStrengthSummary(value){
   const label=n>=80?'Strong':n>=65?'Trade-ready':n>=45?'Moderate':'Weak';
   return{value:label+' · '+n.toFixed(0)+'/100',detail:'How usable the entry, stop, target and reward/risk setup is. 65/100 is the current execution gate.'}
 }
+function niftyMetricLegend(){
+  return '<div class="metric-legend compact"><strong>Score legends</strong>'+
+    '<span><b>DES5:</b> +60…+100 Strong Bull · +30…+59 Bull · +15…+29 Mild Bull · −14…+14 Range · −29…−15 Mild Bear · −59…−30 Bear · −100…−60 Strong Bear</span>'+
+    '<span><b>Market Trust:</b> 80–100 Strong · 65–79 Good · 50–64 Developing · 35–49 Low · &lt;35 Untrusted</span>'+
+    '<span><b>Execution Edge:</b> 80–100 Excellent · 65–79 Tradeable · 50–64 Marginal · &lt;50 Reject</span></div>'
+}
+function niftyMetricBreakdown(result,normalized){
+  const d=result?.engine_diagnostics||{},data=normalized&&typeof normalized==='object'&&Object.keys(normalized).length?normalized:d;
+  const regime=String(data.regime||d.regime||'UNKNOWN').toUpperCase();
+  const components=data.component_scores||d.component_scores||{};
+  const regimeWeights={
+    TREND:{PRICE_STRUCTURE:40,PVPO:30,PARTICIPATION:15,MACRO_CATALYSTS:15},
+    RANGE:{PRICE_STRUCTURE:30,PVPO:35,PARTICIPATION:15,MACRO_CATALYSTS:20},
+    TRANSITION:{PRICE_STRUCTURE:35,PVPO:25,PARTICIPATION:15,MACRO_CATALYSTS:25},
+    EVENT_SHOCK:{PRICE_STRUCTURE:30,PVPO:20,PARTICIPATION:10,MACRO_CATALYSTS:40}
+  };
+  const weights=regimeWeights[regime]||{};
+  const labels={PRICE_STRUCTURE:'Price / Structure',PVPO:'PVPO / Derivatives',PARTICIPATION:'Market Participation',MACRO_CATALYSTS:'Macro + Catalysts'};
+  const componentCards=Object.keys(labels).map(key=>{
+    const score=Number(components[key]),weight=Number(weights[key]);
+    const contribution=Number.isFinite(score)&&Number.isFinite(weight)?score*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(labels[key])+'</span><strong>'+(Number.isFinite(score)?escapeHtml(score.toFixed(1)):'Not verified')+'</strong><small>Regime weight '+(Number.isFinite(weight)?escapeHtml(weight)+'%':'—')+' · DES5 contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  const trustInputs=data.market_trust_inputs||d.market_trust_inputs||{};
+  const trustWeights={price_confirmation:25,pvpo_confirmation:25,participation_confirmation:15,cross_engine_consistency:15,closing_confirmation:10,evidence_freshness_completeness:10};
+  const trustLabels={price_confirmation:'Price confirmation',pvpo_confirmation:'PVPO confirmation',participation_confirmation:'Participation',cross_engine_consistency:'Cross-engine consistency',closing_confirmation:'Closing confirmation',evidence_freshness_completeness:'Freshness / completeness'};
+  const trustCards=Object.keys(trustLabels).map(key=>{
+    const value=Number(trustInputs[key]),weight=trustWeights[key];
+    const contribution=Number.isFinite(value)?value*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(trustLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · trust contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  const execution=data.execution_inputs||d.execution_inputs||{};
+  const execWeights={rr_score:30,premium_iv_theta_score:25,strike_expiry_fit_score:15,liquidity_spread_score:15,entry_invalidation_score:15};
+  const execLabels={rr_score:'Expected R:R',premium_iv_theta_score:'Premium / IV / theta',strike_expiry_fit_score:'Strike / expiry fit',liquidity_spread_score:'Liquidity / spread',entry_invalidation_score:'Entry / invalidation'};
+  const execCards=Object.keys(execLabels).map(key=>{
+    const value=Number(execution[key]),weight=execWeights[key];
+    const contribution=Number.isFinite(value)?value*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(execLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · edge contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  return '<details class="metric-breakdown-details" open><summary>Metric breakdown & legends</summary>'+
+    niftyMetricLegend()+
+    '<div class="breakdown-section"><div class="step-label">DES5 · '+escapeHtml(regime)+' regime</div><div class="metric-breakdown-grid">'+componentCards+'</div></div>'+
+    '<div class="breakdown-section"><div class="step-label">Market Trust</div><div class="metric-breakdown-grid">'+trustCards+'</div></div>'+
+    '<div class="breakdown-section"><div class="step-label">Execution Edge</div><div class="metric-breakdown-grid">'+execCards+'</div></div>'+
+    '</details>'
+}
+function niftyGateChecklist(result,normalized){
+  const gate=result?.tradeability_gate||{};
+  const data=normalized&&typeof normalized==='object'?normalized:{};
+  const des=Number(result?.des5),mt=Number(result?.market_trust),edge=Number(result?.execution_edge),rr=Number(gate.expected_rr??data.expected_rr);
+  const checks=[
+    ['Data adequate',gate.data_adequate??data.data_adequate===true,'Required evidence branch is usable.'],
+    ['Market Trust ≥ 50',gate.market_trust_pass??(Number.isFinite(mt)&&mt>=50),Number.isFinite(mt)?'Current '+mt.toFixed(1)+'/100':'Not verified'],
+    ['|DES5| ≥ 30',gate.des5_pass??(Number.isFinite(des)&&Math.abs(des)>=30),Number.isFinite(des)?'Current |'+des.toFixed(1)+'|':'Not verified'],
+    ['Execution Edge ≥ 65',gate.execution_edge_pass??(Number.isFinite(edge)&&edge>=65),Number.isFinite(edge)?'Current '+edge.toFixed(1)+'/100':'Not verified'],
+    ['Kill Switch inactive',gate.event_kill_switch_inactive??data.event_kill_switch===false,'Event Shock '+escapeHtml(String(gate.event_shock??data.event_shock??'UNKNOWN'))],
+    ['Expected R:R ≥ 2.0',gate.rr_pass??(Number.isFinite(rr)&&rr>=2),Number.isFinite(rr)?'Current '+rr.toFixed(2):'Not verified']
+  ];
+  return '<section class="gate-panel"><div class="stock-section-title"><div><span>SINGLE TRADEABILITY GATE</span><h3>Why the trade is permitted or rejected</h3></div><span class="status-chip '+(result?.tradeable===true?'positive':'limited')+'">'+(result?.tradeable===true?'PASS':'NO TRADE')+'</span></div><div class="gate-grid">'+checks.map(([label,pass,detail])=>'<div class="gate-item '+(pass?'pass':'fail')+'"><span>'+(pass?'✓':'✕')+' '+escapeHtml(label)+'</span><strong>'+escapeHtml(detail)+'</strong></div>').join('')+'</div></section>'
+}
+function whyCard(label,item){
+  const v=item||{};
+  return '<div class="why-card"><strong>'+escapeHtml(label)+'</strong>'+
+    '<div class="why-step"><span>WHAT WE SAW</span><p>'+escapeHtml(v.observed||'Not verified')+'</p></div>'+
+    '<div class="why-step"><span>WHAT IT MEANS</span><p>'+escapeHtml(v.meaning||'No interpretation available without governed evidence.')+'</p></div>'+
+    '<div class="why-step"><span>WHY IT MATTERS NOW</span><p>'+escapeHtml(v.impact||'No additional current impact recorded.')+'</p></div></div>'
+}
 function blockerText(code){const map={DATA_INADEQUATE:'Not enough reliable evidence',MARKET_TRUST_LT_50:'Market confidence is too low',DES5_LT_30:'Directional strength is too weak',EXECUTION_EDGE_LT_65:'Trade setup quality is too weak',RR_LT_2:'Potential reward is not high enough for the risk',EVENT_KILL_SWITCH:'A major event-risk safeguard is active'};return map[String(code)]||String(code||'').replaceAll('_',' ').toLowerCase()}
 function friendlyFailureMessage(raw){
   const text=String(raw||'').toLowerCase();
