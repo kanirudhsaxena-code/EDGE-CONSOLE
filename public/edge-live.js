@@ -234,21 +234,35 @@ export function renderEdgeV13(report){
     ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Move since that earlier call: '+esc(pct(previous.current_return_pct))+(String(previous.outcome_verdict||previous.lifecycle_status||'').toUpperCase()==='OPEN'?' · still provisional':'') )+'</small></div></div>'
     : '<div class="edge-previous-call single"><div><span>Previous call</span><strong>None yet</strong><small>This stock does not yet have an earlier EDGE call to compare.</small></div></div>';
 
+  const masterOfficial=Number(master.official_scorable_recommendations??0);
   const section1='<section class="edge-user-section" data-edge-section="master-assessment">'+
-    '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>How has EDGE performed on '+esc(r.ticker||'this stock')+'?</h3></div><p>Only selected canonical recommendations enter official efficacy. Operational reruns remain visible for audit but cannot inflate the sample.</p></div>'+
+    '<div class="edge-user-head"><div><span>1 — EDGE MASTER ASSESSMENT</span><h3>System-wide efficacy first, then '+esc(r.ticker||'stock')+' efficacy</h3></div><p>OFFICIAL metrics use selected CLOSED/scorable recommendations only. PROVISIONAL diagnostics track open calls without inflating the official sample.</p></div>'+
+    '<div class="step-label">SYSTEM-WIDE · OFFICIAL / PROVISIONAL</div>'+
+    '<div class="edge-key-grid">'+
+      metricCard('Tracked recommendations',master.recommendations??0,(master.open_recommendations??0)+' OPEN / '+(master.closed_recommendations??0)+' CLOSED · '+(master.unique_stocks??0)+' stocks')+
+      metricCard('Official scorable sample',masterOfficial,masterOfficial?'Closed/scorable recommendations only.':'N/A · 0 closed/scorable. A zero sample is never displayed as 0% accuracy.')+
+      metricCard('Recommendation hit rate',masterOfficial?pct(master.recommendation_hit_rate_pct):'N/A',masterOfficial?'WIN / resolved canonical recommendations.':'Not scorable yet.')+
+      metricCard('Directional hit rate',masterOfficial?pct(master.direction_hit_rate_pct):'N/A',masterOfficial?'Correct direction / closed scorable recommendations.':'Not scorable yet.')+
+      metricCard('Target hit rate',masterOfficial?pct(master.target_hit_rate_pct):'N/A',masterOfficial?'Defined target reached / closed scorable recommendations.':'Not scorable yet.')+
+      metricCard('Average gain / loss',masterOfficial?(pct(master.avg_gain_pct)+' / '+pct(master.avg_loss_pct)):'N/A','Standardized model returns for winning / losing recommendations.')+
+      metricCard('Average MFE / MAE',masterOfficial?(pct(master.avg_mfe_pct)+' / '+pct(master.avg_mae_pct)):'N/A','Maximum favourable / adverse excursion across resolved calls.')+
+      metricCard('Cumulative model P/L',master.cumulative_model_pnl_units==null?'N/A':String(master.cumulative_model_pnl_units),'Standardized model units only · never inferred user P/L.')+
+      metricCard('Provisional direction',Number(master.provisional_forecast_scorable||0)?pct(master.provisional_forecast_accuracy_pct):'Not enough history',(master.provisional_forecast_hits??0)+' / '+(master.provisional_forecast_scorable??0)+' scorable checkpoint hits')+
+      metricCard('Provisional price zone',Number(master.provisional_zone_scorable||0)?pct(master.provisional_zone_accuracy_pct):'Not enough history',(master.provisional_zone_hits??0)+' / '+(master.provisional_zone_scorable??0)+' scorable zone hits')+
+    '</div>'+
+    '<div class="step-label">SELECTED STOCK · '+esc(r.ticker||'—')+'</div>'+
     previousCard+
     '<div class="edge-key-grid">'+
-      metricCard('Early forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' of '+forecastScorable+' direction checks were correct so far. This remains provisional until the calls mature.'):'No completed forecast checks yet.')+
-      metricCard('Early price-zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' of '+zoneScorable+' price-zone checks were correct so far. This remains provisional until the calls mature.'):'No completed price-zone checks yet.')+
-      metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'Not enough history',official?(official+' fully matured recommendation'+(official===1?' has':'s have')+' an official outcome.'):'No recommendation has matured enough for an official score yet.')+
-      metricCard('Outcome checks recorded',forecastChecks+' of '+dueChecks,'Each past call is checked from D+1 to D+5. More recorded checks mean the performance statistics are based on stronger evidence.')+
+      metricCard('Tracked calls',stock.recommendations??0,(stock.open_recommendations??0)+' OPEN / '+(stock.closed_recommendations??0)+' CLOSED')+
+      metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'N/A',official?(official+' closed/scorable recommendation'+(official===1?'':'s')+'.'):'0 closed/scorable · not yet a percentage')+
+      metricCard('Directional / target hit rate',official?(pct(stock.direction_hit_rate_pct)+' / '+pct(stock.target_hit_rate_pct)):'N/A','Direction correctness / defined target attainment.')+
+      metricCard('Average gain / loss',official?(pct(stock.avg_gain_pct)+' / '+pct(stock.avg_loss_pct)):'N/A','Standardized resolved recommendation results.')+
+      metricCard('MFE / MAE',official?(pct(stock.avg_mfe_pct)+' / '+pct(stock.avg_mae_pct)):'N/A','Best / worst excursion during recommendation window.')+
+      metricCard('Provisional forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' / '+forecastScorable+' direction checkpoints hit.'):'No completed forecast checks yet.')+
+      metricCard('Provisional zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' / '+zoneScorable+' price-zone checkpoints hit.'):'No completed zone checks yet.')+
+      metricCard('Outcome checks recorded',forecastChecks+' / '+dueChecks,'Each call is checked from D+1 through D+5; missing evidence stays unscored.')+
     '</div>'+
-    '<details class="edge-advanced-details"><summary>Advanced assessment details</summary><div class="edge-user-grid compact">'+
-      metricCard('Tracked calls',stock.recommendations??0,'All EDGE calls recorded for this stock.')+
-      metricCard('Open / closed calls',(stock.open_recommendations??0)+' / '+(stock.closed_recommendations??0),'Open calls are still being tracked; closed calls have finished their lifecycle.')+
-      metricCard('Internal model P/L score',stock.cumulative_model_pnl_units??'—','Audit-only model score. It is not your portfolio return and should not be read as rupees or percentage profit.')+
-      metricCard('Average gain / loss on resolved calls',pct(stock.avg_gain_pct)+' / '+pct(stock.avg_loss_pct),'Average move on past hits versus misses, when enough resolved history exists.')+
-    '</div></details>'+
+    edgeStockLegends()+
   '</section>';
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
