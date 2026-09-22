@@ -115,7 +115,10 @@
         "tradeability_blockers",
         "recommendation",
         "tradeability_gate",
-        "engine_diagnostics"
+        "engine_diagnostics",
+        "forecast_horizon",
+        "expected_nifty_zone",
+        "event_shock"
       ],
       "properties": {
         "model_version": {
@@ -525,6 +528,60 @@
         },
         "engine_diagnostics": {
           "type": "object"
+        },
+        "forecast_horizon": {
+          "const": "D+5"
+        },
+        "expected_nifty_zone": {
+          "type": "object",
+          "required": [
+            "low",
+            "high"
+          ],
+          "properties": {
+            "low": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "high": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "additionalProperties": false
+        },
+        "event_shock": {
+          "type": "object",
+          "required": [
+            "level",
+            "transmission",
+            "convexity_warranted",
+            "kill_switch"
+          ],
+          "properties": {
+            "level": {
+              "enum": [
+                "LOW",
+                "MODERATE",
+                "HIGH",
+                "EXTREME"
+              ]
+            },
+            "transmission": {
+              "enum": [
+                "BULLISH",
+                "BEARISH",
+                "TWO_SIDED"
+              ]
+            },
+            "convexity_warranted": {
+              "type": "boolean"
+            },
+            "kill_switch": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
         }
       },
       "additionalProperties": true
