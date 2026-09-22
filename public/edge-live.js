@@ -167,6 +167,25 @@ function drillFinding(row){
   }
   return raw||String(row?.key_outcome||'No detailed finding was published.');
 }
+function drillInterpretation(row){
+  const verified=String(row?.verification_status||'NOT_VERIFIED')==='VERIFIED';
+  if(!verified){
+    const component=String(row?.component||'').toUpperCase();
+    if(component.includes('INSTITUTIONAL'))return 'Institutional Behaviour was left unscored because the required independent evidence was not verified. It therefore adds no bullish or bearish weight to this run.';
+    if(component.includes('VALUATION'))return 'Valuation was left unscored because the required verified evidence was unavailable. It therefore adds no directional weight to this run.';
+    return 'This factor was left unscored because its evidence gate was not met. It therefore adds no directional weight to this run.';
+  }
+  const raw=String(row?.interpretation||'').trim();
+  const legacy=row?.narrative_source==='LEGACY_SCORE_RECONSTRUCTION'||/legacy active run|original narrative field was not persisted|immutable verified component score/i.test(raw);
+  if(legacy)return 'The verified historical score is available, but the original detailed interpretation was not persisted. No additional market fact is inferred.';
+  const cleaned=raw.split(/(?<=[.!?])\s+/).filter(sentence=>!/(governed .*score|Independent ChatGPT web research|Research direction\(s\)|Supporting provider evidence|provider evidence was excluded|immutable verified component score)/i.test(sentence)).join(' ').trim();
+  if(cleaned)return cleaned;
+  const score=Number(row?.score_or_level);
+  if(Number.isFinite(score)&&score>0)return 'The verified evidence supports the bullish side of the five-day view.';
+  if(Number.isFinite(score)&&score<0)return 'The verified evidence adds bearish pressure to the five-day view.';
+  if(Number.isFinite(score))return 'The verified evidence is directionally neutral in the current five-day view.';
+  return 'The factor is verified, but no additional user-facing interpretation was persisted.';
+}
 function metricCard(label,value,detail){
   return '<div class="edge-user-metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(detail)+'</small></div>';
 }
@@ -302,7 +321,7 @@ export function renderEdgeV13(report){
     return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(componentDisplayName(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(outcome)+'</span></div>'+
       '<div class="edge-drill-metrics"><span>Raw score <b>'+esc(row.score_or_level??'N/A')+'</b></span><span>Original weight <b>'+esc(row.original_weight==null?'—':num(row.original_weight,1)+'%')+'</b></span><span>Used weight <b>'+esc(weight==null?'—':num(weight,1)+'%')+'</b></span><span>Contribution <b>'+esc(contribution==null?'—':num(contribution,2))+'</b></span></div>'+
       '<div class="edge-explanation-block"><span>WHAT WE SAW</span><p>'+esc(finding)+'</p></div>'+
-      '<div class="edge-explanation-block"><span>WHAT IT MEANS</span><p>'+esc(row.interpretation||'No evidence-grounded interpretation was persisted.')+'</p></div>'+
+      '<div class="edge-explanation-block"><span>WHAT IT MEANS</span><p>'+esc(drillInterpretation(row))+'</p></div>'+
       '<div class="edge-explanation-block"><span>WHY IT MATTERS NOW</span><p>'+esc(meaning)+'</p></div>'+
       '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified · '+human(row.evidence_quality||'—'):'Evidence limited')+'</span>'+(row.conflict_flag?'<span class="evidence-chip limited">Material conflict</span>':'')+'</div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
