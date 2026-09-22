@@ -196,7 +196,7 @@ jobs:
               -o /tmp/start.json
             cat /tmp/start.json
             python - <<'PY' > /tmp/stocks.env
-          import json
+          import json,shlex
           d=json.load(open('/tmp/start.json'))
           assert d.get('ok') is True,d
           assert d.get('status')=='DISPATCHED',d
