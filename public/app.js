@@ -562,6 +562,60 @@ async function loadRecentResults(module){
     runs.innerHTML=list.slice(0,8).map(r=>'<article class="run history-row"><strong>'+escapeHtml(module==='5DR'?'EDGE NIFTY result':'EDGE Stocks result')+'</strong><span class="muted">'+escapeHtml(new Date(r.generated_at).toLocaleString())+'</span></article>').join('');runsNote.textContent=list.length+' recent'
   }catch(e){console.error(e);runs.innerHTML='<div class="generic-empty">Unable to load recent results.</div>';runsNote.textContent='Unavailable'}
 }
+function niftyBandLegend(){
+  return '<details class="metric-legend"><summary>Current-run metric legends</summary><div class="legend-grid">'+
+    '<div><b>DES5 — Directional Evidence Score</b><small>+60 to +100 Strong Bull · +30 to +59 Bull · +15 to +29 Mild Bull · -14 to +14 Range · -29 to -15 Mild Bear · -59 to -30 Bear · -100 to -60 Strong Bear.</small></div>'+
+    '<div><b>Market Trust — Evidence Confidence</b><small>80–100 Strong · 65–79 Good · 50–64 Developing · 35–49 Low · below 35 Untrusted. It measures reliability, not direction.</small></div>'+
+    '<div><b>Execution Edge — Trade Setup Strength</b><small>80–100 Excellent · 65–79 Tradeable · 50–64 Marginal · below 50 Reject. It affects tradeability, not direction.</small></div>'+
+    '<div><b>Event Shock</b><small>LOW normal · MODERATE caution · HIGH probability cap/downgrade · EXTREME kill switch. Transmission and Convexity Warranted are shown separately.</small></div>'+
+    '<div><b>Bull / Range / Bear</b><small>Model scenario probabilities total 100%. They are estimates, not guarantees.</small></div>'+
+  '</div></details>'
+}
+function gateMark(ok,known=true){return known?(ok?'✓ PASS':'✕ FAIL'):'— NOT VERIFIED'}
+function niftyTradeabilityGate(result,normalized,event,diagnostics){
+  const rr=Number(diagnostics?.expected_rr??normalized?.expected_rr),data=normalized?.data_adequate;
+  const rows=[
+    ['Data adequate',data===true,data!==undefined,'Required governed evidence is usable.'],
+    ['Market Trust ≥ 50',Number(result.market_trust)>=50,Number.isFinite(Number(result.market_trust)),'Evidence reliability gate.'],
+    ['|DES5| ≥ 30',Math.abs(Number(result.des5))>=30,Number.isFinite(Number(result.des5)),'Directional-strength gate.'],
+    ['Execution Edge ≥ 65',Number(result.execution_edge)>=65,Number.isFinite(Number(result.execution_edge)),'Trade-setup quality gate.'],
+    ['Event Kill Switch inactive',event?.kill_switch===false,typeof event?.kill_switch==='boolean','EXTREME Event Shock blocks directional option buying.'],
+    ['Expected R:R ≥ 2.0',rr>=2,Number.isFinite(rr),'Minimum governed reward/risk gate.']
+  ];
+  return '<div class="tradeability-gate"><div class="step-label">Single Tradeability Gate</div><div class="gate-grid">'+rows.map(([name,ok,known,detail])=>'<div class="gate-row '+(known?(ok?'pass':'fail'):'unknown')+'"><span>'+escapeHtml(name)+'</span><strong>'+escapeHtml(gateMark(ok,known))+'</strong><small>'+escapeHtml(detail)+'</small></div>').join('')+'</div></div>'
+}
+function niftyBreakdown(title,subtitle,rows,totalValue,legend){
+  return '<details class="metric-breakdown"><summary>'+escapeHtml(title)+' · '+escapeHtml(totalValue)+'</summary><p class="metric-breakdown-subtitle">'+escapeHtml(subtitle)+'</p><div class="metric-breakdown-grid">'+rows.map(row=>'<div class="metric-breakdown-card"><span>'+escapeHtml(row.label)+'</span><strong>'+escapeHtml(row.value)+'</strong><small>'+escapeHtml(row.detail)+'</small></div>').join('')+'</div>'+(legend?'<div class="metric-breakdown-legend">'+escapeHtml(legend)+'</div>':'')+'</details>'
+}
+function niftyEngineBreakdowns(result,normalized){
+  const diagnostics=result.engine_diagnostics&&typeof result.engine_diagnostics==='object'?result.engine_diagnostics:{};
+  const components=diagnostics.component_scores&&typeof diagnostics.component_scores==='object'?diagnostics.component_scores:(normalized.component_scores||{});
+  const trust=diagnostics.market_trust_inputs&&typeof diagnostics.market_trust_inputs==='object'?diagnostics.market_trust_inputs:(normalized.market_trust_inputs||{});
+  const execution=diagnostics.execution_inputs&&typeof diagnostics.execution_inputs==='object'?diagnostics.execution_inputs:(normalized.execution_inputs||{});
+  const regime=String(result.regime||normalized.regime||'RANGE').replace('-','_').toUpperCase();
+  const regimeWeights={TREND:{PRICE_STRUCTURE:40,PVPO:30,PARTICIPATION:15,MACRO_CATALYSTS:15},RANGE:{PRICE_STRUCTURE:30,PVPO:35,PARTICIPATION:15,MACRO_CATALYSTS:20},TRANSITION:{PRICE_STRUCTURE:35,PVPO:25,PARTICIPATION:15,MACRO_CATALYSTS:25},EVENT_SHOCK:{PRICE_STRUCTURE:30,PVPO:20,PARTICIPATION:10,MACRO_CATALYSTS:40}}[regime]||{PRICE_STRUCTURE:30,PVPO:35,PARTICIPATION:15,MACRO_CATALYSTS:20};
+  const componentLabels={PRICE_STRUCTURE:'Price + Volume + Structure',PVPO:'PVPO / Derivatives',PARTICIPATION:'Market Participation',MACRO_CATALYSTS:'Macro + Catalysts'};
+  const componentRows=Object.entries(regimeWeights).map(([key,weight])=>{
+    const score=Number(components[key]),contribution=Number.isFinite(score)?score*Number(weight)/100:null;
+    return {label:componentLabels[key]||humanText(key),value:Number.isFinite(score)?score.toFixed(1)+'/100':'Not verified',detail:'Regime weight '+weight+'%'+(contribution==null?'':' · DES5 contribution '+contribution.toFixed(1))}
+  });
+  const trustWeights={price_confirmation:25,pvpo_confirmation:25,participation_confirmation:15,cross_engine_consistency:15,closing_confirmation:10,evidence_freshness_completeness:10};
+  const trustRows=Object.entries(trustWeights).map(([key,weight])=>({label:humanText(key),value:Number.isFinite(Number(trust[key]))?Number(trust[key]).toFixed(1)+'/100':'Not verified',detail:'Market Trust weight '+weight+'%'}));
+  const execWeights={rr_score:30,premium_iv_theta_score:25,strike_expiry_fit_score:15,liquidity_spread_score:15,entry_invalidation_score:15};
+  const execRows=Object.entries(execWeights).map(([key,weight])=>({label:humanText(key),value:Number.isFinite(Number(execution[key]))?Number(execution[key]).toFixed(1)+'/100':'Not verified',detail:'Execution Edge weight '+weight+'%'}));
+  return [
+    niftyBreakdown('DES5 — Directional Evidence Score','Four directional engines under the frozen '+humanText(regime)+' regime weights.',componentRows,Number.isFinite(Number(result.des5))?Number(result.des5).toFixed(1):'Not verified','Direction only. Execution quality never changes DES5.'),
+    niftyBreakdown('Market Trust — Evidence Confidence','Six reliability inputs; this score measures how much the evidence can be trusted, not whether it is bullish.',trustRows,Number.isFinite(Number(result.market_trust))?Number(result.market_trust).toFixed(1)+'/100':'Not verified','80–100 Strong · 65–79 Good · 50–64 Developing · 35–49 Low · <35 Untrusted.'),
+    niftyBreakdown('Execution Edge — Trade Setup Strength','Five execution-quality inputs; this score can reject a trade without changing the market forecast.',execRows,Number.isFinite(Number(result.execution_edge))?Number(result.execution_edge).toFixed(1)+'/100':'Not verified','80–100 Excellent · 65–79 Tradeable · 50–64 Marginal · <50 Reject.')
+  ].join('')
+}
+function structuredWhyCard(title,item){
+  const x=item||{};
+  return '<div class="why-card"><strong>'+escapeHtml(title)+'</strong>'+
+    '<div class="analysis-step"><span>WHAT WE SAW</span><p>'+escapeHtml(x.observed||'Not verified from the governed evidence record.')+'</p></div>'+
+    '<div class="analysis-step"><span>WHAT IT MEANS</span><p>'+escapeHtml(x.meaning||'No additional interpretation is permitted without verified evidence.')+'</p></div>'+
+    '<div class="analysis-step"><span>WHY IT MATTERS NOW</span><p>'+escapeHtml(x.impact||'No current-run impact was established.')+'</p></div></div>'
+}
 function render5dr(run,request,outcomeAssessment){
   if(!run){
     const meta=request&&request.metadata?request.metadata:{},stage=meta.adapter_stage||'—',status=request?request.status:'READY';
@@ -571,55 +625,74 @@ function render5dr(run,request,outcomeAssessment){
       ?'<p class="muted">This run stopped safely. Press Run EDGE NIFTY to start a fresh run.</p>'
       :'<p class="muted">No action is required. EDGE NIFTY will advance this run automatically and publish the result when complete.</p>';
     const technical=request?'<details class="tech-details"><summary>Advanced details</summary><div class="tech-body"><div><span>Request</span><strong>'+escapeHtml(request.request_id)+'</strong></div><div><span>Internal stage</span><strong>'+escapeHtml(stage)+'</strong></div><div><span>Status</span><strong>'+escapeHtml(status)+'</strong></div><div><span>Evidence files</span><strong>'+escapeHtml(meta.evidence_file_count||'—')+'</strong></div></div></details>':'';
-    const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run assessment</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><h2>'+escapeHtml(progress)+'</h2><p class="run-timestamp">Run started: '+escapeHtml(runDateTime(request?.created_at||request?.updated_at||request?.submitted_at))+'</p><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
+    const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run setup</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';
+    fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><h2>'+escapeHtml(progress)+'</h2><p class="run-timestamp">Run started: '+escapeHtml(runDateTime(request?.created_at||request?.updated_at||request?.submitted_at))+'</p><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
     return;
   }
   const result=run.result||{},prob=result.probabilities||{},blockers=Array.isArray(result.tradeability_blockers)?result.tradeability_blockers:[],direction=friendlyDirection(result.directional_label),confidence=confidenceLabel(result.market_trust),tradeable=result.tradeable===true;
-  const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},components=normalized.component_scores||{},trust=normalized.market_trust_inputs||{},execution=normalized.execution_inputs||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
+  const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},diagnostics=result.engine_diagnostics||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
+  const event=result.event_shock&&typeof result.event_shock==='object'?result.event_shock:{level:normalized.event_shock||'Not preserved',expected_transmission:'Not preserved',convexity_warranted:'Not preserved',kill_switch:normalized.event_kill_switch};
+  const zone=result.expected_nifty_zone&&typeof result.expected_nifty_zone==='object'?result.expected_nifty_zone:((result.horizon_slots&&result.horizon_slots['D+5'])?{low:result.horizon_slots['D+5'].zone_low,high:result.horizon_slots['D+5'].zone_high,source_horizon:'D+5'}:{});
+  const recommendation=result.recommendation||(!tradeable?'NO_TRADE':'Legacy result · recommendation not preserved'),tradePlan=result.trade_plan&&typeof result.trade_plan==='object'?result.trade_plan:{};
   fiveDrState.textContent='Result ready';
-  const action=tradeable?'A trade setup currently meets the EDGE NIFTY gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
+  const action=recommendation==='NO_TRADE'?'Wait — NO TRADE under the governed recommendation assessment.':String(recommendation).replaceAll('_',' ');
   const directionStrength=directionStrengthSummary(result.des5),tradeSetupStrength=tradeSetupStrengthSummary(result.execution_edge);
   const why=governedWhy(meta,normalized,result);
   const changes=userChangeConditions(why,normalized,result);
   const blockersPlain=blockers.map(blockerText);
+  const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;
   fiveDrSummary.innerHTML=[
     '<article class="simple-result direction-'+escapeHtml(String(result.directional_label||'RANGE').toLowerCase())+'">',
-      '<div class="result-kicker">Today’s Market View</div>',
+      '<div class="result-kicker">TABLE 2 · CURRENT 5DR RUN</div>',
       '<h2>'+escapeHtml(direction)+'</h2>',
       '<p class="run-timestamp">Run date/time: '+escapeHtml(runDateTime(run.generated_at||run.run_timestamp||run.created_at))+'</p>',
-      '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
+      '<div class="probability-line"><span class="bull">Bull <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Range <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Bear <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
+      '<div class="edge-decision-highlights nifty-highlights">',
+        '<div class="edge-highlight-card direction"><span>5-DAY FORECAST</span><strong>'+escapeHtml(direction)+'</strong><small>Current governed five-day directional call.</small></div>',
+        '<div class="edge-highlight-card range"><span>EXPECTED 5-DAY NIFTY ZONE</span><strong>'+escapeHtml(zone.low==null&&zone.high==null?'Not verified':String(zone.low??'—')+' – '+String(zone.high??'—'))+'</strong><small>Governed D+5 expected zone; not a guaranteed target.</small></div>',
+      '</div>',
       '<div class="nifty-signal-grid">',
-        '<div class="decision-card"><span>Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
-        '<div class="decision-card"><span>Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>How reliable and internally consistent the evidence is for this market view.</small></div>',
-        '<div class="decision-card"><span>Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>DES5 — Directional Evidence Score</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>Market Trust — Evidence Confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>Reliability and internal consistency of the evidence. It does not measure bullishness.</small></div>',
+        '<div class="decision-card"><span>Execution Edge — Trade Setup Strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
       '</div>',
       '<div class="decision-grid">',
-        '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'Current gates passed':'Current gates are not met')+'</small></div>',
-        '<div class="decision-card"><span>Market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
+        '<div class="decision-card"><span>Regime</span><strong>'+escapeHtml(humanText(result.regime||normalized.regime||'Not preserved'))+'</strong><small>Frozen regime determines only the approved engine weights.</small></div>',
+        '<div class="decision-card"><span>Event Shock</span><strong>'+escapeHtml(humanText(event.level||'Not preserved'))+'</strong><small>Transmission '+escapeHtml(humanText(event.expected_transmission||'Not preserved'))+' · Convexity '+escapeHtml(String(event.convexity_warranted??'Not preserved'))+' · Kill Switch '+escapeHtml(event.kill_switch===true?'ACTIVE':event.kill_switch===false?'Inactive':'Not preserved')+'</small></div>',
+        '<div class="decision-card"><span>Directional Trade</span><strong>'+(tradeable?'YES':'NO')+'</strong><small>'+(tradeable?'The six directional gates pass. A separate executable trade plan is still required.':'One or more directional gates fail.')+'</small></div>',
+        '<div class="decision-card"><span>Definitive Recommendation</span><strong>'+escapeHtml(humanText(recommendation))+'</strong><small>Forecast direction and recommendation are intentionally separate.</small></div>',
       '</div>',
       '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
-      '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
+      niftyBandLegend(),
+      niftyTradeabilityGate(result,normalized,event,diagnostics),
+      '<div class="assessment-card governed-assessment"><div><span>Forecast Assessment</span><strong>'+escapeHtml(result.forecast_assessment_class||'LEGACY / NOT PRESERVED')+'</strong></div><p>'+escapeHtml(result.forecast_assessment||'This historical run predates the complete governed Forecast Assessment field. No assessment is reconstructed.')+'</p></div>',
+      '<div class="assessment-card governed-assessment"><div><span>Recommendation Assessment</span><strong>'+escapeHtml(recommendation==='NO_TRADE'?'REJECTED / NO TRADE':'PERMITTED')+'</strong></div><p>'+escapeHtml(result.recommendation_assessment||'This historical run predates the complete governed Recommendation Assessment field. No assessment is reconstructed.')+'</p></div>',
+      '<div class="assessment-card trade-plan-card"><div><span>Trade Plan</span><strong>'+escapeHtml(humanText(recommendation))+'</strong></div><p>Contract '+escapeHtml(tradePlan.instrument||'NONE')+(tradePlan.strike==null?'':' · Strike '+escapeHtml(tradePlan.strike))+(tradePlan.expiry?' · Expiry '+escapeHtml(tradePlan.expiry):'')+' · Entry '+escapeHtml(tradePlan.entry_low==null?'N/A':tradePlan.entry_low+'–'+tradePlan.entry_high)+' · SL '+escapeHtml(tradePlan.stop??'N/A')+' · T1 '+escapeHtml(tradePlan.target1??'N/A')+' · T2 '+escapeHtml(tradePlan.target2??'N/A')+' · R:R '+escapeHtml(tradePlan.expected_rr??diagnostics.expected_rr??normalized.expected_rr??'N/A')+'</p></div>',
+      (setup?'<div class="assessment-card"><div><span>Run setup</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':''),
       '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
       '<div class="analysis-detail" data-analysis-detail hidden>',
-      currentForecastDrilldown(result),
-      '<details class="why-details" open><summary>Why this view?</summary>',
-        '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p>'+escapeHtml(why.price.observed+' '+why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p>'+escapeHtml(why.options.observed+' '+why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Market participation</strong><p>'+escapeHtml(why.market.observed+' '+why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
-          '<div class="why-card"><strong>Macro & events</strong><p>'+escapeHtml(why.macro.observed+' '+why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p>'+escapeHtml(why.trade.observed+' '+why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
+        currentForecastDrilldown(result),
+        niftyEngineBreakdowns(result,normalized),
+        '<details class="why-details" open><summary>Detailed analysis — Why this view?</summary><div class="why-grid">',
+          structuredWhyCard('Price + Volume + Structure',why.price),
+          structuredWhyCard('PVPO / Derivatives',why.options),
+          structuredWhyCard('Market Participation',why.market),
+          structuredWhyCard('Macro + Catalysts',why.macro),
+          structuredWhyCard('Execution / Trade Quality',why.trade),
         '</div>',
-        (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
-      '</details>',
-      '<details class="change-details"><summary>What could change the view?</summary><p class="change-intro">These are the market developments that would actually make the current assessment stronger, weaker or tradeable:</p><ul>'+changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></details>',
-      '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. This forecast will be scored after its D+1 to D+5 outcomes are available. That scorecard measures forecast/recommendation performance; it is separate from the run assessment above.')+'</p></details>',
-      '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
-        '<div><span>Framework</span><strong>'+escapeHtml(run.framework_version)+'</strong></div>',
-        '<div><span>Run ID</span><strong>'+escapeHtml(run.run_id)+'</strong></div>',
-        '<div><span>Source mode</span><strong>'+escapeHtml(run.provenance_mode)+'</strong></div>',
-        (blockers.length?'<div class="full"><span>System reason codes</span><strong>'+blockers.map(escapeHtml).join(' · ')+'</strong></div>':''),
-      '</div></details>',
+        (blockersPlain.length?'<div class="plain-blockers"><strong>Governed blockers</strong><ul>'+blockersPlain.slice(0,8).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
+        (limits.length?'<div class="plain-blockers"><strong>Evidence limitations</strong><ul>'+limits.slice(0,8).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
+        '</details>',
+        '<details class="change-details"><summary>What could change the view?</summary><p class="change-intro">Only material new evidence should change the forecast or recommendation:</p><ul>'+changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></details>',
+        '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. The forecast and recommendation will be assessed only when governed outcomes become scorable; missing context remains NOT SCORABLE rather than inferred.')+'</p></details>',
+        '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
+          '<div><span>Framework</span><strong>'+escapeHtml(run.framework_version)+'</strong></div>',
+          '<div><span>Run ID</span><strong>'+escapeHtml(run.run_id)+'</strong></div>',
+          '<div><span>Source mode</span><strong>'+escapeHtml(run.provenance_mode)+'</strong></div>',
+          '<div><span>Assessment snapshot</span><strong>'+escapeHtml(result.assessment_snapshot_complete===true?'Complete':'Legacy / incomplete')+'</strong></div>',
+          '<div><span>Recommendation ledger</span><strong>'+escapeHtml(result.recommendation_ledger_complete===true?'Complete':'Legacy / incomplete')+'</strong></div>',
+          (blockers.length?'<div class="full"><span>System reason codes</span><strong>'+blockers.map(escapeHtml).join(' · ')+'</strong></div>':''),
+        '</div></details>',
       '</div>',
     '</article>'
   ].join('');
