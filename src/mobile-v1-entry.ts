@@ -382,7 +382,7 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     return json({...normalizedBody,ok:true,status:'PROCESSING',adapter_stage:'NORMALIZED_READY',engine_dispatch:previous,idempotent:true});
   }
   const origin=new URL(requestUrl).origin;
-  const packetResponse=await router.fetch(new Request(\`\${origin}/api/5dr/run-requests/\${encodeURIComponent(requestId)}/execution-packet\`,{method:'GET'}),env as any);
+  const packetResponse=await router.fetch(new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/execution-packet`,{method:'GET'}),env as any);
   const executionPacket=await responseJson(packetResponse);
   if(!packetResponse.ok)return json({...normalizedBody,...executionPacket},packetResponse.status);
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
