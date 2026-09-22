@@ -32,7 +32,7 @@ test('pending historical forecasts and current five-day forecast are collapsed b
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes('<details class="pending-forecast-block pending-forecast-details">'));
   assert.ok(app.includes('function currentForecastDrilldown(result)'));
-  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — day-wise direction & range</summary>'));
+  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary>'));
   assert.ok(!app.includes('<details class="pending-forecast-block pending-forecast-details" open>'));
   assert.ok(!app.includes('<details class="current-forecast-details" open>'));
 });
@@ -161,4 +161,14 @@ test('pre-open NIFTY and Stocks automation use curl service-token transport, not
     assert.ok(!workflow.includes('urllib.request'));
     assert.ok(!workflow.includes('urllib.error'));
   }
+});
+
+
+test('NIFTY canonical horizon presentation maps internal five slots to D through D+4',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  assert.ok(app.includes("{label:'D',internal:'D+1'}"));
+  assert.ok(app.includes("{label:'D+4',internal:'D+5'}"));
+  assert.ok(app.includes("const labels=['D','D+1','D+2','D+3','D+4']"));
+  assert.ok(app.includes('D is the canonical target trading session'));
+  assert.ok(app.includes('assessmentMetricForDisplay'));
 });
