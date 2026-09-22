@@ -172,3 +172,16 @@ test('NIFTY canonical horizon presentation maps internal five slots to D through
   assert.ok(app.includes('D is the canonical target trading session'));
   assert.ok(app.includes('assessmentMetricForDisplay'));
 });
+
+
+test('pre-open schedulers prewarm before 08:40 and skip outside the 08:55 cutoff',()=>{
+  const nifty=readFileSync('.github/workflows/5dr-preopen-canonical.yml','utf8');
+  const stocks=readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
+  for(const workflow of [nifty,stocks]){
+    assert.ok(workflow.includes("cron: '55 2 * * 1-5'"));
+    assert.ok(workflow.includes("cron: '20,25 3 * * 1-5'"));
+    assert.ok(workflow.includes('warmup=now.replace(hour=8,minute=40'));
+    assert.ok(workflow.includes('cutoff=now.replace(hour=8,minute=55'));
+    assert.ok(workflow.includes('PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW'));
+  }
+});
