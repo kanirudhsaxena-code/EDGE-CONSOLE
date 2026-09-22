@@ -47,8 +47,28 @@ export function validateNormalizedInput(key:string,value:unknown):string[]{
     case 'expected_rr': return isFiniteNumber(value)&&value>=0?[]:['expected_rr must be a finite non-negative number'];
     case 'horizon_slots': {
       if(!isObject(value)||!exactKeys(value,HORIZON_KEYS))return ['horizon_slots must contain exactly D+1, D+2, D+3, D+4 and D+5'];
-      const invalid=HORIZON_KEYS.filter(slot=>!isObject(value[slot]));
-      return invalid.length?[`horizon_slots ${invalid.join(', ')} must each be objects`]:[];
+      const errors:string[]=[];
+      const scenarioKeys=['BULL','RANGE','BEAR'] as const;
+      const directionToScenario:Record<string,string>={BULLISH:'BULL',RANGE:'RANGE',BEARISH:'BEAR'};
+      for(const horizon of HORIZON_KEYS){
+        const slot=value[horizon];
+        if(!isObject(slot)){errors.push(`horizon_slots.${horizon} must be an object`);continue}
+        if(!['BULLISH','RANGE','BEARISH'].includes(String(slot.direction)))errors.push(`horizon_slots.${horizon}.direction must be BULLISH, RANGE or BEARISH`);
+        const probs=slot.probabilities;
+        if(!isObject(probs)||!exactKeys(probs,scenarioKeys))errors.push(`horizon_slots.${horizon}.probabilities must contain exactly BULL, RANGE and BEAR`);
+        else{
+          const values=scenarioKeys.map(key=>Number(probs[key]));
+          if(values.some(v=>!Number.isFinite(v)||v<0||v>100))errors.push(`horizon_slots.${horizon} scenario probabilities must be 0..100`);
+          else{
+            if(Math.abs(values.reduce((a,b)=>a+b,0)-100)>0.02)errors.push(`horizon_slots.${horizon} scenario probabilities must total 100`);
+            const selected=directionToScenario[String(slot.direction)];
+            if(selected&&Math.abs(Number(probs[selected])-Math.max(...values))>0.02)errors.push(`horizon_slots.${horizon}.direction must match the highest scenario probability`);
+          }
+        }
+        if(!isFiniteNumber(slot.zone_low)||!isFiniteNumber(slot.zone_high)||Number(slot.zone_low)<=0||Number(slot.zone_high)<Number(slot.zone_low))errors.push(`horizon_slots.${horizon} requires positive zone_low <= zone_high`);
+        if(!isNonEmptyString(slot.basis))errors.push(`horizon_slots.${horizon}.basis is mandatory`);
+      }
+      return errors;
     }
     default:return [`unsupported normalized input ${key}`];
   }
