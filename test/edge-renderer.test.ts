@@ -135,7 +135,7 @@ test('PV/PVPO is expanded for users',()=>{
 test('assessment and decision labels are user-friendly',()=>{
   const html=renderEdgeV13(report);
   assert.ok(html.includes('Outcome checks recorded'));
-  assert.ok(html.includes('Internal model P/L score'));
+  assert.ok(html.includes('Cumulative model P/L'));
   assert.ok(html.includes('Early forecast tracking'));
   assert.ok(html.includes('Official recommendation accuracy'));
   assert.ok(html.includes('Audit-only model score. It is not your portfolio return'));
@@ -205,7 +205,7 @@ test('current approved presentation contract validates cleanly',()=>{
 test('EDGE Stocks renderer exposes canonical governance status',()=>{
   const js=readFileSync('public/edge-live.js','utf8');
   assert.ok(js.includes('Official canonical status'));
-  assert.ok(js.includes('Only selected canonical recommendations enter official efficacy'));
+  assert.ok(js.includes('OFFICIAL metrics use selected CLOSED/scorable recommendations only'));
   assert.ok(js.includes('No qualifying canonical was selected for this target'));
   assert.ok(js.includes('current_run_is_selected'));
 });
