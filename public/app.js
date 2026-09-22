@@ -617,7 +617,7 @@ function render5dr(run,request,outcomeAssessment){
   const result=run.result||{},prob=result.probabilities||{},blockers=Array.isArray(result.tradeability_blockers)?result.tradeability_blockers:[],direction=friendlyDirection(result.directional_label),confidence=confidenceLabel(result.market_trust),tradeable=result.tradeable===true;
   const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},components=normalized.component_scores||{},trust=normalized.market_trust_inputs||{},execution=normalized.execution_inputs||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
   fiveDrState.textContent='Result ready';
-  const action=tradeable?'A trade setup currently meets the EDGE NIFTY gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
+  const action=result.recommendation?humanText(result.recommendation):(tradeable?'Legacy run · tradeability passed, but the frozen recommendation field was not persisted.':'No Trade · legacy published result');
   const directionStrength=directionStrengthSummary(result.des5),tradeSetupStrength=tradeSetupStrengthSummary(result.execution_edge);
   const why=governedWhy(meta,normalized,result);
   const changes=userChangeConditions(why,normalized,result);
@@ -629,26 +629,31 @@ function render5dr(run,request,outcomeAssessment){
       '<p class="run-timestamp">Run date/time: '+escapeHtml(runDateTime(run.generated_at||run.run_timestamp||run.created_at))+'</p>',
       '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
       '<div class="nifty-signal-grid">',
-        '<div class="decision-card"><span>Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
-        '<div class="decision-card"><span>Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>How reliable and internally consistent the evidence is for this market view.</small></div>',
-        '<div class="decision-card"><span>Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>DES5 · Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>Market Trust · Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>Reliability and internal consistency of the evidence; it is confidence, not direction.</small></div>',
+        '<div class="decision-card"><span>Execution Edge · Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
       '</div>',
       '<div class="decision-grid">',
         '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'Current gates passed':'Current gates are not met')+'</small></div>',
         '<div class="decision-card"><span>Market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
       '</div>',
-      '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
-      '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
+      '<div class="action-box"><span>Definitive recommendation</span><strong>'+escapeHtml(action)+'</strong></div>',
+      niftyGateChecklist(result,normalized),
+      '<div class="assessment-pair">'+
+        '<div class="assessment-card"><div><span>Forecast Assessment</span><strong>'+(result.forecast_assessment?'Governed':'Legacy incomplete')+'</strong></div><p>'+escapeHtml(result.forecast_assessment||'This published legacy run did not persist the mandatory Forecast Assessment. No retrospective assessment is being invented.')+'</p></div>'+
+        '<div class="assessment-card"><div><span>Recommendation Assessment</span><strong>'+(result.recommendation_assessment?'Governed':'Legacy incomplete')+'</strong></div><p>'+escapeHtml(result.recommendation_assessment||'This published legacy run did not persist the mandatory Recommendation Assessment. New V2.1.2 runs fail closed when it is missing.')+'</p></div>'+
+      '</div>',
       '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
       '<div class="analysis-detail" data-analysis-detail hidden>',
       currentForecastDrilldown(result),
-      '<details class="why-details" open><summary>Why this view?</summary>',
+      niftyMetricBreakdown(result,normalized),
+      '<details class="why-details" open><summary>Detailed analysis · why this view?</summary>',
         '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p>'+escapeHtml(why.price.observed+' '+why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p>'+escapeHtml(why.options.observed+' '+why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Market participation</strong><p>'+escapeHtml(why.market.observed+' '+why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
-          '<div class="why-card"><strong>Macro & events</strong><p>'+escapeHtml(why.macro.observed+' '+why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p>'+escapeHtml(why.trade.observed+' '+why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
+          whyCard('Price & structure',why.price),
+          whyCard('Options & positioning',why.options),
+          whyCard('Market participation',why.market),
+          whyCard('Macro & events',why.macro),
+          whyCard('Trade quality',why.trade),
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',
