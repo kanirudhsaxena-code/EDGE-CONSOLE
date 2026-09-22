@@ -235,7 +235,7 @@ jobs:
           grep -q 'EXPECTED 5-DAY RANGE' /tmp/edge-live.js
           grep -q 'WHY IT MATTERS' /tmp/edge-live.js
           grep -q 'Official canonical status' /tmp/edge-live.js
-          grep -q 'Only selected canonical recommendations enter official efficacy' /tmp/edge-live.js
+          grep -q 'OFFICIAL metrics use selected CLOSED/scorable recommendations only' /tmp/edge-live.js
           ! grep -q '<b>Outcome:</b>' /tmp/edge-live.js
           grep -q 'Call date/time:' /tmp/edge-live.js
           grep -q 'execution-key-grid' /tmp/edge-live.js
