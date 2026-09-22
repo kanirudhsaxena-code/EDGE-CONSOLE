@@ -736,3 +736,34 @@ html,body{max-width:100%;overflow-x:hidden}
   .current-forecast-details summary{font-size:18px!important}
   .assessment-drill-section>.step-label{font-size:10px!important}
 }
+
+
+/* Master-spec conformance additions v19 — preserves frozen light/card visual system */
+.scenario-mini-line{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:5px;margin-top:6px}
+.scenario-mini-line span{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;border:1px solid var(--border-light);border-radius:9px;background:#fff;font-size:10px;color:var(--text-soft)}
+.scenario-mini-line b{font-size:12px;color:var(--ink)}
+.metric-legend{display:grid;gap:5px;margin:10px 0;padding:10px 12px;border:1px solid var(--border-light);border-radius:13px;background:var(--surface-soft);font-size:10px;line-height:1.45;color:var(--text-soft)}
+.metric-legend strong{color:var(--ink);font-size:11px}.metric-legend.compact{margin:8px 0 12px}
+.metric-breakdown-details,.gate-panel{margin-top:10px;padding:12px;border:1px solid var(--border-light);border-radius:16px;background:var(--surface-soft)}
+.metric-breakdown-details>summary{cursor:pointer;font-size:var(--ui-section-title-size);font-weight:800;color:var(--ink)}
+.breakdown-section{margin-top:12px}.breakdown-section .step-label{font-size:10px;font-weight:800;letter-spacing:.06em;color:var(--text-soft);text-transform:uppercase;margin-bottom:7px}
+.metric-breakdown-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.breakdown-card{padding:10px;border:1px solid var(--border-light);border-radius:12px;background:#fff;min-width:0}
+.breakdown-card span{display:block;font-size:10px;color:var(--text-soft);text-transform:uppercase;letter-spacing:.045em}
+.breakdown-card strong{display:block;margin-top:3px;font-size:15px;color:var(--ink)}
+.breakdown-card small{display:block;margin-top:3px;font-size:10px;line-height:1.4;color:var(--text-soft)}
+.gate-panel{display:grid;gap:10px}.gate-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.gate-item{padding:10px;border:1px solid var(--border-light);border-radius:12px;background:#fff}
+.gate-item span{display:block;font-size:11px;font-weight:800;color:var(--ink)}
+.gate-item strong{display:block;margin-top:4px;font-size:10px;line-height:1.35;color:var(--text-soft)}
+.gate-item.pass{border-color:#c9e5d4}.gate-item.fail{border-color:#efd5d2}
+.assessment-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0}
+.assessment-pair .assessment-card{margin:0}
+.why-step{margin-top:9px;padding-top:8px;border-top:1px solid var(--border-light)}
+.why-step:first-of-type{margin-top:8px}.why-step>span{display:block;font-size:9px;line-height:1.2;font-weight:800;letter-spacing:.07em;color:var(--text-soft)}
+.why-step p{margin:4px 0 0!important}
+@media(max-width:600px){
+  .metric-breakdown-grid,.gate-grid,.assessment-pair{grid-template-columns:1fr}
+  .metric-breakdown-details>summary{font-size:18px}
+  .scenario-mini-line{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
