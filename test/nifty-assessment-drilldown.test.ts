@@ -16,7 +16,7 @@ test('5DR assessment UI exposes day-wise forecast range direction and outcome dr
   assert.ok(app.includes('Matured historical performance'));
   assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
   assert.ok(app.includes('Expected range / zone'));
-  assert.ok(app.includes('No evidence-supported day-specific direction/range was stored for this slot.'));
+  assert.ok(app.includes('No evidence-supported daily scenario/range was stored for this slot.'));
   assert.ok(app.includes('Matured eligible'));
 });
 
