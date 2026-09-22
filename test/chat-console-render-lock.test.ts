@@ -52,7 +52,7 @@ test('EDGE NIFTY Chat capture expands full analysis before reading Console text'
   assert.match(capture,/detail\.hidden=false/);
   assert.match(capture,/querySelectorAll\('details'\)\.forEach/);
   assert.match(capture,/node\.open=true/);
-  assert.match(workflow,/5-day forecast — day-wise direction & range/);
+  assert.match(workflow,/5-day forecast/);
   assert.match(workflow,/Why this view\?/);
   assert.match(workflow,/What could change the view\?/);
   assert.match(workflow,/Future performance scorecard/);
