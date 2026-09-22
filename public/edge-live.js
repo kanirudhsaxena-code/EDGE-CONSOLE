@@ -224,7 +224,7 @@ export function renderEdgeV13(report){
   '</section>';
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
-    '<div class="edge-result-hero"><div class="result-kicker">2 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
+    '<div class="edge-result-hero"><div class="result-kicker">3 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
     canonicalCard+
     '<div class="edge-decision-highlights">'+
       '<div class="edge-highlight-card direction"><span>5-DAY DIRECTION</span><strong>'+esc(userForecastLabel(d.definitive_forecast))+'</strong><small>Current price '+money(d.current_price)+'</small></div>'+
@@ -258,11 +258,11 @@ export function renderEdgeV13(report){
       '<div class="edge-explanation-block"><span>WHY IT MATTERS</span><p>'+esc(meaning)+'</p></div>'+
       '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span></div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
-  const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>3 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
+  const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>4 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
-  const section4='<section class="edge-user-section" data-edge-section="active-calls"><div class="edge-user-head"><div><span>4 — ACTIVE CALLS</span><h3>Calls still being tracked</h3></div><p>These are open EDGE calls that have not completed their full assessment lifecycle yet.</p></div>'+activeCallCards(calls,r.ticker)+'</section>';
+  const section4='<section class="edge-user-section" data-edge-section="active-calls"><div class="edge-user-head"><div><span>2 — ACTIVE CALLS</span><h3>Calls still being tracked</h3></div><p>These are open EDGE calls that have not completed their full assessment lifecycle yet.</p></div>'+activeCallCards(calls,r.ticker)+'</section>';
 
-  return '<article class="canonical-edge-result edge-user-output" data-contract="'+esc(r.contract_version)+'">'+section1+section2+section3+section4+
+  return '<article class="canonical-edge-result edge-user-output" data-contract="'+esc(r.contract_version)+'">'+section1+section4+section2+section3+
     '<div class="canonical-edge-meta">Run '+esc(r.run_id||'—')+' · '+esc(r.framework_version||'—')+' · Generated '+esc(r.generated_at?new Date(r.generated_at).toLocaleString():'—')+'</div></article>';
 }
 if(typeof document!=='undefined'){
