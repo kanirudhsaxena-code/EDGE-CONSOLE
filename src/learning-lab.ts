@@ -91,3 +91,17 @@ export function learningSnapshotOverview(row:JsonRecord|null){
     production_change_allowed:false,
   };
 }
+
+export function validateLearningCandidate(body:unknown):string[]{
+  const errors:string[]=[];
+  if(!isObject(body))return['body must be an object'];
+  if(!nonEmpty(body.candidate_id))errors.push('candidate_id is mandatory');
+  if(!LEARNING_ENGINES.includes(String(body.engine) as typeof LEARNING_ENGINES[number]))errors.push('engine must be 5DR or EDGE_STOCKS');
+  if(!['CANDIDATE','VALIDATING','PENDING_USER_APPROVAL','APPROVED_FOR_BUILD','REJECTED','DEFERRED'].includes(String(body.status)))errors.push('candidate status is invalid');
+  if(!isObject(body.proposal))errors.push('proposal must be an object');
+  if(!isObject(body.baseline_metrics))errors.push('baseline_metrics must be an object');
+  if(!isObject(body.challenger_metrics))errors.push('challenger_metrics must be an object');
+  if(!isObject(body.validation_state))errors.push('validation_state must be an object');
+  if(body.production_change_allowed!==false)errors.push('production_change_allowed must be false');
+  return errors;
+}
