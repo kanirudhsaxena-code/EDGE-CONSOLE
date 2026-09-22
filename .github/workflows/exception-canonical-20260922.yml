@@ -1,0 +1,115 @@
+name: One-time 22 Sep Exception Canonical Runs
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-canonical-20260922.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exception-canonical-20260922
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Launch fresh NIFTY and LTF exception runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+
+          call_json() {
+            local method="$1"; shift
+            local url="$1"; shift
+            local data="${1:-}"
+            if [ -n "$data" ]; then
+              curl --location --fail-with-body --silent --show-error \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H 'content-type: application/json' -H 'accept: application/json' \
+                -X "$method" --data-binary "$data" "$url"
+            else
+              curl --location --fail-with-body --silent --show-error \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H 'accept: application/json' -X "$method" "$url"
+            fi
+          }
+
+          NIFTY_CREATE="$(call_json POST "$CONSOLE_URL/api/5dr/automated-runs" '{"force_new":true,"client_invocation_id":"user-exception-canonical-20260922"}')"
+          echo "$NIFTY_CREATE" > /tmp/nifty-create.json
+          NIFTY_REQ="$(python -c "import json; d=json.load(open('/tmp/nifty-create.json')); print((d.get('request') or {}).get('request_id') or '')")"
+          test -n "$NIFTY_REQ"
+          echo "nifty_request_id=$NIFTY_REQ"
+
+          NIFTY_RUN=""
+          for attempt in $(seq 1 60); do
+            sleep 8
+            if call_json POST "$CONSOLE_URL/api/5dr/run-requests/$NIFTY_REQ/resume-processing" '{}' > /tmp/nifty-state.json; then
+              STATUS="$(python -c "import json; d=json.load(open('/tmp/nifty-state.json')); print(d.get('status') or '')")"
+              STAGE="$(python -c "import json; d=json.load(open('/tmp/nifty-state.json')); print(d.get('adapter_stage') or '')")"
+              echo "nifty_resume=$attempt status=$STATUS stage=$STAGE"
+              if [ "$STATUS" = "COMPLETED" ]; then
+                NIFTY_RUN="$(python -c "import json; d=json.load(open('/tmp/nifty-state.json')); print(d.get('run_id') or '')")"
+                break
+              fi
+              if [ "$STATUS" = "FAILED" ]; then
+                cat /tmp/nifty-state.json
+                exit 1
+              fi
+            fi
+          done
+          test -n "$NIFTY_RUN"
+          echo "nifty_run_id=$NIFTY_RUN"
+
+          LTF_CREATE="$(call_json POST "$CONSOLE_URL/api/edge-stocks/invoke" '{"command":"EDGE LTF","force_new":true}')"
+          echo "$LTF_CREATE" > /tmp/ltf-create.json
+          LTF_AFTER="$(python -c "import json; d=json.load(open('/tmp/ltf-create.json')); print(d.get('dispatched_at') or '')")"
+          test -n "$LTF_AFTER"
+          echo "ltf_dispatched_at=$LTF_AFTER"
+
+          LTF_RUN=""
+          for attempt in $(seq 1 45); do
+            sleep 8
+            QS="$(python -c "import urllib.parse,sys; print(urllib.parse.urlencode({'ticker':'LTF','after':sys.argv[1]}))" "$LTF_AFTER")"
+            if call_json GET "$CONSOLE_URL/api/edge-stocks/invoke/status?$QS" > /tmp/ltf-state.json; then
+              STATUS="$(python -c "import json; d=json.load(open('/tmp/ltf-state.json')); print(d.get('status') or '')")"
+              echo "ltf_poll=$attempt status=$STATUS"
+              if [ "$STATUS" = "COMPLETE" ]; then
+                LTF_RUN="$(python -c "import json; d=json.load(open('/tmp/ltf-state.json')); print(d.get('run_id') or '')")"
+                break
+              fi
+            fi
+          done
+          test -n "$LTF_RUN"
+          echo "ltf_run_id=$LTF_RUN"
+
+          python - <<PY
+          import json
+          payload={
+            "exception_date":"2026-09-22",
+            "nifty_request_id":"$NIFTY_REQ",
+            "nifty_run_id":"$NIFTY_RUN",
+            "ltf_run_id":"$LTF_RUN",
+            "research_bundle_id":"EDGE-RESEARCH-LTF-20260922T040104Z",
+          }
+          open("exception-canonical-run-ids.json","w").write(json.dumps(payload,indent=2))
+          print(json.dumps(payload,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exception-canonical-run-ids-20260922
+          path: exception-canonical-run-ids.json
+          retention-days: 30
