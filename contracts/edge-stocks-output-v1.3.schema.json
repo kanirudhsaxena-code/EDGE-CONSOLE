@@ -92,7 +92,136 @@
         "decision_ladder",
         "bot",
         "execution"
-      ]
+      ],
+      "properties": {
+        "market_trust": {
+          "type": "object",
+          "required": [
+            "score",
+            "band",
+            "subscores"
+          ],
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "band": {
+              "type": "string",
+              "minLength": 1
+            },
+            "subscores": {
+              "type": "object",
+              "required": [
+                "evidence_quality",
+                "freshness",
+                "completeness",
+                "directional_agreement",
+                "market_confirmation"
+              ],
+              "properties": {
+                "evidence_quality": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "freshness": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "completeness": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "directional_agreement": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "market_confirmation": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": true
+        },
+        "bot": {
+          "type": "object",
+          "required": [
+            "score",
+            "grade",
+            "subscores"
+          ],
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "grade": {
+              "enum": [
+                "C",
+                "B",
+                "A",
+                "A+",
+                "A++"
+              ]
+            },
+            "subscores": {
+              "type": "object",
+              "required": [
+                "forecast_edge",
+                "market_trust",
+                "structure_pattern_quality",
+                "pv_pvpo_confirmation",
+                "catalyst_asymmetry",
+                "execution_quality"
+              ],
+              "properties": {
+                "forecast_edge": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "market_trust": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "structure_pattern_quality": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "pv_pvpo_confirmation": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "catalyst_asymmetry": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                },
+                "execution_quality": {
+                  "type": "number",
+                  "minimum": 0,
+                  "maximum": 100
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          "additionalProperties": true
+        }
+      }
     },
     "drilldown": {
       "type": "array",
@@ -102,7 +231,13 @@
         "required": [
           "component",
           "score_or_level",
+          "original_weight",
+          "normalized_direction",
+          "normalized_weight",
+          "weighted_contribution",
+          "evidence_quality",
           "verification_status",
+          "conflict_flag",
           "key_outcome",
           "interpretation"
         ],
@@ -128,6 +263,46 @@
           "interpretation": {
             "type": "string",
             "minLength": 1
+          },
+          "original_weight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 100
+          },
+          "normalized_direction": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -1,
+            "maximum": 1
+          },
+          "normalized_weight": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 100
+          },
+          "weighted_contribution": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": -100,
+            "maximum": 100
+          },
+          "evidence_quality": {
+            "enum": [
+              "HIGH",
+              "MEDIUM",
+              "LOW",
+              "NOT_VERIFIED"
+            ]
+          },
+          "conflict_flag": {
+            "type": "boolean"
           }
         }
       }
