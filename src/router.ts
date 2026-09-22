@@ -544,8 +544,6 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       left join bot_scores b using (recommendation_id)
       left join execution_plans e using (recommendation_id)
      where r.ticker = ${symbol}
-       and l.include_in_master_metrics
-       and l.status = 'OPEN'
      order by r.run_timestamp desc
      limit 1
   `;
