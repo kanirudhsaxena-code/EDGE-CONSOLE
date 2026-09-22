@@ -170,6 +170,34 @@ function drillFinding(row){
 function metricCard(label,value,detail){
   return '<div class="edge-user-metric"><span>'+esc(label)+'</span><strong>'+esc(value)+'</strong><small>'+esc(detail)+'</small></div>';
 }
+function edgeStockLegends(){
+  return '<div class="metric-legend compact"><strong>EDGE Stocks legends</strong>'+
+    '<span><b>Component score:</b> −2 Strong Bearish · −1 Bearish · 0 Neutral · +1 Bullish · +2 Strong Bullish</span>'+
+    '<span><b>Market Trust:</b> 85–100 Very High · 70–84 High · 55–69 Moderate · 40–54 Low · &lt;40 Very Low</span>'+
+    '<span><b>BOT grade:</b> A++ ≥90 · A+ ≥80 · A ≥70 · B ≥60 · C &lt;60</span>'+
+    '<span><b>Decision Ladder:</b> Observe / Watchlist / Investigation = 0R · Pilot = 0.25R · Partial = 0.50R · Full = 1.00R</span></div>'
+}
+function trustBreakdown(d){
+  const t=d?.market_trust||{},s=t.subscores||{},w=t.weights||{};
+  const labels={evidence_quality:'Evidence quality',freshness:'Freshness',completeness:'Completeness',directional_agreement:'Directional agreement',market_confirmation:'Market confirmation'};
+  return '<div class="breakdown-section"><div class="step-label">Market Trust breakdown</div><div class="metric-breakdown-grid">'+Object.keys(labels).map(key=>'<div class="breakdown-card"><span>'+esc(labels[key])+'</span><strong>'+(s[key]==null?'Not available':num(s[key],1)+'/100')+'</strong><small>Weight '+esc(w[key]??'—')+'%'+(s[key]==null?' · not persisted in this run':'')+'</small></div>').join('')+'</div></div>'
+}
+function botBreakdown(d){
+  const b=d?.bot||{},s=b.subscores||{},w=b.weights||{};
+  const labels={forecast_edge:'Forecast Edge',market_trust:'Market Trust',structure_pattern_quality:'Structure / pattern quality',pv_pvpo_confirmation:'PV/PVPO confirmation',catalyst_asymmetry:'Catalyst asymmetry',execution_quality:'Execution quality'};
+  return '<div class="breakdown-section"><div class="step-label">BOT Hunter breakdown</div><div class="metric-breakdown-grid">'+Object.keys(labels).map(key=>'<div class="breakdown-card"><span>'+esc(labels[key])+'</span><strong>'+(s[key]==null?'Not available':num(s[key],1)+'/100')+'</strong><small>Weight '+esc(w[key]??'—')+'%</small></div>').join('')+'</div></div>'
+}
+function ladderMeaning(value){
+  const map={
+    OBSERVE:'Observe · 0R · no capital commitment',
+    WATCHLIST:'Watchlist · 0R · monitor only',
+    INVESTIGATION:'Investigation · 0R · setup not executable',
+    PILOT:'Pilot · 0.25R · small governed risk unit',
+    PARTIAL:'Partial · 0.50R · half governed risk unit',
+    FULL:'Full · 1.00R · full governed risk unit'
+  };
+  return map[String(value||'').toUpperCase()]||human(value||'—')
+}
 export function renderEdgeV13(report){
   const r=report||{};
   if(r.contract_version!==EDGE_RENDERER_CONTRACT)throw new Error('EDGE Stocks contract mismatch');
