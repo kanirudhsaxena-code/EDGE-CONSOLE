@@ -15,9 +15,9 @@ const report = {
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
-    table_2:'CURRENT_STOCK_OUTCOME',
-    table_3:'DRILLDOWN',
-    table_4:'ACTIVE_CALLS'
+    table_2:'ACTIVE_CALLS',
+    table_3:'CURRENT_STOCK_OUTCOME',
+    table_4:'DRILLDOWN'
   },
   master_assessment:{
     recommendations:5,unique_stocks:3,open_recommendations:5,closed_recommendations:0,
@@ -56,9 +56,9 @@ const report = {
 test('Efficacy V2 renderer produces four mobile-first sections in approved order',()=>{
   const html=renderEdgeV13(report);
   const i1=html.indexOf('1 — EDGE MASTER ASSESSMENT');
-  const i2=html.indexOf('2 — CURRENT STOCK OUTCOME');
-  const i3=html.indexOf('3 — DRILL-DOWN');
-  const i4=html.indexOf('4 — ACTIVE CALLS');
+  const i2=html.indexOf('2 — ACTIVE CALLS');
+  const i3=html.indexOf('3 — CURRENT STOCK OUTCOME');
+  const i4=html.indexOf('4 — DRILL-DOWN');
   assert.ok(i1<i2 && i2<i3 && i3<i4);
   assert.equal((html.match(/data-edge-section=/g)||[]).length,4);
 });
@@ -191,9 +191,9 @@ test('verified drill-down still requires meaningful persisted evidence',()=>{
 
 test('validator rejects obsolete presentation order',()=>{
   const bad=structuredClone(report);
-  bad.presentation.table_2='ACTIVE_CALLS';
-  bad.presentation.table_3='CURRENT_STOCK_OUTCOME';
-  bad.presentation.table_4='DRILLDOWN';
+  bad.presentation.table_2='CURRENT_STOCK_OUTCOME';
+  bad.presentation.table_3='DRILLDOWN';
+  bad.presentation.table_4='ACTIVE_CALLS';
   assert.ok(validateEdgeStocksResult(bad).length>0);
 });
 
