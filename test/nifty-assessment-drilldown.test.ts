@@ -12,7 +12,7 @@ test('5DR assessment separates matured efficacy from pending published forecasts
 
 test('5DR assessment UI exposes day-wise forecast range direction and outcome drill-down',()=>{
   const app=readFileSync('public/app.js','utf8');
-  assert.ok(app.includes('Drill down — day-wise forecast, range & outcomes'));
+  assert.ok(app.includes('D through D+4 forecast efficacy'));
   assert.ok(app.includes('Matured historical performance'));
   assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
   assert.ok(app.includes('Expected range / zone'));
