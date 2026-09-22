@@ -149,3 +149,16 @@ test('legacy pending assessment population keeps only last valid run per IST run
   assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
   assert.ok(app.includes('pending legacy canonical'));
 });
+
+
+test('pre-open NIFTY and Stocks automation use curl service-token transport, not urllib',()=>{
+  const nifty=readFileSync('.github/workflows/5dr-preopen-canonical.yml','utf8');
+  const stocks=readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
+  for(const workflow of [nifty,stocks]){
+    assert.ok(workflow.includes('"curl"'));
+    assert.ok(workflow.includes('CF-Access-Client-Id'));
+    assert.ok(workflow.includes('CF-Access-Client-Secret'));
+    assert.ok(!workflow.includes('urllib.request'));
+    assert.ok(!workflow.includes('urllib.error'));
+  }
+});
