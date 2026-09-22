@@ -1,0 +1,114 @@
+name: Import Daily Learning Lab State
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '45 12 * * 1-5'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: import-daily-learning-lab
+  cancel-in-progress: true
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      FIVE_DR_HANDOFF_URL: https://raw.githubusercontent.com/kanirudhsaxena-code/5DR-V2/state/assessment-handoff/runtime/5dr-learning-lab-handoff.json
+      EDGE_HANDOFF_URL: https://raw.githubusercontent.com/kanirudhsaxena-code/EDGE---V1/state/learning-lab-handoff/runtime/edge-learning-lab-handoff.json
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Fetch and validate engine handoffs
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error -H 'Cache-Control: no-cache' "$FIVE_DR_HANDOFF_URL" -o /tmp/5dr-learning.json
+          curl --fail-with-body --silent --show-error -H 'Cache-Control: no-cache' "$EDGE_HANDOFF_URL" -o /tmp/edge-learning.json
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+
+          specs=[
+              ("/tmp/5dr-learning.json","5DR"),
+              ("/tmp/edge-learning.json","EDGE_STOCKS"),
+          ]
+          for path,engine in specs:
+              p=json.load(open(path,encoding="utf-8"))
+              if p.get("schema_version")!="MDOS_LEARNING_LAB_HANDOFF_V1":
+                  raise SystemExit(f"LEARNING_HANDOFF_SCHEMA_MISMATCH engine={engine}")
+              if p.get("engine")!=engine:
+                  raise SystemExit(f"LEARNING_HANDOFF_ENGINE_MISMATCH expected={engine} got={p.get('engine')}")
+              generated=p.get("generated_at")
+              if not isinstance(generated,str):
+                  raise SystemExit(f"LEARNING_HANDOFF_MISSING_GENERATED_AT engine={engine}")
+              generated_at=datetime.fromisoformat(generated.replace("Z","+00:00"))
+              age=(datetime.now(timezone.utc)-generated_at.astimezone(timezone.utc)).total_seconds()
+              if age < -300 or age > 14400:
+                  raise SystemExit(f"LEARNING_HANDOFF_STALE engine={engine} age_seconds={int(age)}")
+              if p.get("methodology_changed") is not False or p.get("production_change_allowed") is not False:
+                  raise SystemExit(f"LEARNING_HANDOFF_FIREWALL_FAILED engine={engine}")
+              if not isinstance(p.get("snapshot"),dict) or p["snapshot"].get("engine")!=engine:
+                  raise SystemExit(f"LEARNING_HANDOFF_SNAPSHOT_INVALID engine={engine}")
+              if not isinstance(p.get("observations"),list) or not isinstance(p.get("candidates"),list):
+                  raise SystemExit(f"LEARNING_HANDOFF_COLLECTION_INVALID engine={engine}")
+              print(f"learning_handoff_valid engine={engine} observations={len(p['observations'])} candidates={len(p['candidates'])}")
+          PY
+      - name: Import immutable Learning Lab records
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          python - <<'PY'
+          import json, os, subprocess, tempfile
+
+          console=os.environ["CONSOLE_URL"].rstrip("/")
+          client_id=os.environ["CF_ACCESS_CLIENT_ID"]
+          client_secret=os.environ["CF_ACCESS_CLIENT_SECRET"]
+
+          def post(path,payload):
+              fd,name=tempfile.mkstemp(suffix=".json")
+              os.close(fd)
+              try:
+                  with open(name,"w",encoding="utf-8") as out:
+                      json.dump(payload,out,separators=(",",":"),default=str)
+                  cmd=[
+                      "curl","--location","--silent","--show-error",
+                      "-o",name+".response","-w","%{http_code}",
+                      "-X","POST",
+                      "-H",f"CF-Access-Client-Id: {client_id}",
+                      "-H",f"CF-Access-Client-Secret: {client_secret}",
+                      "-H","Content-Type: application/json",
+                      "-H","Accept: application/json",
+                      "--data-binary","@"+name,
+                      console+path,
+                  ]
+                  last=None
+                  for attempt in range(1,7):
+                      code=subprocess.check_output(cmd,text=True).strip()
+                      body=open(name+".response",encoding="utf-8").read()
+                      print(f"learning_import path={path} status={code} attempt={attempt} response={body[:500]}")
+                      if code in {"200","201"}:
+                          return
+                      last=(code,body)
+                      if attempt<6:
+                          subprocess.run(["sleep","10"],check=True)
+                  raise SystemExit(f"LEARNING_IMPORT_FAILED path={path} last={last}")
+              finally:
+                  for p in (name,name+".response"):
+                      try: os.unlink(p)
+                      except FileNotFoundError: pass
+
+          for source in ("/tmp/5dr-learning.json","/tmp/edge-learning.json"):
+              payload=json.load(open(source,encoding="utf-8"))
+              # Snapshot is imported last: a visible COMPLETE/PARTIAL day only exists
+              # after all preceding immutable records were accepted.
+              for observation in payload["observations"]:
+                  post("/api/learning-lab/observation-import",observation)
+              for candidate in payload["candidates"]:
+                  post("/api/learning-lab/candidate-import",candidate)
+              post("/api/learning-lab/snapshot-import",payload["snapshot"])
+          PY
