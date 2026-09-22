@@ -75,7 +75,7 @@ export function validateEdgeStocksResult(body: unknown): string[] {
       else {
         const w=mt.weights as JsonRecord;
         for (const key of ['evidence_quality','freshness','completeness','directional_agreement','market_confirmation']) requiredNumber(w,key,0,100,errors,'current_stock_outcome.market_trust.weights');
-        const total=Object.values(w).reduce((sum,value)=>sum+(typeof value==='number'?value:0),0);
+        const total=Object.values(w).reduce<number>((sum,value)=>sum+(typeof value==='number'?value:0),0);
         if(Math.abs(total-100)>0.01)errors.push('current_stock_outcome.market_trust.weights must sum to 100');
       }
     }
@@ -90,7 +90,7 @@ export function validateEdgeStocksResult(body: unknown): string[] {
       else {
         const w=bot.weights as JsonRecord;
         for (const key of ['forecast_edge','market_trust','structure_pattern_quality','pv_pvpo_confirmation','catalyst_asymmetry','execution_quality']) requiredNumber(w,key,0,100,errors,'current_stock_outcome.bot.weights');
-        const total=Object.values(w).reduce((sum,value)=>sum+(typeof value==='number'?value:0),0);
+        const total=Object.values(w).reduce<number>((sum,value)=>sum+(typeof value==='number'?value:0),0);
         if(Math.abs(total-100)>0.01)errors.push('current_stock_outcome.bot.weights must sum to 100');
       }
     }
