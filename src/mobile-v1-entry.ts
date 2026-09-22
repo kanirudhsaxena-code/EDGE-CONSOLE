@@ -9,6 +9,7 @@ import { produceIntelligence } from './intelligence-producer';
 import { assessAutomatedMarketEvidence } from './automated-market-evidence';
 import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { build5drReleaseEnvelope } from './5dr-release-package';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -360,7 +361,7 @@ async function reconcileIntelligence(request:Request,env:Env,requestId:string):P
   const evidence=[{evidence_type:'INTELLIGENCE_RECONCILIATION',source_ref:`5dr-intelligence://${requestId}`,captured_at:new Date().toISOString(),normalized:produced.normalized}];
   const normalizedReq=new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/normalized`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({evidence})});
   const normalizedResponse=await normalizedAndDispatch(normalizedReq,env,requestId);
-  const reconciliationRecord={status:normalizedResponse.ok?'NORMALIZED_AND_DISPATCHED':'NORMALIZED_OR_DISPATCH_BLOCKED',attempted_at:new Date().toISOString(),model:produced.model,verification:produced.judgment.verification,source_refs:produced.judgment.source_refs,limitations:produced.judgment.limitations,judgment:{regime:produced.judgment.regime,directional_raw:produced.judgment.directional_raw,market_trust_inputs:produced.judgment.market_trust_inputs,event_shock:produced.judgment.event_shock,execution_inputs:produced.judgment.execution_inputs,data_adequate:produced.judgment.data_adequate,expected_rr:produced.judgment.expected_rr}};
+  const reconciliationRecord={status:normalizedResponse.ok?'NORMALIZED_AND_DISPATCHED':'NORMALIZED_OR_DISPATCH_BLOCKED',attempted_at:new Date().toISOString(),model:produced.model,verification:produced.judgment.verification,source_refs:produced.judgment.source_refs,limitations:produced.judgment.limitations,judgment:{regime:produced.judgment.regime,directional_raw:produced.judgment.directional_raw,market_trust_inputs:produced.judgment.market_trust_inputs,event_shock:produced.judgment.event_shock,event_shock_transmission:produced.judgment.event_shock_transmission,convexity_warranted:produced.judgment.convexity_warranted,execution_inputs:produced.judgment.execution_inputs,data_adequate:produced.judgment.data_adequate,expected_rr:produced.judgment.expected_rr}};
   const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
   const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
   await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,intelligence_reconciliation:reconciliationRecord})}::jsonb,updated_at=now() where request_id=${requestId}`;
@@ -452,11 +453,27 @@ async function resumeProcessing(request:Request,env:Env,requestId:string):Promis
         await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify({...metadata,engine_dispatch:failedDispatch})}::jsonb,error=${JSON.stringify({stage:'EVIDENCE_CONFLICT',detail:conflict.detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
         return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:stage,evidence_conflict:conflict,next_step:'REUPLOAD_CURRENT_SCREENSHOTS'},409);
       }
+      const assessmentRows=await sql`select source_id,headline,score,metrics,assessed_at from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
+      const predecessorRows=await sql`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true order by generated_at desc limit 1`;
+      let releaseEnvelope:Record<string,unknown>;
+      try{
+        releaseEnvelope=build5drReleaseEnvelope({
+          envelope:sync.envelope,
+          requestMetadata:metadata,
+          assessmentRow:assessmentRows[0]??null,
+          predecessorRun:predecessorRows[0]??null
+        });
+      }catch(error){
+        const detail=error instanceof Error?error.message:String(error);
+        const blockedMeta={...metadata,adapter_stage:'RELEASE_PACKAGE_BLOCKED',release_package:{status:'BLOCKED',detail,attempted_at:new Date().toISOString()}};
+        await sql`update analysis_requests set metadata=${JSON.stringify(blockedMeta)}::jsonb,error=${JSON.stringify({stage:'RELEASE_PACKAGE',detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
+        return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:'RELEASE_PACKAGE_BLOCKED',engine_sync:sync,error:'5DR release package is incomplete',release_gate:{detail},next_step:'RETRY_AFTER_GOVERNED_ASSESSMENT_OR_EVIDENCE_UPDATE'},409);
+      }
       const origin=new URL(request.url).origin;
-      const publishReq=new Request(`${origin}/api/5dr/runs`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(sync.envelope)});
+      const publishReq=new Request(`${origin}/api/5dr/runs`,{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify(releaseEnvelope)});
       const published=await router.fetch(publishReq as any,env as any);
       const body=await responseJson(published);
-      if(!published.ok)return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_sync:sync,error:'validated engine result could not be persisted',publish_gate:body},409);
+      if(!published.ok)return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:'RELEASE_PACKAGE_BLOCKED',engine_sync:sync,error:'validated governed release package could not be persisted',publish_gate:body},409);
       const completedDispatch={...dispatch,ok:true,status:'RESULT_SYNCED',workflow_run_id:sync.workflow_run_id,result_synced_at:new Date().toISOString()};
       const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
       const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
