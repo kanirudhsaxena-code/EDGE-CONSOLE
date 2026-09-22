@@ -17,6 +17,7 @@ const validResult=(directional_label:string)=>({
   market_trust:45,
   market_trust_band:'LOW',
   probabilities:{BULL:7.873,RANGE:45.498,BEAR:46.629},
+  definitive_forecast:'BEARISH',
   execution_edge:0,
   tradeable:false,
   tradeability_blockers:['MARKET_TRUST_LT_50'],
@@ -60,4 +61,12 @@ test('Console rejects selected daily direction that is not highest probability',
   bad.horizon_slots['D+1'].direction='BULLISH';
   const errors=validate5drResult(bad);
   assert.ok(errors.some(error=>error.includes('direction must match highest scenario probability')));
+});
+
+
+test('Console rejects overall definitive forecast that is not highest probability',()=>{
+  const bad=validResult('RANGE') as any;
+  bad.definitive_forecast='BULLISH';
+  const errors=validate5drResult(bad);
+  assert.ok(errors.some(error=>error.includes('highest overall scenario probability')));
 });
