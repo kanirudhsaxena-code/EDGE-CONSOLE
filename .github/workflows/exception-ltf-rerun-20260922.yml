@@ -1,0 +1,78 @@
+name: One-time 22 Sep LTF Exception Rerun
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-ltf-rerun-20260922.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: exception-ltf-rerun-20260922
+  cancel-in-progress: false
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Launch fresh LTF exception rerun
+        shell: bash
+        run: |
+          set -euo pipefail
+          call_json() {
+            local method="$1"; shift
+            local url="$1"; shift
+            local data="${1:-}"
+            if [ -n "$data" ]; then
+              curl --location --fail-with-body --silent --show-error \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H 'content-type: application/json' -H 'accept: application/json' \
+                -X "$method" --data-binary "$data" "$url"
+            else
+              curl --location --fail-with-body --silent --show-error \
+                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+                -H 'accept: application/json' -X "$method" "$url"
+            fi
+          }
+
+          CREATE="$(call_json POST "$CONSOLE_URL/api/edge-stocks/invoke" '{"command":"EDGE LTF","force_new":true}')"
+          echo "$CREATE" > /tmp/ltf-create.json
+          cat /tmp/ltf-create.json
+          AFTER="$(python -c "import json; d=json.load(open('/tmp/ltf-create.json')); print(d.get('dispatched_at') or '')")"
+          test -n "$AFTER"
+
+          RUN_ID=""
+          for attempt in $(seq 1 45); do
+            sleep 8
+            QS="$(python -c "import urllib.parse,sys; print(urllib.parse.urlencode({'ticker':'LTF','after':sys.argv[1]}))" "$AFTER")"
+            call_json GET "$CONSOLE_URL/api/edge-stocks/invoke/status?$QS" > /tmp/ltf-state.json || true
+            STATUS="$(python -c "import json; d=json.load(open('/tmp/ltf-state.json')); print(d.get('status') or '')" 2>/dev/null || true)"
+            echo "ltf_poll=$attempt status=$STATUS"
+            if [ "$STATUS" = "COMPLETE" ]; then
+              RUN_ID="$(python -c "import json; d=json.load(open('/tmp/ltf-state.json')); print(d.get('run_id') or '')")"
+              break
+            fi
+          done
+          test -n "$RUN_ID"
+          echo "ltf_run_id=$RUN_ID"
+          python - <<PY
+          import json
+          p={"exception_date":"2026-09-22","ltf_run_id":"$RUN_ID","research_bundle_id":"EDGE-RESEARCH-LTF-20260922T040104Z"}
+          open("exception-ltf-run-id.json","w").write(json.dumps(p,indent=2))
+          print(json.dumps(p,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: exception-ltf-run-id-20260922
+          path: exception-ltf-run-id.json
+          retention-days: 30
