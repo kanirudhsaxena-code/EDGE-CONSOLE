@@ -13,9 +13,9 @@ const valid = {
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
-    table_2:'CURRENT_STOCK_OUTCOME',
-    table_3:'DRILLDOWN',
-    table_4:'ACTIVE_CALLS'
+    table_2:'ACTIVE_CALLS',
+    table_3:'CURRENT_STOCK_OUTCOME',
+    table_4:'DRILLDOWN'
   },
   master_assessment:{
     recommendations:6,unique_stocks:4,open_recommendations:6,closed_recommendations:0,
