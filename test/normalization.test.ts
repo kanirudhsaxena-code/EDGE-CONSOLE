@@ -11,7 +11,13 @@ const fullNormalized = {
   data_adequate:true,
   event_kill_switch:false,
   expected_rr:2.4,
-  horizon_slots:{'D+1':{},'D+2':{},'D+3':{},'D+4':{},'D+5':{}}
+  horizon_slots:{
+  'D+1':{direction:'BULLISH',probabilities:{BULL:58,RANGE:30,BEAR:12},zone_low:23000,zone_high:23300,basis:'Price structure'},
+  'D+2':{direction:'BULLISH',probabilities:{BULL:57,RANGE:31,BEAR:12},zone_low:22950,zone_high:23400,basis:'Price structure'},
+  'D+3':{direction:'RANGE',probabilities:{BULL:25,RANGE:55,BEAR:20},zone_low:22900,zone_high:23450,basis:'Mixed confirmation'},
+  'D+4':{direction:'RANGE',probabilities:{BULL:25,RANGE:54,BEAR:21},zone_low:22850,zone_high:23500,basis:'Mixed confirmation'},
+  'D+5':{direction:'RANGE',probabilities:{BULL:25,RANGE:53,BEAR:22},zone_low:22800,zone_high:23550,basis:'Wider uncertainty'}
+}
 };
 const item = (normalized: Record<string, unknown>, source_ref = 'evidence://one') => ({ evidence_type: 'STRUCTURED', source_ref, captured_at: '2026-09-15T07:00:00.000Z', normalized });
 
@@ -64,4 +70,12 @@ test('semantic JSON equality ignores object key ordering from jsonb persistence'
   const a={component_scores:{PRICE_STRUCTURE:20,PVPO:12.5,PARTICIPATION:0,MACRO_CATALYSTS:0}};
   const b={component_scores:{MACRO_CATALYSTS:0,PARTICIPATION:0,PVPO:12.5,PRICE_STRUCTURE:20}};
   assert.equal(jsonEquivalent(a,b),true);
+});
+
+
+test('rejects daily scenario vectors that do not total 100 or match selected direction',()=>{
+  const bad=structuredClone(fullNormalized);
+  bad.horizon_slots['D+5']={direction:'BULLISH',probabilities:{BULL:35,RANGE:45,BEAR:20},zone_low:22800,zone_high:23550,basis:'Invalid selected direction'};
+  const errors=validateNormalizedEvidence({evidence:[item(bad)]});
+  assert.ok(errors.some(error=>error.includes('D+5')&&error.includes('highest scenario probability')));
 });
