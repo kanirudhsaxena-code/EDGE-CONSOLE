@@ -767,3 +767,11 @@ html,body{max-width:100%;overflow-x:hidden}
   .metric-breakdown-details>summary{font-size:18px}
   .scenario-mini-line{grid-template-columns:repeat(3,minmax(0,1fr))}
 }
+
+
+/* EDGE Stocks conformance detail additions v20 */
+.edge-drill-metrics{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin:8px 0}
+.edge-drill-metrics span{display:flex;justify-content:space-between;gap:8px;padding:6px 8px;border:1px solid var(--border-light);border-radius:9px;background:#fff;font-size:10px;color:var(--text-soft)}
+.edge-drill-metrics b{color:var(--ink);font-variant-numeric:tabular-nums}
+.edge-user-section>.step-label{margin:10px 0 7px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--text-soft)}
+@media(max-width:560px){.edge-drill-metrics{grid-template-columns:1fr 1fr}}
