@@ -27,17 +27,27 @@ jobs:
           test -n "$CF_ACCESS_CLIENT_ID"
           test -n "$CF_ACCESS_CLIENT_SECRET"
           python - <<'PY'
-          import json, os, time, urllib.request
+          import json, os, time, subprocess
           from datetime import datetime
           from zoneinfo import ZoneInfo
 
           base=os.environ["CONSOLE_URL"].rstrip("/")
-          headers={
-              "Content-Type":"application/json",
-              "Accept":"application/json",
-              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
-              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
-          }
+          def request_json(url,method="GET",payload=None):
+              args=[
+                  "curl","--location","--silent","--show-error","--fail-with-body",
+                  "-H","Content-Type: application/json",
+                  "-H","Accept: application/json",
+                  "-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                  "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",
+                  "-X",method,
+              ]
+              if payload is not None:
+                  args += ["--data-binary",json.dumps(payload,separators=(",",":"))]
+              args.append(url)
+              proc=subprocess.run(args,text=True,capture_output=True)
+              if proc.returncode!=0:
+                  raise RuntimeError((proc.stderr or proc.stdout or "curl transport failed").strip())
+              return json.loads(proc.stdout)
           now=datetime.now(ZoneInfo("Asia/Kolkata"))
           slot=now.strftime("%H:%M")
           body={
@@ -46,14 +56,7 @@ jobs:
               "canonical_attempt_slot":slot,
               "client_invocation_id":f"preopen-{now:%Y%m%d-%H%M}",
           }
-          req=urllib.request.Request(
-              base+"/api/5dr/automated-runs",
-              data=json.dumps(body).encode(),
-              headers=headers,
-              method="POST",
-          )
-          with urllib.request.urlopen(req,timeout=30) as response:
-              payload=json.loads(response.read().decode())
+          payload=request_json(base+"/api/5dr/automated-runs","POST",body)
           request_id=((payload.get("request") or {}).get("request_id"))
           if not request_id:
               raise SystemExit(f"PREOPEN_RUN_CREATE_FAILED {payload}")
@@ -61,17 +64,10 @@ jobs:
 
           for attempt in range(48):
               time.sleep(8)
-              resume=urllib.request.Request(
-                  base+f"/api/5dr/run-requests/{request_id}/resume-processing",
-                  data=b"{}",
-                  headers=headers,
-                  method="POST",
-              )
               try:
-                  with urllib.request.urlopen(resume,timeout=30) as response:
-                      state=json.loads(response.read().decode())
+                  state=request_json(base+f"/api/5dr/run-requests/{request_id}/resume-processing","POST",{})
               except Exception as exc:
-                  print(f"resume_attempt={attempt+1} transport_error={type(exc).__name__}")
+                  print(f"resume_attempt={attempt+1} transport_error={type(exc).__name__}:{str(exc)[:160]}")
                   continue
               status=str(state.get("status") or "")
               stage=str(state.get("adapter_stage") or "")
