@@ -3,25 +3,97 @@
   "$id": "edge-console.5dr-output.v1",
   "title": "EDGE Console 5DR Output Envelope",
   "type": "object",
-  "required": ["contract_version", "run_id", "engine", "framework_version", "status", "provenance", "generated_at", "result"],
+  "required": [
+    "contract_version",
+    "run_id",
+    "engine",
+    "framework_version",
+    "status",
+    "provenance",
+    "generated_at",
+    "result"
+  ],
   "properties": {
-    "contract_version": {"const": "1.0"},
-    "run_id": {"type": "string", "minLength": 1},
-    "engine": {"const": "5DR"},
-    "framework_version": {"type": "string", "minLength": 1},
-    "status": {"enum": ["SUCCESS", "PARTIAL", "FAILED", "SHADOW"]},
-    "published": {"type": "boolean"},
+    "contract_version": {
+      "const": "1.0"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "engine": {
+      "const": "5DR"
+    },
+    "framework_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "enum": [
+        "SUCCESS",
+        "PARTIAL",
+        "FAILED",
+        "SHADOW"
+      ]
+    },
+    "published": {
+      "type": "boolean"
+    },
     "provenance": {
       "type": "object",
-      "required": ["mode", "sources"],
+      "required": [
+        "mode",
+        "sources"
+      ],
       "properties": {
-        "mode": {"enum": ["MANUAL", "HYBRID", "AUTOMATED"]},
-        "sources": {"type": "array", "items": {"type": "string"}},
-        "freshness_at": {"type": ["string", "null"], "format": "date-time"}
+        "mode": {
+          "enum": [
+            "MANUAL",
+            "HYBRID",
+            "AUTOMATED"
+          ]
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "evidence_type",
+              "source_ref"
+            ],
+            "properties": {
+              "evidence_type": {
+                "type": "string",
+                "minLength": 1
+              },
+              "source_ref": {
+                "type": "string",
+                "minLength": 1
+              },
+              "captured_at": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "additionalProperties": true
+          }
+        },
+        "freshness_at": {
+          "type": [
+            "string",
+            "null"
+          ],
+          "format": "date-time"
+        }
       },
       "additionalProperties": true
     },
-    "generated_at": {"type": "string", "format": "date-time"},
+    "generated_at": {
+      "type": "string",
+      "format": "date-time"
+    },
     "result": {
       "type": "object",
       "required": [
@@ -30,33 +102,439 @@
         "forecast_assessment",
         "recommendation_assessment",
         "assessment_snapshot_complete",
+        "assessment_snapshot",
         "horizon_slots",
-        "recommendation_ledger_complete"
+        "recommendation_ledger_complete",
+        "probabilities",
+        "des5",
+        "directional_label",
+        "market_trust",
+        "market_trust_band",
+        "execution_edge",
+        "tradeable",
+        "tradeability_blockers",
+        "recommendation",
+        "tradeability_gate",
+        "engine_diagnostics"
       ],
       "properties": {
-        "model_version": {"const": "5DR_V2_1"},
-        "output_contract_version": {"const": "5DR_V2_1_2"},
-        "forecast_assessment": {"type": "string", "minLength": 1},
-        "recommendation_assessment": {"type": "string", "minLength": 1},
-        "assessment_snapshot_complete": {"const": true},
+        "model_version": {
+          "const": "5DR_V2_1"
+        },
+        "output_contract_version": {
+          "const": "5DR_V2_1_2"
+        },
+        "forecast_assessment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "recommendation_assessment": {
+          "type": "string",
+          "minLength": 1
+        },
+        "assessment_snapshot_complete": {
+          "type": "boolean"
+        },
         "horizon_slots": {
           "type": "object",
-          "required": ["D+1", "D+2", "D+3", "D+4", "D+5"],
+          "required": [
+            "D+1",
+            "D+2",
+            "D+3",
+            "D+4",
+            "D+5"
+          ],
           "properties": {
-            "D+1": {},
-            "D+2": {},
-            "D+3": {},
-            "D+4": {},
-            "D+5": {}
+            "D+1": {
+              "type": "object",
+              "required": [
+                "direction",
+                "probabilities",
+                "zone_low",
+                "zone_high",
+                "basis"
+              ],
+              "properties": {
+                "direction": {
+                  "enum": [
+                    "BULLISH",
+                    "RANGE",
+                    "BEARISH"
+                  ]
+                },
+                "probabilities": {
+                  "type": "object",
+                  "required": [
+                    "BULL",
+                    "RANGE",
+                    "BEAR"
+                  ],
+                  "properties": {
+                    "BULL": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "RANGE": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "BEAR": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "zone_low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "zone_high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": true
+            },
+            "D+2": {
+              "type": "object",
+              "required": [
+                "direction",
+                "probabilities",
+                "zone_low",
+                "zone_high",
+                "basis"
+              ],
+              "properties": {
+                "direction": {
+                  "enum": [
+                    "BULLISH",
+                    "RANGE",
+                    "BEARISH"
+                  ]
+                },
+                "probabilities": {
+                  "type": "object",
+                  "required": [
+                    "BULL",
+                    "RANGE",
+                    "BEAR"
+                  ],
+                  "properties": {
+                    "BULL": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "RANGE": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "BEAR": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "zone_low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "zone_high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": true
+            },
+            "D+3": {
+              "type": "object",
+              "required": [
+                "direction",
+                "probabilities",
+                "zone_low",
+                "zone_high",
+                "basis"
+              ],
+              "properties": {
+                "direction": {
+                  "enum": [
+                    "BULLISH",
+                    "RANGE",
+                    "BEARISH"
+                  ]
+                },
+                "probabilities": {
+                  "type": "object",
+                  "required": [
+                    "BULL",
+                    "RANGE",
+                    "BEAR"
+                  ],
+                  "properties": {
+                    "BULL": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "RANGE": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "BEAR": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "zone_low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "zone_high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": true
+            },
+            "D+4": {
+              "type": "object",
+              "required": [
+                "direction",
+                "probabilities",
+                "zone_low",
+                "zone_high",
+                "basis"
+              ],
+              "properties": {
+                "direction": {
+                  "enum": [
+                    "BULLISH",
+                    "RANGE",
+                    "BEARISH"
+                  ]
+                },
+                "probabilities": {
+                  "type": "object",
+                  "required": [
+                    "BULL",
+                    "RANGE",
+                    "BEAR"
+                  ],
+                  "properties": {
+                    "BULL": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "RANGE": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "BEAR": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "zone_low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "zone_high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": true
+            },
+            "D+5": {
+              "type": "object",
+              "required": [
+                "direction",
+                "probabilities",
+                "zone_low",
+                "zone_high",
+                "basis"
+              ],
+              "properties": {
+                "direction": {
+                  "enum": [
+                    "BULLISH",
+                    "RANGE",
+                    "BEARISH"
+                  ]
+                },
+                "probabilities": {
+                  "type": "object",
+                  "required": [
+                    "BULL",
+                    "RANGE",
+                    "BEAR"
+                  ],
+                  "properties": {
+                    "BULL": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "RANGE": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    },
+                    "BEAR": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 100
+                    }
+                  },
+                  "additionalProperties": false
+                },
+                "zone_low": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "zone_high": {
+                  "type": "number",
+                  "exclusiveMinimum": 0
+                },
+                "basis": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "additionalProperties": true
+            }
           },
           "additionalProperties": true
         },
-        "recommendation_ledger_complete": {"const": true}
+        "recommendation_ledger_complete": {
+          "type": "boolean"
+        },
+        "assessment_snapshot": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "probabilities": {
+          "type": "object",
+          "required": [
+            "BULL",
+            "RANGE",
+            "BEAR"
+          ],
+          "properties": {
+            "BULL": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "RANGE": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "BEAR": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          },
+          "additionalProperties": false
+        },
+        "des5": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "directional_label": {
+          "enum": [
+            "STRONG_BULL",
+            "BULL",
+            "MILD_BULL",
+            "RANGE",
+            "MILD_BEAR",
+            "BEAR",
+            "STRONG_BEAR"
+          ]
+        },
+        "market_trust": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "market_trust_band": {
+          "type": "string",
+          "minLength": 1
+        },
+        "execution_edge": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "tradeable": {
+          "type": "boolean"
+        },
+        "tradeability_blockers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "recommendation": {
+          "enum": [
+            "BUY_CE",
+            "BUY_PE",
+            "BUY_CONVEXITY",
+            "NO_TRADE"
+          ]
+        },
+        "tradeability_gate": {
+          "type": "object"
+        },
+        "engine_diagnostics": {
+          "type": "object"
+        }
       },
       "additionalProperties": true
     },
-    "warnings": {"type": "array"},
-    "learning_eligible": {"type": "boolean"}
+    "warnings": {
+      "type": "array"
+    },
+    "learning_eligible": {
+      "type": "boolean"
+    }
   },
   "additionalProperties": true
 }
