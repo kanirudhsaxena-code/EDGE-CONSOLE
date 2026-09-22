@@ -61,6 +61,13 @@ export function validate5drResult(result:unknown,requireReleaseCompleteness=fals
     }
   }
 
+  if(!['BULLISH','RANGE','BEARISH'].includes(String(result.definitive_forecast)))errors.push('result.definitive_forecast must be BULLISH, RANGE or BEARISH');
+  else if(isObject(result.probabilities)){
+    const key=String(result.definitive_forecast)==='BULLISH'?'BULL':String(result.definitive_forecast)==='BEARISH'?'BEAR':'RANGE';
+    const selected=Number(result.probabilities[key]),highest=Math.max(Number(result.probabilities.BULL),Number(result.probabilities.RANGE),Number(result.probabilities.BEAR));
+    if(Number.isFinite(selected)&&Number.isFinite(highest)&&Math.abs(selected-highest)>0.02)errors.push('result.definitive_forecast must match the highest overall scenario probability');
+  }
+
   if(typeof result.execution_edge!=='number'||!Number.isFinite(result.execution_edge))errors.push('result.execution_edge must be a finite number');
   if(typeof result.tradeable!=='boolean')errors.push('result.tradeable must be boolean');
   if(!Array.isArray(result.tradeability_blockers))errors.push('result.tradeability_blockers must be an array');
