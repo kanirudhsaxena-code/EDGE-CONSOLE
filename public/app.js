@@ -362,32 +362,83 @@ function assessmentMetricForDisplay(metrics,label,index){
   if(Object.prototype.hasOwnProperty.call(source,'D'))return source[label];
   return source['D+'+(index+1)];
 }
+function assessmentValue(value,kind='pct',empty='Not available'){
+  if(value==null||value===''||Number.isNaN(Number(value)))return empty;
+  if(kind==='number')return Number(value).toFixed(2);
+  if(kind==='r')return Number(value).toFixed(2)+'R';
+  return pct(Number(value));
+}
+function renderRegimeAccuracy(regimes){
+  if(!regimes||typeof regimes!=='object'||!Object.keys(regimes).length)return '<div class="metric-unavailable"><b>Accuracy by regime — Not available</b><small>No governed regime-level efficacy population has been published yet.</small></div>';
+  return '<div class="metric-breakdown-grid">'+Object.entries(regimes).map(([name,row])=>{
+    const r=row&&typeof row==='object'?row:{},hits=Number(r.hits??0),total=Number(r.total??r.scorable??0),accuracy=r.accuracy_pct??r.hit_rate_pct;
+    return '<div class="metric-breakdown-card"><span>'+escapeHtml(humanText(name))+'</span><strong>'+assessmentValue(accuracy,'pct','Not scorable')+'</strong><small>'+hits+'/'+total+' canonical scorable</small></div>'
+  }).join('')+'</div>'
+}
+function renderRecommendationLedger(rows){
+  const ledger=Array.isArray(rows)?rows:[];
+  if(!ledger.length)return '<div class="metric-unavailable"><b>Recommendation ledger — No entries</b><small>No governed recommendation record is available in this assessment snapshot.</small></div>';
+  return '<div class="assessment-ledger">'+ledger.slice().reverse().slice(0,12).map(row=>{
+    const life=row&&row.lifecycle&&typeof row.lifecycle==='object'?row.lifecycle:{};
+    const plan=row&&row.execution&&typeof row.execution==='object'?row.execution:{};
+    return '<div class="assessment-ledger-row"><div><strong>'+escapeHtml(row.recommendation||'—')+'</strong><span>'+escapeHtml(row.forecast_id||row.run_id||'—')+'</span></div><div><b>'+escapeHtml(humanText(row.definitive_forecast||'—'))+'</b><small>'+escapeHtml(humanText(life.latest_event||'Pending'))+(life.pnl_pct==null?'':' · '+pct(life.pnl_pct))+'</small></div><div><b>'+escapeHtml(plan.instrument||'NONE')+'</b><small>'+(plan.strike==null?'No contract':escapeHtml(plan.strike)+' · '+escapeHtml(plan.expiry||'—'))+'</small></div></div>'
+  }).join('')+'</div>'
+}
+function renderAssessmentLegends(){
+  return '<details class="metric-legend"><summary>Metric legends & scoring rules</summary><div class="legend-grid">'+
+    '<div><b>Forecast Accuracy</b><small>Directional hits ÷ scorable matured canonical checkpoints. Reruns do not inflate the denominator.</small></div>'+
+    '<div><b>Probability Calibration / Brier</b><small>Three-class probability error. Lower is better; 0 is perfect. Shown as NOT SCORABLE until complete immutable Bull/Range/Bear vectors and a governed realized-class rule are available.</small></div>'+
+    '<div><b>Recommendation Accuracy</b><small>Wins ÷ resolved canonical actionable recommendations. NO TRADE is evaluated separately.</small></div>'+
+    '<div><b>Average R</b><small>Average standardized reward/risk multiple across resolved canonical actionable recommendations.</small></div>'+
+    '<div><b>Realized Model P/L</b><small>Equal-notional standardized model performance. It is not the user’s portfolio return.</small></div>'+
+    '<div><b>Open MTM</b><small>Verified standardized mark-to-market for still-open canonical recommendations only.</small></div>'+
+    '<div><b>No-Trade Effectiveness</b><small>How often a canonical NO TRADE correctly avoided a poor opportunity once the avoidance outcome becomes scorable.</small></div>'+
+    '<div><b>Maximum Drawdown</b><small>Peak-to-trough decline of the standardized canonical model equity curve.</small></div>'+
+    '<div><b>Directional Margin</b><small>Average NIFTY-point margin in favour of the frozen day forecast.</small></div>'+
+    '<div><b>Zone Error</b><small>Average distance from the nearest frozen zone boundary when the zone is missed.</small></div>'+
+  '</div></details>'
+}
 function renderAssessmentDetails(details,pending){
   const labels=['D','D+1','D+2','D+3','D+4'];
-  let maturedHtml='<p class="assessment-empty-copy">No matured outcome records yet.</p>';
+  let maturedHtml='<p class="assessment-empty-copy">No matured outcome records yet.</p>',ledgerHtml='',regimeHtml='';
   if(details.length){
     const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
-    maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>D is the canonical target trading session; these rows affect the accuracy and return statistics above.</small></div>','<div class="scorecard-days">'+labels.map((label,index)=>assessmentDayCell(label,assessmentMetricForDisplay(day,label,index),assessmentMetricForDisplay(zone,label,index),assessmentMetricForDisplay(rec,label,index))).join('')+'</div>'].join('')
+    maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>D is the canonical target trading session; these rows affect the official accuracy and standardized performance statistics above.</small></div>','<div class="scorecard-days">'+labels.map((label,index)=>assessmentDayCell(label,assessmentMetricForDisplay(day,label,index),assessmentMetricForDisplay(zone,label,index),assessmentMetricForDisplay(rec,label,index))).join('')+'</div>'].join('');
+    ledgerHtml=renderRecommendationLedger(m.recommendation_ledger);
+    regimeHtml=renderRegimeAccuracy(m.regime_metrics);
   }
-  return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div><div class="assessment-drill-section"><div class="step-label">Legacy canonical forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
+  return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div>'+
+    '<div class="assessment-drill-section"><div class="step-label">Accuracy by regime</div>'+regimeHtml+'</div>'+
+    '<div class="assessment-drill-section"><div class="step-label">Recommendation ledger</div>'+ledgerHtml+'</div>'+
+    '<div class="assessment-drill-section"><div class="step-label">Legacy canonical forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
 }
 function renderAssessment(container,payload){
   if(!container)return;
   const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[],pending=payload&&Array.isArray(payload.pending_forecasts)?payload.pending_forecasts:[];
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
-  const canonical=summary.canonical||null,f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
+  const canonical=summary.canonical||null,f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},cal=summary.calibration||{},eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
+  const brier=cal.status==='SCORABLE'&&cal.brier_score!=null?Number(cal.brier_score).toFixed(4):'NOT SCORABLE';
+  const noTrade=r.no_trade_effectiveness_pct==null?'NOT SCORABLE':pct(r.no_trade_effectiveness_pct);
+  const maxDrawdown=ret.maximum_drawdown_pct==null?'NOT AVAILABLE':pct(ret.maximum_drawdown_pct);
+  const openMtm=ret.open_mtm_pct==null?'—':pct(ret.open_mtm_pct);
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">TABLE 1 · ASSESSMENT & EFFICACY</div><h3>Assessment · Till Date</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
     canonicalAssessmentContext(canonical),
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
-      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' wins / '+escapeHtml(r.total||0)+' resolved canonical recommendations</small></div>',
-      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Canonical actionable calls only</small></div>',
-      '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful canonical calls</small></div>',
-      '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful canonical calls</small></div>',
+      '<div class="assessment-metric"><span>Forecast Accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+'/'+escapeHtml(f.total||0)+' directional hits · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
+      '<div class="assessment-metric"><span>Probability Calibration / Brier</span><strong>'+escapeHtml(brier)+'</strong><small>'+(cal.status==='SCORABLE'?escapeHtml(cal.scorable_count||0)+' scorable probability observations':'Complete daily probability vectors and a governed realized-class rule are required. Legacy single-probability rows are excluded.')+'</small></div>',
+      '<div class="assessment-metric"><span>Recommendation Accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+'/'+escapeHtml(r.total||0)+' resolved canonical actionable recommendations</small></div>',
+      '<div class="assessment-metric"><span>Average R</span><strong>'+assessmentValue(r.average_r,'r','—')+'</strong><small>Resolved canonical actionable recommendations only</small></div>',
+      '<div class="assessment-metric"><span>Realized Standardized Model P/L</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Equal-notional model efficacy · not user portfolio P/L</small></div>',
+      '<div class="assessment-metric"><span>Open Standardized MTM</span><strong>'+escapeHtml(openMtm)+'</strong><small>Verified open canonical recommendations only</small></div>',
+      '<div class="assessment-metric"><span>No-Trade Effectiveness</span><strong>'+escapeHtml(noTrade)+'</strong><small>'+escapeHtml(r.no_trade_calls||0)+' canonical NO TRADE call'+(Number(r.no_trade_calls||0)===1?'':'s')+' recorded · only scorable avoidance outcomes enter the rate</small></div>',
+      '<div class="assessment-metric"><span>Maximum Drawdown</span><strong>'+escapeHtml(maxDrawdown)+'</strong><small>Peak-to-trough standardized canonical model decline</small></div>',
+      '<div class="assessment-metric"><span>Return on Hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Resolved winning canonical actionable recommendations</small></div>',
+      '<div class="assessment-metric"><span>Return on Misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Resolved losing canonical actionable recommendations</small></div>',
     '</div>',
-    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns do not increase denominators.</p><p><strong>Matured eligible</strong> means the D or D+n trading session has passed. <strong>Scorable</strong> additionally requires the original frozen day-wise forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently unscorable because legacy frozen context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
-    '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
+    renderAssessmentLegends(),
+    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected canonical forecast per target trading date.</strong> Fresh reruns remain auditable but do not increase headline denominators.</p><p><strong>Matured eligible</strong> means the governed checkpoint date has passed. <strong>Scorable</strong> additionally requires the original frozen forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently NOT SCORABLE because required immutable context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
+    '<details class="assessment-detail-row"><summary>Drill down — day-wise efficacy, regime & recommendation ledger</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
 async function loadAssessment(engine,container){
