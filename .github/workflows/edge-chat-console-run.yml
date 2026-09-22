@@ -255,7 +255,7 @@ jobs:
           if module=='EDGE_NIFTY':
               required=['EDGE NIFTY','ASSESSMENT · TILL DATE','Today’s Market View','5-day forecast — day-wise direction & range','Why this view?','What could change the view?','Future performance scorecard','Advanced details']
           else:
-              required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — CURRENT STOCK OUTCOME','3 — DRILL-DOWN','4 — ACTIVE CALLS']
+              required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN']
           missing=[x for x in required if x not in text]
           assert not missing, {'missing_console_sections':missing}
           print('CHAT_PRESENTATION_SOURCE=LIVE_EDGE_CONSOLE')
