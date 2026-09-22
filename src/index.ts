@@ -53,18 +53,20 @@ export function validate5drResult(result:unknown,requireReleaseCompleteness=fals
 
   if(!isObject(result.probabilities))errors.push('result.probabilities must be an object');
   else{
+    const probs=result.probabilities as JsonRecord;
     const keys=['BULL','RANGE','BEAR'];
-    for(const label of keys)if(typeof result.probabilities[label]!=='number'||!Number.isFinite(result.probabilities[label] as number))errors.push(`result.probabilities.${label} must be a finite number`);
-    if(keys.every(key=>typeof result.probabilities[key]==='number'&&Number.isFinite(result.probabilities[key] as number))){
-      const sum=keys.reduce((acc,key)=>acc+Number(result.probabilities[key]),0);
+    for(const label of keys)if(typeof probs[label]!=='number'||!Number.isFinite(probs[label] as number))errors.push(`result.probabilities.${label} must be a finite number`);
+    if(keys.every(key=>typeof probs[key]==='number'&&Number.isFinite(probs[key] as number))){
+      const sum=keys.reduce((acc,key)=>acc+Number(probs[key]),0);
       if(Math.abs(sum-100)>0.02)errors.push('result.probabilities must sum to 100');
     }
   }
 
   if(!['BULLISH','RANGE','BEARISH'].includes(String(result.definitive_forecast)))errors.push('result.definitive_forecast must be BULLISH, RANGE or BEARISH');
   else if(isObject(result.probabilities)){
+    const probs=result.probabilities as JsonRecord;
     const key=String(result.definitive_forecast)==='BULLISH'?'BULL':String(result.definitive_forecast)==='BEARISH'?'BEAR':'RANGE';
-    const selected=Number(result.probabilities[key]),highest=Math.max(Number(result.probabilities.BULL),Number(result.probabilities.RANGE),Number(result.probabilities.BEAR));
+    const selected=Number(probs[key]),highest=Math.max(Number(probs.BULL),Number(probs.RANGE),Number(probs.BEAR));
     if(Number.isFinite(selected)&&Number.isFinite(highest)&&Math.abs(selected-highest)>0.02)errors.push('result.definitive_forecast must match the highest overall scenario probability');
   }
 
