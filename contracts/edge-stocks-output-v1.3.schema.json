@@ -59,13 +59,13 @@
           "const": "EDGE_MASTER_ASSESSMENT"
         },
         "table_2": {
-          "const": "CURRENT_STOCK_OUTCOME"
+          "const": "ACTIVE_CALLS"
         },
         "table_3": {
-          "const": "DRILLDOWN"
+          "const": "CURRENT_STOCK_OUTCOME"
         },
         "table_4": {
-          "const": "ACTIVE_CALLS"
+          "const": "DRILLDOWN"
         }
       },
       "additionalProperties": false
