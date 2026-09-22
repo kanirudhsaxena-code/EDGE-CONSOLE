@@ -5,6 +5,7 @@ export type JsonRecord = Record<string, unknown>;
 // outputs and must never be fabricated to make a run executable.
 export const REQUIRED_5DR_INPUTS = [
   'regime', 'component_scores', 'market_trust_inputs', 'event_shock',
+  'event_transmission', 'convexity_warranted',
   'execution_inputs', 'data_adequate', 'event_kill_switch', 'expected_rr',
   'horizon_slots'
 ] as const;
@@ -15,6 +16,9 @@ const EXECUTION_KEYS=['rr_score','premium_iv_theta_score','strike_expiry_fit_sco
 const HORIZON_KEYS=['D+1','D+2','D+3','D+4','D+5'] as const;
 const REGIMES=new Set(['TREND','RANGE','TRANSITION','EVENT_SHOCK']);
 const EVENT_SHOCK_LEVELS=new Set(['LOW','MODERATE','HIGH','EXTREME']);
+const EVENT_TRANSMISSIONS=new Set(['BULLISH','BEARISH','TWO_SIDED']);
+const HORIZON_DIRECTIONS=new Set(['BULLISH','RANGE','BEARISH']);
+const SCENARIO_KEYS=['BULL','RANGE','BEAR'] as const;
 
 export const isObject = (value: unknown): value is JsonRecord =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -41,14 +45,37 @@ export function validateNormalizedInput(key:string,value:unknown):string[]{
     case 'component_scores': return boundedObject(value,COMPONENT_SCORE_KEYS,-100,100)?[]:['component_scores must contain exactly PRICE_STRUCTURE, PVPO, PARTICIPATION and MACRO_CATALYSTS values in -100..100'];
     case 'market_trust_inputs': return boundedObject(value,MARKET_TRUST_KEYS,0,100)?[]:['market_trust_inputs must contain exactly the six governed Market Trust inputs in 0..100'];
     case 'event_shock': return typeof value==='string'&&EVENT_SHOCK_LEVELS.has(value)?[]:['event_shock must be LOW, MODERATE, HIGH or EXTREME'];
+    case 'event_transmission': return typeof value==='string'&&EVENT_TRANSMISSIONS.has(value)?[]:['event_transmission must be BULLISH, BEARISH or TWO_SIDED'];
+    case 'convexity_warranted': return typeof value==='boolean'?[]:['convexity_warranted must be boolean'];
     case 'execution_inputs': return boundedObject(value,EXECUTION_KEYS,0,100)?[]:['execution_inputs must contain exactly the five governed Execution Edge inputs in 0..100'];
     case 'data_adequate': return typeof value==='boolean'?[]:['data_adequate must be boolean'];
     case 'event_kill_switch': return typeof value==='boolean'?[]:['event_kill_switch must be boolean'];
     case 'expected_rr': return isFiniteNumber(value)&&value>=0?[]:['expected_rr must be a finite non-negative number'];
     case 'horizon_slots': {
       if(!isObject(value)||!exactKeys(value,HORIZON_KEYS))return ['horizon_slots must contain exactly D+1, D+2, D+3, D+4 and D+5'];
-      const invalid=HORIZON_KEYS.filter(slot=>!isObject(value[slot]));
-      return invalid.length?[`horizon_slots ${invalid.join(', ')} must each be objects`]:[];
+      const errors:string[]=[];
+      for(const horizon of HORIZON_KEYS){
+        const slot=value[horizon];
+        if(!isObject(slot)){errors.push(`horizon_slots.${horizon} must be an object`);continue}
+        if(typeof slot.direction!=='string'||!HORIZON_DIRECTIONS.has(slot.direction))errors.push(`horizon_slots.${horizon}.direction must be BULLISH, RANGE or BEARISH`);
+        const probabilities=slot.probabilities;
+        if(!isObject(probabilities)||!exactKeys(probabilities,SCENARIO_KEYS)){
+          errors.push(`horizon_slots.${horizon}.probabilities must contain exactly BULL, RANGE and BEAR`);
+        }else{
+          for(const scenario of SCENARIO_KEYS)if(!isFiniteNumber(probabilities[scenario])||Number(probabilities[scenario])<0||Number(probabilities[scenario])>100)errors.push(`horizon_slots.${horizon}.probabilities.${scenario} must be 0..100`);
+          if(SCENARIO_KEYS.every(scenario=>isFiniteNumber(probabilities[scenario]))){
+            const sum=SCENARIO_KEYS.reduce((acc,scenario)=>acc+Number(probabilities[scenario]),0);
+            if(Math.abs(sum-100)>0.02)errors.push(`horizon_slots.${horizon}.probabilities must sum to 100 within 0.02`);
+            const selectedKey=slot.direction==='BULLISH'?'BULL':slot.direction==='BEARISH'?'BEAR':'RANGE';
+            const selected=Number(probabilities[selectedKey]);
+            const maximum=Math.max(...SCENARIO_KEYS.map(scenario=>Number(probabilities[scenario])));
+            if(Math.abs(selected-maximum)>0.02)errors.push(`horizon_slots.${horizon}.direction must match the highest scenario probability`);
+          }
+        }
+        if(!isFiniteNumber(slot.zone_low)||!isFiniteNumber(slot.zone_high)||Number(slot.zone_low)<=0||Number(slot.zone_high)<Number(slot.zone_low))errors.push(`horizon_slots.${horizon} must contain positive zone_low <= zone_high`);
+        if(!isNonEmptyString(slot.basis))errors.push(`horizon_slots.${horizon}.basis is mandatory`);
+      }
+      return errors;
     }
     default:return [`unsupported normalized input ${key}`];
   }
