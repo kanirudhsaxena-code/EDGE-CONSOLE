@@ -624,7 +624,7 @@ function render5dr(run,request,outcomeAssessment){
   const blockersPlain=blockers.map(blockerText);
   fiveDrSummary.innerHTML=[
     '<article class="simple-result direction-'+escapeHtml(String(result.directional_label||'RANGE').toLowerCase())+'">',
-      '<div class="result-kicker">Today’s Market View</div>',
+      '<div class="eyebrow">TABLE 2 · CURRENT 5DR RUN</div><div class="result-kicker">Today’s Market View</div>',
       '<h2>'+escapeHtml(direction)+'</h2>',
       '<p class="run-timestamp">Run date/time: '+escapeHtml(runDateTime(run.generated_at||run.run_timestamp||run.created_at))+'</p>',
       '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
