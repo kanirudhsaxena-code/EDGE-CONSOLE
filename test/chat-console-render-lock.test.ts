@@ -20,7 +20,8 @@ test('capture selectors are owned by the current Console',()=>{
     assert.match(html,new RegExp('id="'+id+'"'));
   }
   assert.match(app,/Today’s Market View/);
-  assert.match(app,/ASSESSMENT · TILL DATE/);
+  assert.match(app,/TABLE 1 · 5DR ASSESSMENT & EFFICACY/);
+  assert.match(app,/TABLE 2 · CURRENT 5DR RUN/);
   assert.match(stocks,/1 — EDGE MASTER ASSESSMENT/);
   assert.match(stocks,/2 — ACTIVE CALLS/);
   assert.match(stocks,/3 — CURRENT STOCK OUTCOME/);
