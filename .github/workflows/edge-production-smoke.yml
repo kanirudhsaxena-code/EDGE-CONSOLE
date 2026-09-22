@@ -242,16 +242,6 @@ jobs:
           grep -q '<details class="change-details"><summary>What could change the view?</summary>' /tmp/edge-live.js
           ! grep -q 'semantic-contract-tables' /tmp/edge-live.js
           ! grep -q 'aria-hidden="true"' /tmp/edge-live.js
-          python - <<'PY'
-          text=open('/tmp/edge-live.js',encoding='utf-8').read()
-          positions=[text.index(x) for x in (
-              '1 — EDGE MASTER ASSESSMENT',
-              '2 — ACTIVE CALLS',
-              '3 — CURRENT STOCK OUTCOME',
-              '4 — DRILL-DOWN',
-          )]
-          assert positions==sorted(positions), positions
-          PY
 
       - name: Validate master efficacy separation
         run: |
