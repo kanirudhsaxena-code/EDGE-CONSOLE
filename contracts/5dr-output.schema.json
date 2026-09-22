@@ -1,7 +1,31 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "edge-console.5dr-output.v1",
-  "title": "EDGE Console 5DR Output Envelope",
+  "title": "EDGE Console 5DR Governed Release Envelope",
+  "$defs": {
+    "probabilities": {
+      "type": "object",
+      "required": ["BULL", "RANGE", "BEAR"],
+      "properties": {
+        "BULL": {"type": "number", "minimum": 0, "maximum": 100},
+        "RANGE": {"type": "number", "minimum": 0, "maximum": 100},
+        "BEAR": {"type": "number", "minimum": 0, "maximum": 100}
+      },
+      "additionalProperties": false
+    },
+    "horizon": {
+      "type": "object",
+      "required": ["direction", "probabilities", "zone_low", "zone_high", "basis"],
+      "properties": {
+        "direction": {"enum": ["BULLISH", "RANGE", "BEARISH"]},
+        "probabilities": {"$ref": "#/$defs/probabilities"},
+        "zone_low": {"type": "number", "exclusiveMinimum": 0},
+        "zone_high": {"type": "number", "exclusiveMinimum": 0},
+        "basis": {"type": "string", "minLength": 1}
+      },
+      "additionalProperties": true
+    }
+  },
   "type": "object",
   "required": ["contract_version", "run_id", "engine", "framework_version", "status", "provenance", "generated_at", "result"],
   "properties": {
@@ -16,7 +40,7 @@
       "required": ["mode", "sources"],
       "properties": {
         "mode": {"enum": ["MANUAL", "HYBRID", "AUTOMATED"]},
-        "sources": {"type": "array", "items": {"type": "string"}},
+        "sources": {"type": "array"},
         "freshness_at": {"type": ["string", "null"], "format": "date-time"}
       },
       "additionalProperties": true
@@ -25,33 +49,71 @@
     "result": {
       "type": "object",
       "required": [
-        "model_version",
-        "output_contract_version",
-        "forecast_assessment",
-        "recommendation_assessment",
-        "assessment_snapshot_complete",
-        "horizon_slots",
-        "recommendation_ledger_complete"
+        "model_version", "output_contract_version", "forecast_assessment", "forecast_assessment_class",
+        "recommendation_assessment", "assessment_snapshot_complete", "assessment_snapshot",
+        "horizon_slots", "recommendation_ledger_complete", "recommendation_ledger",
+        "des5", "directional_label", "market_trust", "market_trust_band", "probabilities",
+        "regime", "event_shock", "expected_nifty_zone", "execution_edge", "tradeable",
+        "directional_trade", "tradeability_blockers", "recommendation", "trade_plan",
+        "engine_diagnostics", "evidence_delta"
       ],
       "properties": {
         "model_version": {"const": "5DR_V2_1"},
         "output_contract_version": {"const": "5DR_V2_1_2"},
         "forecast_assessment": {"type": "string", "minLength": 1},
+        "forecast_assessment_class": {"enum": ["IMPROVED", "UNCHANGED", "WORSENED", "REVERSED"]},
         "recommendation_assessment": {"type": "string", "minLength": 1},
         "assessment_snapshot_complete": {"const": true},
+        "assessment_snapshot": {"type": "object"},
         "horizon_slots": {
           "type": "object",
           "required": ["D+1", "D+2", "D+3", "D+4", "D+5"],
           "properties": {
-            "D+1": {},
-            "D+2": {},
-            "D+3": {},
-            "D+4": {},
-            "D+5": {}
+            "D+1": {"$ref": "#/$defs/horizon"},
+            "D+2": {"$ref": "#/$defs/horizon"},
+            "D+3": {"$ref": "#/$defs/horizon"},
+            "D+4": {"$ref": "#/$defs/horizon"},
+            "D+5": {"$ref": "#/$defs/horizon"}
+          },
+          "additionalProperties": false
+        },
+        "recommendation_ledger_complete": {"const": true},
+        "recommendation_ledger": {"type": "array"},
+        "des5": {"type": "number", "minimum": -100, "maximum": 100},
+        "directional_label": {"enum": ["STRONG_BULL", "BULL", "MILD_BULL", "RANGE", "MILD_BEAR", "BEAR", "STRONG_BEAR"]},
+        "market_trust": {"type": "number", "minimum": 0, "maximum": 100},
+        "market_trust_band": {"type": "string", "minLength": 1},
+        "probabilities": {"$ref": "#/$defs/probabilities"},
+        "regime": {"enum": ["TREND", "RANGE", "TRANSITION", "EVENT_SHOCK"]},
+        "event_shock": {
+          "type": "object",
+          "required": ["level", "expected_transmission", "convexity_warranted", "kill_switch"],
+          "properties": {
+            "level": {"enum": ["LOW", "MODERATE", "HIGH", "EXTREME"]},
+            "expected_transmission": {"enum": ["BULLISH", "BEARISH", "TWO_SIDED"]},
+            "convexity_warranted": {"enum": ["YES", "NO"]},
+            "kill_switch": {"type": "boolean"}
           },
           "additionalProperties": true
         },
-        "recommendation_ledger_complete": {"const": true}
+        "expected_nifty_zone": {
+          "type": "object",
+          "required": ["low", "high", "source_horizon"],
+          "properties": {
+            "low": {"type": "number", "exclusiveMinimum": 0},
+            "high": {"type": "number", "exclusiveMinimum": 0},
+            "source_horizon": {"const": "D+5"}
+          },
+          "additionalProperties": false
+        },
+        "execution_edge": {"type": "number", "minimum": 0, "maximum": 100},
+        "tradeable": {"type": "boolean"},
+        "directional_trade": {"type": "boolean"},
+        "tradeability_blockers": {"type": "array"},
+        "recommendation": {"enum": ["BUY_CE", "BUY_PE", "BUY_CONVEXITY", "NO_TRADE"]},
+        "trade_plan": {"type": "object"},
+        "engine_diagnostics": {"type": "object"},
+        "evidence_delta": {"type": "object"}
       },
       "additionalProperties": true
     },
