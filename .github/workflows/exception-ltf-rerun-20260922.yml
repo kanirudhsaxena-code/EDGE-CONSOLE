@@ -1,4 +1,5 @@
 name: One-time 22 Sep LTF Exception Rerun
+# attempt 2 after legacy lifecycle expiry repair
 
 on:
   workflow_dispatch:
