@@ -203,7 +203,7 @@ jobs:
           assert d.get('ticker'),d
           assert d.get('next'),d
           print('CAPTURE_TICKER='+str(d['ticker']))
-          print('EDGE_STATUS_URL='+str(d['next']))
+          print('EDGE_STATUS_URL='+shlex.quote(str(d['next'])))
           PY
             cat /tmp/stocks.env >> "$GITHUB_ENV"
             source /tmp/stocks.env
