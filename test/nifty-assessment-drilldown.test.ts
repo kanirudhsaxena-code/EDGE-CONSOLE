@@ -24,7 +24,7 @@ test('empty current D+1 to D+5 slots fail closed instead of inventing forecast r
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes("if(!has)return"));
   assert.ok(app.includes('<b>Not verified</b>'));
-  assert.ok(app.includes('Only evidence-supported ranges are shown.'));
+  assert.ok(app.includes('No evidence-supported daily scenario/range was stored for this slot.'));
 });
 
 
@@ -51,7 +51,7 @@ test('5DR assessment labels official canonical population rather than run count'
   assert.ok(app.includes('matured eligible'));
   assert.ok(app.includes('resolved canonical recommendations'));
   assert.ok(app.includes('one selected DAILY_CANONICAL forecast per target trading date'));
-  assert.ok(app.includes('Canonical actionable calls only'));
+  assert.ok(app.includes('resolved canonical actionable recommendations'));
   assert.ok(source.includes("population_rule:String(overall.population_rule??rec.population_rule??'SELECTED_DAILY_CANONICAL_ONLY')"));
   assert.ok(source.includes("population:'SCORABLE_MATURED_CANONICAL_CHECKPOINTS'"));
   assert.ok(source.includes("population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS'"));
@@ -64,7 +64,7 @@ test('NIFTY current 5-day forecast is hidden inside full analysis and uses stand
   const toggle=app.indexOf('data-analysis-toggle>View full analysis');
   const analysis=app.indexOf('data-analysis-detail hidden',toggle);
   const forecast=app.indexOf('currentForecastDrilldown(result)',analysis);
-  const why=app.indexOf('Why this view?',forecast);
+  const why=app.indexOf('Detailed analysis · why this view?',forecast);
   assert.ok(toggle>=0 && analysis>toggle && forecast>analysis && why>forecast);
   assert.ok(css.includes('.current-forecast-details summary'));
   assert.ok(css.includes('.assessment-drill-section>.step-label'));
