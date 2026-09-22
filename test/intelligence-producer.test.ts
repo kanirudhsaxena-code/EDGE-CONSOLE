@@ -11,7 +11,9 @@ const judgment:IntelligenceJudgment={
     MACRO_CATALYSTS:{global_risk_environment:0,india_macro_rbi_inr_rates:1,crude_commodities_geopolitics:-1,scheduled_high_impact_catalysts:0}
   },
   market_trust_inputs:{price_confirmation:70,pvpo_confirmation:65,participation_confirmation:55,cross_engine_consistency:65,closing_confirmation:70,evidence_freshness_completeness:90},
-  event_shock:'LOW',execution_inputs:{rr_score:80,premium_iv_theta_score:70,strike_expiry_fit_score:75,liquidity_spread_score:85,entry_invalidation_score:75},
+  event_shock:'LOW',
+  event_transmission:'TWO_SIDED',
+  convexity_warranted:false,execution_inputs:{rr_score:80,premium_iv_theta_score:70,strike_expiry_fit_score:75,liquidity_spread_score:85,entry_invalidation_score:75},
   data_adequate:true,expected_rr:2.5,horizon_slots:{
     'D+1':{direction:'BULLISH',probabilities:{BULL:58,RANGE:30,BEAR:12},zone_low:23000,zone_high:23300,basis:'Price structure'},
     'D+2':{direction:'BULLISH',probabilities:{BULL:57,RANGE:31,BEAR:12},zone_low:22950,zone_high:23400,basis:'Price structure'},
