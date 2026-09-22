@@ -74,7 +74,51 @@
       "type": "object"
     },
     "active_calls": {
-      "type": "array"
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "ticker",
+          "recommendation_id",
+          "definitive_forecast",
+          "definitive_recommendation",
+          "expected_price_zone",
+          "probabilities"
+        ],
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1
+          },
+          "recommendation_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definitive_forecast": {
+            "type": "string",
+            "minLength": 1
+          },
+          "definitive_recommendation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "expected_price_zone": {
+            "type": "object",
+            "required": [
+              "low",
+              "high"
+            ]
+          },
+          "probabilities": {
+            "type": "object",
+            "required": [
+              "bull",
+              "base",
+              "bear"
+            ]
+          }
+        }
+      }
     },
     "current_stock_outcome": {
       "type": "object",
@@ -92,7 +136,150 @@
         "decision_ladder",
         "bot",
         "execution"
-      ]
+      ],
+      "properties": {
+        "des": {
+          "type": "number",
+          "minimum": -100,
+          "maximum": 100
+        },
+        "market_trust": {
+          "type": "object",
+          "required": [
+            "score",
+            "band",
+            "subscores",
+            "weights"
+          ],
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "band": {
+              "type": "string",
+              "minLength": 1
+            },
+            "subscores": {
+              "type": "object",
+              "required": [
+                "evidence_quality",
+                "freshness",
+                "completeness",
+                "directional_agreement",
+                "market_confirmation"
+              ]
+            },
+            "weights": {
+              "type": "object",
+              "required": [
+                "evidence_quality",
+                "freshness",
+                "completeness",
+                "directional_agreement",
+                "market_confirmation"
+              ]
+            }
+          }
+        },
+        "directional_agreement": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100
+        },
+        "effective_conviction": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "probabilities": {
+          "type": "object",
+          "required": [
+            "bull",
+            "base",
+            "bear"
+          ]
+        },
+        "definitive_forecast": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expected_price_zone": {
+          "type": "object",
+          "required": [
+            "low",
+            "high"
+          ]
+        },
+        "forecast_horizon": {
+          "type": "string",
+          "minLength": 1
+        },
+        "risk_override": {
+          "type": "object",
+          "required": [
+            "status"
+          ]
+        },
+        "primary_action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "decision_ladder": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bot": {
+          "type": "object",
+          "required": [
+            "score",
+            "grade",
+            "subscores",
+            "weights"
+          ],
+          "properties": {
+            "score": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "grade": {
+              "type": "string",
+              "minLength": 1
+            },
+            "subscores": {
+              "type": "object",
+              "required": [
+                "forecast_edge",
+                "market_trust",
+                "structure_pattern_quality",
+                "pv_pvpo_confirmation",
+                "catalyst_asymmetry",
+                "execution_quality"
+              ]
+            },
+            "weights": {
+              "type": "object",
+              "required": [
+                "forecast_edge",
+                "market_trust",
+                "structure_pattern_quality",
+                "pv_pvpo_confirmation",
+                "catalyst_asymmetry",
+                "execution_quality"
+              ]
+            }
+          }
+        },
+        "execution": {
+          "type": "object",
+          "required": [
+            "instrument",
+            "execution_quality_score"
+          ]
+        }
+      }
     },
     "drilldown": {
       "type": "array",
@@ -104,7 +291,13 @@
           "score_or_level",
           "verification_status",
           "key_outcome",
-          "interpretation"
+          "interpretation",
+          "original_weight",
+          "normalized_weight",
+          "weighted_contribution",
+          "evidence_quality",
+          "conflict_flag",
+          "finding"
         ],
         "properties": {
           "component": {
@@ -126,6 +319,38 @@
             "minLength": 1
           },
           "interpretation": {
+            "type": "string",
+            "minLength": 1
+          },
+          "original_weight": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "normalized_direction": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "normalized_weight": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "weighted_contribution": {
+            "type": [
+              "number",
+              "null"
+            ]
+          },
+          "evidence_quality": {},
+          "conflict_flag": {
+            "type": "boolean"
+          },
+          "finding": {
             "type": "string",
             "minLength": 1
           }
