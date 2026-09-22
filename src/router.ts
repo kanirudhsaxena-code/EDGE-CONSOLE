@@ -127,6 +127,28 @@ async function saveNormalizedEvidence(request: Request, env: Env, requestId: str
   return json({ ok: executable, request_id: requestId, normalized_items: evidence.length, adapter_stage: metadata.adapter_stage, blockers: assessment, next_step: executable ? 'Execute governed 5DR runner' : 'Supply missing or resolve conflicting normalized inputs' }, executable ? 200 : 409);
 }
 
+async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonRecord;predecessor:JsonRecord|null}|null>{
+  const assessmentRows=await sql`select source_id,assessed_at,headline,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
+  if(!assessmentRows.length||!isObject(assessmentRows[0].metrics))return null;
+  const metrics=assessmentRows[0].metrics as JsonRecord;
+  const day=isObject(metrics.day_metrics)?metrics.day_metrics as JsonRecord:{};
+  const labels=['D','D+1','D+2','D+3','D+4'];
+  const ledger=Array.isArray(metrics.recommendation_ledger)?metrics.recommendation_ledger:[];
+  const expectedCount=Number(metrics.all_recommendations_count??ledger.length);
+  const snapshotComplete=metrics.assessment_snapshot_complete===true&&labels.every(label=>isObject(day[label]));
+  const ledgerComplete=metrics.recommendation_ledger_complete===true&&ledger.length===expectedCount;
+  if(!snapshotComplete||!ledgerComplete)return null;
+  const assessedAt=String(assessmentRows[0].assessed_at||'');
+  if(!assessedAt||Number.isNaN(Date.parse(assessedAt)))return null;
+  const ageMs=Date.now()-Date.parse(assessedAt);
+  if(ageMs < -5*60_000||ageMs > 24*60*60_000)return null;
+  const predecessorRows=await sql`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true and status='SUCCESS' order by generated_at desc limit 1`;
+  const predecessor=predecessorRows.length&&isObject(predecessorRows[0].result)
+    ? {run_id:String(predecessorRows[0].run_id),generated_at:predecessorRows[0].generated_at,result:predecessorRows[0].result as JsonRecord}
+    : null;
+  return {assessment_context:{source_id:String(assessmentRows[0].source_id),assessed_at:assessedAt,headline:isNonEmptyString(assessmentRows[0].headline)?String(assessmentRows[0].headline):null,snapshot_complete:true,recommendation_ledger_complete:true,metrics},predecessor};
+}
+
 async function executionPacket(env: Env, requestId: string): Promise<Response> {
   if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
   const sql = neon(env.DATABASE_URL);
@@ -135,7 +157,9 @@ async function executionPacket(env: Env, requestId: string): Promise<Response> {
   if (!['READY_FOR_ENGINE', 'PROCESSING'].includes(String(rows[0].status))) return json({ error: 'request_id is not eligible for execution' }, 409);
   const metadata = isObject(rows[0].metadata) ? rows[0].metadata as JsonRecord : {};
   if (metadata.adapter_stage !== 'NORMALIZED_READY' || !Array.isArray(metadata.normalized_evidence) || !metadata.normalized_evidence.length) return json({ error: 'request is not normalization-ready', blockers: metadata.normalization_assessment ?? null, next_step: 'Complete normalized evidence before execution' }, 409);
-  return json({ request_id: String(rows[0].request_id), provenance_mode: String(rows[0].provenance_mode), framework_version: String(rows[0].framework_version), output_contract_version: String(rows[0].output_contract_version), evidence: metadata.normalized_evidence });
+  const context=await fiveDrExecutionContext(sql);
+  if(!context)return json({error:'5DR assessment-first release gate blocked: canonical assessment snapshot or recommendation ledger is missing/incomplete/stale',next_step:'Run canonical lifecycle assessment handoff before engine execution'},409);
+  return json({ request_id: String(rows[0].request_id), provenance_mode: String(rows[0].provenance_mode), framework_version: String(rows[0].framework_version), output_contract_version: String(rows[0].output_contract_version), evidence: metadata.normalized_evidence, ...context });
 }
 
 async function failRequest(request: Request, env: Env, requestId: string): Promise<Response> {
@@ -501,15 +525,18 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
 
   const activeRows = await sql`
     select r.*, l.expiry_trading_date, p.current_price, p.current_return_pct, p.outcome_verdict,
-           mt.directional_agreement_score,
+           mt.evidence_quality_score, mt.freshness_score, mt.completeness_score,
+           mt.directional_agreement_score, mt.market_confirmation_score,
            coalesce(mt.market_trust_score, r.market_trust_score) as resolved_market_trust_score,
            coalesce(mt.market_trust_band, r.market_trust_band) as resolved_market_trust_band,
+           b.forecast_edge, b.market_trust as bot_market_trust, b.structure_pattern_quality,
+           b.pv_pvpo_confirmation, b.catalyst_asymmetry, b.execution_quality,
            coalesce(b.bot_score, r.bot_score) as resolved_bot_score,
            coalesce(b.bot_grade, r.bot_grade) as resolved_bot_grade,
            coalesce(b.decision_ladder, r.decision_ladder) as resolved_decision_ladder,
            e.instrument, e.entry_low, e.entry_high, e.stop_price, e.invalidation_text,
-           e.target1, e.target2, e.time_exit, e.option_strike, e.option_expiry,
-           e.observed_premium, e.option_suitability_status, e.execution_quality_score
+           e.target1, e.target2, e.rr_t1, e.rr_t2, e.risk_unit_category, e.time_exit, e.option_strike, e.option_expiry,
+           e.observed_premium, e.option_suitability_status, e.execution_quality_score, e.execution_quality_level
       from recommendations r
       join recommendation_lifecycle l using (recommendation_id)
       left join recommendation_performance p using (recommendation_id)
@@ -575,7 +602,9 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     }
   }
   const componentRows = await sql`
-    select component, raw_score, evidence_quality, availability_status, conflict_flag, notes
+    select component, original_weight, raw_score, normalized_direction, evidence_quality,
+           availability_status, normalized_weight, weighted_contribution, conflict_flag,
+           gate_override_flag, notes
       from component_scores
      where recommendation_id = ${String(active.recommendation_id)}
      order by component
@@ -649,7 +678,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       component.includes('EVENT_SHOCK') ? 'Event-risk evidence is therefore affecting the risk overlay rather than creating direction by itself.' :
       component.includes('CHART_PATTERN') ? 'The active chart-pattern signal is therefore contributing to the near-term setup.' :
       'This governed component is contributing to the overall EDGE direction and conviction.';
-    return `Legacy active run: the original narrative field was not persisted. The immutable verified component score is ${Number.isFinite(score) ? score.toFixed(0) : 'N/A'} (${tone}); ${consequence}`;
+    return 'Legacy active run: the original narrative field was not persisted. The immutable verified component score is '+(Number.isFinite(score) ? score.toFixed(0) : 'N/A')+' ('+tone+'); '+consequence;
   };
   const componentKey = (value: unknown): string => String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
   const researchFinding = (componentRaw: unknown): string | undefined => {
@@ -721,6 +750,13 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     return {
       component: String(row.component),
       score_or_level: row.raw_score ?? 'N/A',
+      original_weight: numberOrNull(row.original_weight),
+      normalized_direction: numberOrNull(row.normalized_direction),
+      normalized_weight: numberOrNull(row.normalized_weight),
+      weighted_contribution: numberOrNull(row.weighted_contribution),
+      evidence_quality: row.evidence_quality ?? null,
+      conflict_flag: row.conflict_flag === true,
+      gate_override_flag: row.gate_override_flag ?? null,
       verification_status: verification,
       key_outcome: keyOutcome,
       finding: plainFinding(row.component,row.raw_score,verification,notes),
@@ -768,9 +804,9 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',
-      table_2: 'CURRENT_STOCK_OUTCOME',
-      table_3: 'DRILLDOWN',
-      table_4: 'ACTIVE_CALLS'
+      table_2: 'ACTIVE_CALLS',
+      table_3: 'CURRENT_STOCK_OUTCOME',
+      table_4: 'DRILLDOWN'
     },
     master_assessment: {
       recommendations: integerOrZero(master.recommendations),
@@ -839,7 +875,18 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     })),
     current_stock_outcome: {
       des,
-      market_trust: { score: marketTrust, band: marketTrustBand },
+      market_trust: {
+        score: marketTrust,
+        band: marketTrustBand,
+        subscores: {
+          evidence_quality: numberOrNull(active.evidence_quality_score),
+          freshness: numberOrNull(active.freshness_score),
+          completeness: numberOrNull(active.completeness_score),
+          directional_agreement: directionalAgreement,
+          market_confirmation: numberOrNull(active.market_confirmation_score)
+        },
+        weights: { evidence_quality:30, freshness:20, completeness:15, directional_agreement:20, market_confirmation:15 }
+      },
       directional_agreement: directionalAgreement,
       effective_conviction: Number(effectiveConviction.toFixed(6)),
       probabilities: {
@@ -853,7 +900,19 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
       primary_action: primaryAction,
       decision_ladder: decisionLadder,
-      bot: { score: botScore, grade: botGrade },
+      bot: {
+        score: botScore,
+        grade: botGrade,
+        subscores: {
+          forecast_edge: numberOrNull(active.forecast_edge),
+          market_trust: numberOrNull(active.bot_market_trust),
+          structure_pattern_quality: numberOrNull(active.structure_pattern_quality),
+          pv_pvpo_confirmation: numberOrNull(active.pv_pvpo_confirmation),
+          catalyst_asymmetry: numberOrNull(active.catalyst_asymmetry),
+          execution_quality: numberOrNull(active.execution_quality)
+        },
+        weights: { forecast_edge:25, market_trust:20, structure_pattern_quality:20, pv_pvpo_confirmation:15, catalyst_asymmetry:10, execution_quality:10 }
+      },
       execution: {
         instrument: active.instrument ?? 'NONE',
         entry_low: numberOrNull(active.entry_low),
@@ -862,12 +921,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         invalidation: active.invalidation_text ?? null,
         target1: numberOrNull(active.target1),
         target2: numberOrNull(active.target2),
+        rr_t1: numberOrNull(active.rr_t1),
+        rr_t2: numberOrNull(active.rr_t2),
+        risk_unit_category: active.risk_unit_category ?? null,
         time_exit: active.time_exit ?? null,
         option_strike: numberOrNull(active.option_strike),
         option_expiry: active.option_expiry ?? null,
         observed_premium: numberOrNull(active.observed_premium),
         option_suitability_status: active.option_suitability_status ?? null,
-        execution_quality_score: numberOrNull(active.execution_quality_score)
+        execution_quality_score: numberOrNull(active.execution_quality_score),
+        execution_quality_level: active.execution_quality_level ?? null
       },
       current_price: numberOrNull(active.current_price),
       current_return_pct: numberOrNull(active.current_return_pct),

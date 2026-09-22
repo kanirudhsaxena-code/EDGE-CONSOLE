@@ -15,9 +15,9 @@ const report = {
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
-    table_2:'CURRENT_STOCK_OUTCOME',
-    table_3:'DRILLDOWN',
-    table_4:'ACTIVE_CALLS'
+    table_2:'ACTIVE_CALLS',
+    table_3:'CURRENT_STOCK_OUTCOME',
+    table_4:'DRILLDOWN'
   },
   master_assessment:{
     recommendations:5,unique_stocks:3,open_recommendations:5,closed_recommendations:0,
@@ -41,24 +41,24 @@ const report = {
   },
   active_calls:[{ticker:'TCS',recommendation_id:'EDGE-TCS-X',call_timestamp:'2026-09-17T11:15:00Z',definitive_forecast:'BASE_RANGE',definitive_recommendation:'NO TRADE; NO OPTION TRADE.',expected_price_zone:{low:3000,high:3200},outcome_verdict:'OPEN'}],
   current_stock_outcome:{
-    des:-30,market_trust:{score:92,band:'VERY HIGH'},directional_agreement:80,effective_conviction:.276,
+    des:-30,market_trust:{score:92,band:'VERY HIGH',subscores:{evidence_quality:95,freshness:100,completeness:90,directional_agreement:80,market_confirmation:95},weights:{evidence_quality:30,freshness:20,completeness:15,directional_agreement:20,market_confirmation:15}},directional_agreement:80,effective_conviction:.276,
     probabilities:{bull:5,base:60,bear:35},definitive_forecast:'BASE_RANGE',expected_price_zone:{low:3000,high:3200},
     forecast_horizon:'D+5',risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
-    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B'},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
+    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B',subscores:{forecast_edge:55,market_trust:92,structure_pattern_quality:60,pv_pvpo_confirmation:55,catalyst_asymmetry:50,execution_quality:60},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
   },
   drilldown:[
-    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
-    {component:'PV_PVPO',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
-    {component:'VALUATION',score_or_level:'N/A',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
+    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,original_weight:10,normalized_weight:11.1,weighted_contribution:5.55,evidence_quality:'HIGH',conflict_flag:false,finding:'Verified fundamentals evidence was positive.',verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
+    {component:'PV_PVPO',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:true,finding:'Price and participation weakened.',verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
+    {component:'VALUATION',score_or_level:'N/A',original_weight:7,normalized_weight:null,weighted_contribution:null,evidence_quality:'NOT_VERIFIED',conflict_flag:false,finding:'Verified valuation evidence was unavailable.',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
   ]
 };
 
 test('Efficacy V2 renderer produces four mobile-first sections in approved order',()=>{
   const html=renderEdgeV13(report);
   const i1=html.indexOf('1 — EDGE MASTER ASSESSMENT');
-  const i2=html.indexOf('2 — CURRENT STOCK OUTCOME');
-  const i3=html.indexOf('3 — DRILL-DOWN');
-  const i4=html.indexOf('4 — ACTIVE CALLS');
+  const i2=html.indexOf('2 — ACTIVE CALLS');
+  const i3=html.indexOf('3 — CURRENT STOCK OUTCOME');
+  const i4=html.indexOf('4 — DRILL-DOWN');
   assert.ok(i1<i2 && i2<i3 && i3<i4);
   assert.equal((html.match(/data-edge-section=/g)||[]).length,4);
 });
@@ -73,11 +73,12 @@ test('user-facing EDGE renderer uses cards rather than horizontally scrolling ta
 
 test('drill-down uses finding, explanation and outcome without fabricating legacy detail',()=>{
   const html=renderEdgeV13(report);
-  assert.ok(html.includes('FINDING'));
-  assert.ok(html.includes('WHY IT MATTERS'));
+  assert.ok(html.includes('WHAT WE SAW'));
+  assert.ok(html.includes('WHAT IT MEANS'));
+  assert.ok(html.includes('WHY IT MATTERS NOW'));
   assert.ok(!html.includes('<b>Outcome:</b>'));
-  assert.ok(html.includes('This older run preserved a verified component score of 1 (positive)'));
-  assert.ok(html.includes('did not preserve the detailed source narrative'));
+  assert.ok(html.includes('The verified historical score is available, but the original detailed interpretation was not persisted.'))
+  assert.ok(html.includes('No additional market fact is inferred.'))
   assert.ok(!html.includes('Legacy active run'));
   assert.ok(!html.includes('original narrative field was not persisted'));
   assert.ok(!html.includes('immutable verified component score'));
@@ -135,15 +136,15 @@ test('PV/PVPO is expanded for users',()=>{
 test('assessment and decision labels are user-friendly',()=>{
   const html=renderEdgeV13(report);
   assert.ok(html.includes('Outcome checks recorded'));
-  assert.ok(html.includes('Internal model P/L score'));
-  assert.ok(html.includes('Early forecast tracking'));
+  assert.ok(html.includes('Cumulative model P/L'));
+  assert.ok(html.includes('Provisional forecast tracking'));
   assert.ok(html.includes('Official recommendation accuracy'));
-  assert.ok(html.includes('Audit-only model score. It is not your portfolio return'));
+  assert.ok(html.includes('Standardized model units only · never inferred user P/L.'));
   assert.ok(html.includes('Evidence confidence'));
   assert.ok(html.includes('High evidence confidence does not mean bullish'));
-  assert.ok(html.includes('Signals pointing the same way'));
-  assert.ok(html.includes('Overall conviction after checks'));
-  assert.ok(html.includes('Extra safety block'));
+  assert.ok(html.includes('Directional Agreement'));
+  assert.ok(html.includes('Effective Conviction'));
+  assert.ok(html.includes('Risk Override'));
   assert.ok(!html.includes('Captured / due checkpoints'));
 });
 
@@ -191,9 +192,9 @@ test('verified drill-down still requires meaningful persisted evidence',()=>{
 
 test('validator rejects obsolete presentation order',()=>{
   const bad=structuredClone(report);
-  bad.presentation.table_2='ACTIVE_CALLS';
-  bad.presentation.table_3='CURRENT_STOCK_OUTCOME';
-  bad.presentation.table_4='DRILLDOWN';
+  bad.presentation.table_2='CURRENT_STOCK_OUTCOME';
+  bad.presentation.table_3='DRILLDOWN';
+  bad.presentation.table_4='ACTIVE_CALLS';
   assert.ok(validateEdgeStocksResult(bad).length>0);
 });
 
@@ -205,7 +206,7 @@ test('current approved presentation contract validates cleanly',()=>{
 test('EDGE Stocks renderer exposes canonical governance status',()=>{
   const js=readFileSync('public/edge-live.js','utf8');
   assert.ok(js.includes('Official canonical status'));
-  assert.ok(js.includes('Only selected canonical recommendations enter official efficacy'));
+  assert.ok(js.includes('OFFICIAL metrics use selected CLOSED/scorable recommendations only'));
   assert.ok(js.includes('No qualifying canonical was selected for this target'));
   assert.ok(js.includes('current_run_is_selected'));
 });

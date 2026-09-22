@@ -12,11 +12,11 @@ test('5DR assessment separates matured efficacy from pending published forecasts
 
 test('5DR assessment UI exposes day-wise forecast range direction and outcome drill-down',()=>{
   const app=readFileSync('public/app.js','utf8');
-  assert.ok(app.includes('Drill down — day-wise forecast, range & outcomes'));
+  assert.ok(app.includes('D through D+4 forecast efficacy'));
   assert.ok(app.includes('Matured historical performance'));
   assert.ok(app.includes('Legacy canonical forecasts awaiting assessment'));
   assert.ok(app.includes('Expected range / zone'));
-  assert.ok(app.includes('No evidence-supported day-specific direction/range was stored for this slot.'));
+  assert.ok(app.includes('No evidence-supported daily scenario/range was stored for this slot.'));
   assert.ok(app.includes('Matured eligible'));
 });
 
@@ -24,7 +24,7 @@ test('empty current D+1 to D+5 slots fail closed instead of inventing forecast r
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes("if(!has)return"));
   assert.ok(app.includes('<b>Not verified</b>'));
-  assert.ok(app.includes('Only evidence-supported ranges are shown.'));
+  assert.ok(app.includes('No evidence-supported daily scenario/range was stored for this slot.'));
 });
 
 
@@ -32,7 +32,7 @@ test('pending historical forecasts and current five-day forecast are collapsed b
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes('<details class="pending-forecast-block pending-forecast-details">'));
   assert.ok(app.includes('function currentForecastDrilldown(result)'));
-  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary>'));
+  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — D through D+4 scenarios & range</summary>'));
   assert.ok(!app.includes('<details class="pending-forecast-block pending-forecast-details" open>'));
   assert.ok(!app.includes('<details class="current-forecast-details" open>'));
 });
@@ -51,7 +51,7 @@ test('5DR assessment labels official canonical population rather than run count'
   assert.ok(app.includes('matured eligible'));
   assert.ok(app.includes('resolved canonical recommendations'));
   assert.ok(app.includes('one selected DAILY_CANONICAL forecast per target trading date'));
-  assert.ok(app.includes('Canonical actionable calls only'));
+  assert.ok(app.includes('resolved canonical actionable recommendations'));
   assert.ok(source.includes("population_rule:String(overall.population_rule??rec.population_rule??'SELECTED_DAILY_CANONICAL_ONLY')"));
   assert.ok(source.includes("population:'SCORABLE_MATURED_CANONICAL_CHECKPOINTS'"));
   assert.ok(source.includes("population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS'"));
@@ -64,7 +64,7 @@ test('NIFTY current 5-day forecast is hidden inside full analysis and uses stand
   const toggle=app.indexOf('data-analysis-toggle>View full analysis');
   const analysis=app.indexOf('data-analysis-detail hidden',toggle);
   const forecast=app.indexOf('currentForecastDrilldown(result)',analysis);
-  const why=app.indexOf('Why this view?',forecast);
+  const why=app.indexOf('Detailed analysis · why this view?',forecast);
   assert.ok(toggle>=0 && analysis>toggle && forecast>analysis && why>forecast);
   assert.ok(css.includes('.current-forecast-details summary'));
   assert.ok(css.includes('.assessment-drill-section>.step-label'));
@@ -171,4 +171,26 @@ test('NIFTY canonical horizon presentation maps internal five slots to D through
   assert.ok(app.includes("const labels=['D','D+1','D+2','D+3','D+4']"));
   assert.ok(app.includes('D is the canonical target trading session'));
   assert.ok(app.includes('assessmentMetricForDisplay'));
+});
+
+
+test('NIFTY current-run UI exposes master-spec metrics, legends and six trade gates',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  for(const phrase of [
+    'DES5 · Direction strength',
+    'Market Trust · Evidence confidence',
+    'Execution Edge · Trade setup strength',
+    'SINGLE TRADEABILITY GATE',
+    'Forecast Assessment',
+    'Recommendation Assessment',
+    'Metric breakdown & legends',
+    'WHAT WE SAW',
+    'WHAT IT MEANS',
+    'WHY IT MATTERS NOW'
+  ]) assert.ok(app.includes(phrase),phrase);
+  for(const gate of ['Data adequate','Market Trust ≥ 50','|DES5| ≥ 30','Execution Edge ≥ 65','Kill Switch inactive','Expected R:R ≥ 2.0']) assert.ok(app.includes(gate),gate);
+  assert.ok(app.includes('result.definitive_forecast||result.directional_label'));
+  assert.ok(app.includes('Bull <b>'));
+  assert.ok(app.includes('Range <b>'));
+  assert.ok(app.includes('Bear <b>'));
 });

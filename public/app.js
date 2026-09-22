@@ -9,7 +9,7 @@ document.getElementById('runButton')?.addEventListener('click',()=>dialog.showMo
 document.getElementById('closeRunDialog')?.addEventListener('click',()=>dialog.close());
 function escapeHtml(v){return String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;')}function readableBytes(b){if(b<1024)return b+' B';if(b<1048576)return(b/1024).toFixed(1)+' KB';return(b/1048576).toFixed(1)+' MB'}function setUploadStatus(m,s){uploadStatus.className='upload-status'+(s?' '+s:'');uploadStatus.textContent=m||''}
 function friendlyEngineStatus(status){const map={EVIDENCE_GATE_READY:'Ready',ACTIVE:'Ready',FOUNDATION:'Setup in progress',INTEGRATION_PENDING:'Setup in progress',READY:'Ready'};return map[String(status)]||String(status||'Status unavailable').replaceAll('_',' ').toLowerCase().replace(/^./,c=>c.toUpperCase())}
-function friendlyDirection(value){const map={BULL:'Bullish',BEAR:'Bearish',RANGE:'Range-bound'};return map[String(value)]||String(value||'—')}
+function friendlyDirection(value){const map={BULL:'Bullish',BULLISH:'Bullish',BEAR:'Bearish',BEARISH:'Bearish',RANGE:'Range-bound',BASE_RANGE:'Range-bound'};return map[String(value)]||String(value||'—')}
 function confidenceLabel(value){const n=Number(value);if(!Number.isFinite(n))return'Unavailable';if(n>=75)return'High';if(n>=50)return'Moderate';return'Low'}
 function runDateTime(value){if(!value)return'—';const d=new Date(value);return Number.isNaN(d.getTime())?'—':d.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}
 function directionStrengthSummary(value){
@@ -21,6 +21,76 @@ function tradeSetupStrengthSummary(value){
   const n=Number(value);if(!Number.isFinite(n))return{value:'Unavailable',detail:'Trade setup quality could not be measured.'};
   const label=n>=80?'Strong':n>=65?'Trade-ready':n>=45?'Moderate':'Weak';
   return{value:label+' · '+n.toFixed(0)+'/100',detail:'How usable the entry, stop, target and reward/risk setup is. 65/100 is the current execution gate.'}
+}
+function niftyMetricLegend(){
+  return '<div class="metric-legend compact"><strong>Score legends</strong>'+
+    '<span><b>DES5:</b> +60…+100 Strong Bull · +30…+59 Bull · +15…+29 Mild Bull · −14…+14 Range · −29…−15 Mild Bear · −59…−30 Bear · −100…−60 Strong Bear</span>'+
+    '<span><b>Market Trust:</b> 80–100 Strong · 65–79 Good · 50–64 Developing · 35–49 Low · &lt;35 Untrusted</span>'+
+    '<span><b>Execution Edge:</b> 80–100 Excellent · 65–79 Tradeable · 50–64 Marginal · &lt;50 Reject</span></div>'
+}
+function niftyMetricBreakdown(result,normalized){
+  const d=result?.engine_diagnostics||{},data=normalized&&typeof normalized==='object'&&Object.keys(normalized).length?normalized:d;
+  const regime=String(data.regime||d.regime||'UNKNOWN').toUpperCase();
+  const components=data.component_scores||d.component_scores||{};
+  const regimeWeights={
+    TREND:{PRICE_STRUCTURE:40,PVPO:30,PARTICIPATION:15,MACRO_CATALYSTS:15},
+    RANGE:{PRICE_STRUCTURE:30,PVPO:35,PARTICIPATION:15,MACRO_CATALYSTS:20},
+    TRANSITION:{PRICE_STRUCTURE:35,PVPO:25,PARTICIPATION:15,MACRO_CATALYSTS:25},
+    EVENT_SHOCK:{PRICE_STRUCTURE:30,PVPO:20,PARTICIPATION:10,MACRO_CATALYSTS:40}
+  };
+  const weights=regimeWeights[regime]||{};
+  const labels={PRICE_STRUCTURE:'Price / Structure',PVPO:'PVPO / Derivatives',PARTICIPATION:'Market Participation',MACRO_CATALYSTS:'Macro + Catalysts'};
+  const componentCards=Object.keys(labels).map(key=>{
+    const score=Number(components[key]),weight=Number(weights[key]);
+    const contribution=Number.isFinite(score)&&Number.isFinite(weight)?score*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(labels[key])+'</span><strong>'+(Number.isFinite(score)?escapeHtml(score.toFixed(1)):'Not verified')+'</strong><small>Regime weight '+(Number.isFinite(weight)?escapeHtml(weight)+'%':'—')+' · DES5 contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  const trustInputs=data.market_trust_inputs||d.market_trust_inputs||{};
+  const trustWeights={price_confirmation:25,pvpo_confirmation:25,participation_confirmation:15,cross_engine_consistency:15,closing_confirmation:10,evidence_freshness_completeness:10};
+  const trustLabels={price_confirmation:'Price confirmation',pvpo_confirmation:'PVPO confirmation',participation_confirmation:'Participation',cross_engine_consistency:'Cross-engine consistency',closing_confirmation:'Closing confirmation',evidence_freshness_completeness:'Freshness / completeness'};
+  const trustCards=Object.keys(trustLabels).map(key=>{
+    const value=Number(trustInputs[key]),weight=trustWeights[key];
+    const contribution=Number.isFinite(value)?value*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(trustLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · trust contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  const execution=data.execution_inputs||d.execution_inputs||{};
+  const execWeights={rr_score:30,premium_iv_theta_score:25,strike_expiry_fit_score:15,liquidity_spread_score:15,entry_invalidation_score:15};
+  const execLabels={rr_score:'Expected R:R',premium_iv_theta_score:'Premium / IV / theta',strike_expiry_fit_score:'Strike / expiry fit',liquidity_spread_score:'Liquidity / spread',entry_invalidation_score:'Entry / invalidation'};
+  const execCards=Object.keys(execLabels).map(key=>{
+    const value=Number(execution[key]),weight=execWeights[key];
+    const contribution=Number.isFinite(value)?value*weight/100:null;
+    return '<div class="breakdown-card"><span>'+escapeHtml(execLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · edge contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+  }).join('');
+
+  return '<details class="metric-breakdown-details" open><summary>Metric breakdown & legends</summary>'+
+    niftyMetricLegend()+
+    '<div class="breakdown-section"><div class="step-label">DES5 · '+escapeHtml(regime)+' regime</div><div class="metric-breakdown-grid">'+componentCards+'</div></div>'+
+    '<div class="breakdown-section"><div class="step-label">Market Trust</div><div class="metric-breakdown-grid">'+trustCards+'</div></div>'+
+    '<div class="breakdown-section"><div class="step-label">Execution Edge</div><div class="metric-breakdown-grid">'+execCards+'</div></div>'+
+    '</details>'
+}
+function niftyGateChecklist(result,normalized){
+  const gate=result?.tradeability_gate||{};
+  const data=normalized&&typeof normalized==='object'?normalized:{};
+  const des=Number(result?.des5),mt=Number(result?.market_trust),edge=Number(result?.execution_edge),rr=Number(gate.expected_rr??data.expected_rr);
+  const checks=[
+    ['Data adequate',gate.data_adequate??data.data_adequate===true,'Required evidence branch is usable.'],
+    ['Market Trust ≥ 50',gate.market_trust_pass??(Number.isFinite(mt)&&mt>=50),Number.isFinite(mt)?'Current '+mt.toFixed(1)+'/100':'Not verified'],
+    ['|DES5| ≥ 30',gate.des5_pass??(Number.isFinite(des)&&Math.abs(des)>=30),Number.isFinite(des)?'Current |'+des.toFixed(1)+'|':'Not verified'],
+    ['Execution Edge ≥ 65',gate.execution_edge_pass??(Number.isFinite(edge)&&edge>=65),Number.isFinite(edge)?'Current '+edge.toFixed(1)+'/100':'Not verified'],
+    ['Kill Switch inactive',gate.event_kill_switch_inactive??data.event_kill_switch===false,'Event Shock '+escapeHtml(String(gate.event_shock??data.event_shock??'UNKNOWN'))],
+    ['Expected R:R ≥ 2.0',gate.rr_pass??(Number.isFinite(rr)&&rr>=2),Number.isFinite(rr)?'Current '+rr.toFixed(2):'Not verified']
+  ];
+  return '<section class="gate-panel"><div class="stock-section-title"><div><span>SINGLE TRADEABILITY GATE</span><h3>Why the trade is permitted or rejected</h3></div><span class="status-chip '+(result?.tradeable===true?'positive':'limited')+'">'+(result?.tradeable===true?'PASS':'NO TRADE')+'</span></div><div class="gate-grid">'+checks.map(([label,pass,detail])=>'<div class="gate-item '+(pass?'pass':'fail')+'"><span>'+(pass?'✓':'✕')+' '+escapeHtml(label)+'</span><strong>'+escapeHtml(detail)+'</strong></div>').join('')+'</div></section>'
+}
+function whyCard(label,item){
+  const v=item||{};
+  return '<div class="why-card"><strong>'+escapeHtml(label)+'</strong>'+
+    '<div class="why-step"><span>WHAT WE SAW</span><p>'+escapeHtml(v.observed||'Not verified')+'</p></div>'+
+    '<div class="why-step"><span>WHAT IT MEANS</span><p>'+escapeHtml(v.meaning||'No interpretation available without governed evidence.')+'</p></div>'+
+    '<div class="why-step"><span>WHY IT MATTERS NOW</span><p>'+escapeHtml(v.impact||'No additional current impact recorded.')+'</p></div></div>'
 }
 function blockerText(code){const map={DATA_INADEQUATE:'Not enough reliable evidence',MARKET_TRUST_LT_50:'Market confidence is too low',DES5_LT_30:'Directional strength is too weak',EXECUTION_EDGE_LT_65:'Trade setup quality is too weak',RR_LT_2:'Potential reward is not high enough for the risk',EVENT_KILL_SWITCH:'A major event-risk safeguard is active'};return map[String(code)]||String(code||'').replaceAll('_',' ').toLowerCase()}
 function friendlyFailureMessage(raw){
@@ -302,34 +372,50 @@ function canonicalAssessmentContext(canonical){
 }
 function assessmentDayCell(label,day,zone,rec){
   const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{},r=rec&&typeof rec==='object'?rec:{};
-  const status=String(d.status||'').toUpperCase(),eligible=Number(d.eligible_matured??0),scorable=Number(d.scorable||0),missing=Number(d.missing_unscorable??Math.max(eligible-scorable,0));
+  const eligible=Number(d.eligible_matured??0),scorable=Number(d.scorable||0),missing=Number(d.missing_unscorable??Math.max(eligible-scorable,0));
   const hits=Number(d.hits||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
   const dirPct=d.hit_rate_pct!=null?Number(d.hit_rate_pct):scorable?hits/scorable*100:null;
   const zonePct=z.zone_hit_rate_pct!=null?Number(z.zone_hit_rate_pct):(d.zone_hit_rate_pct!=null?Number(d.zone_hit_rate_pct):(zoneScorable?zoneHits/zoneScorable*100:null));
   const coverage=d.coverage_pct!=null?Number(d.coverage_pct):(eligible?scorable/eligible*100:null);
+  const margin=d.avg_directional_margin_points??d.average_directional_margin_points??null;
+  const zoneError=d.avg_zone_error_points??d.average_zone_error_points??null;
+  const brier=d.avg_brier_score??d.brier_score??null;
   const resolved=Number(r.resolved||0),recHits=Number(r.hits||0),recMisses=Number(r.misses||0),recPct=r.hit_rate_pct!=null?Number(r.hit_rate_pct):(resolved?recHits/resolved*100:null);
   let forecastHtml='';
   if(eligible===0){
     forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
   }else if(scorable===0){
-    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen day-path context missing</small></div>';
+    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen forecast context unavailable</small></div>';
   }else{
-    forecastHtml='<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' scorable</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+(missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen day-path context missing</small></div>':'');
+    forecastHtml='<div><span>Directional accuracy</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' matured eligible scorable</small></div>'+
+      '<div><span>Zone hit rate</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+
+      '<div><span>Avg directional margin</span><b>'+(margin==null?'Not scorable':escapeHtml(Number(margin).toFixed(2))+' pts')+'</b><small>Signed NIFTY points in favour of the frozen forecast.</small></div>'+
+      '<div><span>Avg zone error</span><b>'+(zoneError==null?'Not scorable':escapeHtml(Number(zoneError).toFixed(2))+' pts')+'</b><small>Average distance from the frozen zone when missed; lower is better.</small></div>'+
+      '<div><span>Probability calibration · Brier</span><b>'+(brier==null?'Not scorable':escapeHtml(Number(brier).toFixed(4)))+'</b><small>Three-scenario probability score; lower is better, 0 is perfect. Legacy single-probability rows are not reconstructed.</small></div>'+
+      (missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen context is incomplete.</small></div>':'');
   }
-  const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
+  const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' wins · '+recMisses+' loss'+(recMisses===1?'':'es')+'</small></div><div><span>Standardized model P/L</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+' · not user P/L</small></div>':'<div><span>Recommendation hit rate</span><b>Not scorable</b><small>No recommendation resolved on this horizon</small></div>';
   return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
 function slotValue(slot,keys){for(const key of keys){if(slot&&slot[key]!=null&&slot[key]!=='')return slot[key]}return null}
 function pendingForecastDayCell(label,slot){
   const has=slot&&typeof slot==='object'&&Object.keys(slot).length>0;
-  if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported day-specific direction/range was stored for this slot.</small></div></div>';
+  if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported daily scenario/range was stored for this slot.</small></div></div>';
   const direction=slotValue(slot,['direction','bias','directional_label','forecast']);
-  const probability=slotValue(slot,['probability','direction_probability','confidence']);
+  const probs=slot.probabilities&&typeof slot.probabilities==='object'?slot.probabilities:null;
+  const legacyProbability=slotValue(slot,['probability','direction_probability','confidence']);
   const low=slotValue(slot,['zone_low','range_low','expected_zone_low','low']);
   const high=slotValue(slot,['zone_high','range_high','expected_zone_high','high']);
   const date=slotValue(slot,['trading_date','date','target_date']);
+  const basis=slotValue(slot,['basis','notes']);
   const zoneText=(low!=null||high!=null)?((low??'—')+' – '+(high??'—')):'Not verified';
-  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b><small>'+(probability!=null?escapeHtml(probability)+'% probability':'No slot probability stored')+'</small></div><div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div></div>'
+  const scenarioHtml=probs
+    ? '<div class="scenario-mini-line"><span>Bull <b>'+escapeHtml(probs.BULL??'—')+'%</b></span><span>Range <b>'+escapeHtml(probs.RANGE??'—')+'%</b></span><span>Bear <b>'+escapeHtml(probs.BEAR??'—')+'%</b></span></div>'
+    : '<small>'+(legacyProbability!=null?'Legacy selected-scenario probability '+escapeHtml(legacyProbability)+'%; full Bull/Range/Bear vector was not stored.':'Full Bull/Range/Bear probability vector not stored.')+'</small>';
+  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong>'+
+    '<div><span>Selected direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b>'+scenarioHtml+'</div>'+
+    '<div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Evidence-supported session range.</small></div>'+
+    '<div><span>Evidence basis</span><b>'+escapeHtml(basis||'Not available')+'</b><small>Why this daily scenario was selected; missing evidence is not inferred.</small></div></div>'
 }
 const CANONICAL_HORIZON_DISPLAY=[
   {label:'D',internal:'D+1'},
@@ -343,14 +429,14 @@ function renderPendingForecasts(pending){
   if(!rows.length)return '<div class="scorecard-context"><p>No published forecasts are currently waiting for future assessment checkpoints.</p></div>';
   return rows.slice(0,5).map(run=>{
     const probs=run.probabilities||{},slots=run.horizon_slots||{};
-    const title=(run.generated_at?runDateTime(run.generated_at):run.run_id||'Pending forecast')+' · '+friendlyDirection(run.directional_label);
-    return '<details class="pending-forecast-block pending-forecast-details"><summary>'+escapeHtml(title)+'</summary><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This operational run affects official accuracy only if it becomes the selected canonical and its governed checkpoints mature.</small></div><div class="scorecard-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
+    const title=(run.generated_at?runDateTime(run.generated_at):run.run_id||'Pending forecast')+' · '+friendlyDirection(run.definitive_forecast||run.directional_label);
+    return '<details class="pending-forecast-block pending-forecast-details"><summary>'+escapeHtml(title)+'</summary><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.definitive_forecast||run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This operational run affects official accuracy only if it becomes the selected canonical and its governed checkpoints mature.</small></div><div class="scorecard-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
   }).join('')
 }
 function currentForecastDrilldown(result){
   const slots=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots:{};
   const populated=CANONICAL_HORIZON_DISPLAY.filter(h=>slots[h.internal]&&typeof slots[h.internal]==='object'&&Object.keys(slots[h.internal]).length>0).length;
-  return '<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>D is the canonical target trading session; D+1 through D+4 are the next four NSE sessions. Unverified fields are never guessed.</p></div><div class="scorecard-days current-forecast-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
+  return '<details class="current-forecast-details"><summary>5-day forecast — D through D+4 scenarios & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>D is the canonical target trading session; D+1 through D+4 are the next four NSE sessions. New runs show Bull/Range/Bear probabilities totaling 100% for every day; legacy missing vectors are never reconstructed.</p></div><div class="scorecard-days current-forecast-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
 }
 function assessmentMetricForDisplay(metrics,label,index){
   const source=metrics&&typeof metrics==='object'?metrics:{};
@@ -370,19 +456,29 @@ function renderAssessment(container,payload){
   if(!container)return;
   const summary=payload&&payload.summary?payload.summary:null,details=payload&&Array.isArray(payload.details)?payload.details:[],pending=payload&&Array.isArray(payload.pending_forecasts)?payload.pending_forecasts:[];
   if(!summary){container.innerHTML='<div class="generic-empty">Till-date assessment is not available yet.</div>';return}
-  const canonical=summary.canonical||null,f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{},eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
+  const canonical=summary.canonical||null,f=summary.forecast||{},r=summary.recommendation||{},ret=summary.returns||{};
+  const eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
+  const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},mr=m.recommendation_metrics||{},mret=m.return_metrics||{},mo=m.overall_forecast_metrics||{};
+  const averageR=mr.average_resolved_r??r.average_r??null,openMtm=mr.open_standardized_mtm_pct??null,brier=mo.avg_brier_score??mo.brier_score??null,drawdown=mret.maximum_drawdown_pct??null,noTrade=m.no_trade_metrics?.effectiveness_pct??null,regime=m.regime_metrics??null;
+  const brierDetail=brier==null?'Not scorable yet — legacy daily records do not contain complete three-scenario probability vectors.':'Lower is better; 0 means perfect three-scenario calibration.';
   container.innerHTML=[
-    '<div class="assessment-header"><div><div class="eyebrow">ASSESSMENT · TILL DATE</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
+    '<div class="assessment-header"><div><div class="eyebrow">TABLE 1 · 5DR ASSESSMENT & EFFICACY</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
     canonicalAssessmentContext(canonical),
     '<div class="assessment-grid">',
-      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct)+'</strong><small>'+escapeHtml(f.hits||0)+' hits / '+escapeHtml(f.total||0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
-      '<div class="assessment-metric"><span>Recommendation accuracy</span><strong>'+pct(r.accuracy_pct)+'</strong><small>'+escapeHtml(r.hits||0)+' wins / '+escapeHtml(r.total||0)+' resolved canonical recommendations</small></div>',
-      '<div class="assessment-metric"><span>Overall gain / loss</span><strong>'+pct(ret.absolute_return_pct)+'</strong><small>Canonical actionable calls only</small></div>',
-      '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful canonical calls</small></div>',
-      '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful canonical calls</small></div>',
+      '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct??mo.directional_accuracy_pct)+'</strong><small>'+escapeHtml(f.hits??mo.directional_hits??0)+' hits / '+escapeHtml(f.total??mo.canonical_scorable_checkpoints??0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
+      '<div class="assessment-metric"><span>Zone hit rate</span><strong>'+pct(mo.zone_hit_rate_pct)+'</strong><small>'+escapeHtml(mo.zone_hits??0)+' zone hits across the selected canonical population.</small></div>',
+      '<div class="assessment-metric"><span>Recommendation hit rate</span><strong>'+pct(r.accuracy_pct??mr.hit_rate_pct)+'</strong><small>'+escapeHtml(r.hits??mr.wins??0)+' wins / '+escapeHtml(r.total??mr.resolved??0)+' resolved canonical recommendations</small></div>',
+      '<div class="assessment-metric"><span>Average R</span><strong>'+(averageR==null?'Not scorable':escapeHtml(Number(averageR).toFixed(2))+'R')+'</strong><small>Average standardized reward/risk on resolved canonical actionable recommendations.</small></div>',
+      '<div class="assessment-metric"><span>Realized model P/L</span><strong>'+pct(ret.absolute_return_pct??mret.cumulative_resolved_pnl_pct)+'</strong><small>Equal-notional standardized model result; never inferred as user profit.</small></div>',
+      '<div class="assessment-metric"><span>Open model MTM</span><strong>'+(openMtm==null?'Not scorable':pct(openMtm))+'</strong><small>Verified open standardized MTM only; unavailable history is not inferred.</small></div>',
+      '<div class="assessment-metric"><span>Probability calibration · Brier</span><strong>'+(brier==null?'Not scorable':escapeHtml(Number(brier).toFixed(4)))+'</strong><small>'+escapeHtml(brierDetail)+'</small></div>',
+      '<div class="assessment-metric"><span>No-Trade effectiveness</span><strong>'+(noTrade==null?'Not scorable':pct(noTrade))+'</strong><small>Scorable avoidance outcomes only; no value is fabricated where historical avoidance scoring is incomplete.</small></div>',
+      '<div class="assessment-metric"><span>Maximum drawdown</span><strong>'+(drawdown==null?'Not scorable':pct(drawdown))+'</strong><small>Standardized model peak-to-trough decline; shown only when a governed portfolio series exists.</small></div>',
+      '<div class="assessment-metric"><span>Accuracy by regime</span><strong>'+(regime?'Available below':'Not scorable')+'</strong><small>Trend / Range / Transition / Event-Shock breakdown appears only with a governed regime sample.</small></div>',
     '</div>',
+    '<div class="metric-legend"><strong>Assessment legend</strong><span>Official = one selected canonical per target trading date.</span><span>Provisional = open/maturing checkpoint diagnostics.</span><span>Not scorable = required frozen evidence was not stored; it is never reconstructed.</span></div>',
     '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns do not increase denominators.</p><p><strong>Matured eligible</strong> means the D or D+n trading session has passed. <strong>Scorable</strong> additionally requires the original frozen day-wise forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently unscorable because legacy frozen context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
-    '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
+    '<details class="assessment-detail-row" open><summary>D through D+4 forecast efficacy</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
 async function loadAssessment(engine,container){
@@ -518,41 +614,48 @@ function render5dr(run,request,outcomeAssessment){
     const rawError=request&&request.error?JSON.stringify(request.error):'';const setup=meta.decision_setup?friendlySetup(meta.decision_setup):null;const setupHtml=setup?'<div class="assessment-card"><div><span>Run assessment</span><strong>Recorded</strong></div><p>'+escapeHtml(setup.objective)+' · '+escapeHtml(setup.risk)+' · '+escapeHtml(setup.priority)+' · '+escapeHtml(setup.horizon)+'</p></div>':'';fiveDrSummary.innerHTML='<article class="simple-result pending-result"><div class="result-kicker">Current EDGE NIFTY run</div><h2>'+escapeHtml(progress)+'</h2><p class="run-timestamp">Run started: '+escapeHtml(runDateTime(request?.created_at||request?.updated_at||request?.submitted_at))+'</p><p class="result-copy">'+(status==='FAILED'?escapeHtml(friendlyFailureMessage(rawError)):'Your current run is still being processed. No previous result is being presented as the current answer.')+'</p>'+setupHtml+resume+(status==='FAILED'?diagnosticSummary(rawError,'Stopped safely'):'')+technical+'</article>';
     return;
   }
-  const result=run.result||{},prob=result.probabilities||{},blockers=Array.isArray(result.tradeability_blockers)?result.tradeability_blockers:[],direction=friendlyDirection(result.directional_label),confidence=confidenceLabel(result.market_trust),tradeable=result.tradeable===true;
+  const result=run.result||{},prob=result.probabilities||{},blockers=Array.isArray(result.tradeability_blockers)?result.tradeability_blockers:[],direction=friendlyDirection(result.definitive_forecast||result.directional_label),confidence=confidenceLabel(result.market_trust),tradeable=result.tradeable===true;
   const meta=request&&request.metadata?request.metadata:{},handoff=meta.intelligence_handoff||{},normalized=handoff.normalized||{},components=normalized.component_scores||{},trust=normalized.market_trust_inputs||{},execution=normalized.execution_inputs||{},limits=(meta.intelligence_reconciliation&&Array.isArray(meta.intelligence_reconciliation.limitations))?meta.intelligence_reconciliation.limitations:[];
   fiveDrState.textContent='Result ready';
-  const action=tradeable?'A trade setup currently meets the EDGE NIFTY gates. Review the setup before acting.':'Wait for a stronger setup before taking a trade.';
+  const action=result.recommendation?humanText(result.recommendation):(tradeable?'Legacy run · tradeability passed, but the frozen recommendation field was not persisted.':'No Trade · legacy published result');
   const directionStrength=directionStrengthSummary(result.des5),tradeSetupStrength=tradeSetupStrengthSummary(result.execution_edge);
   const why=governedWhy(meta,normalized,result);
   const changes=userChangeConditions(why,normalized,result);
   const blockersPlain=blockers.map(blockerText);
   fiveDrSummary.innerHTML=[
     '<article class="simple-result direction-'+escapeHtml(String(result.directional_label||'RANGE').toLowerCase())+'">',
-      '<div class="result-kicker">Today’s Market View</div>',
+      '<div class="eyebrow">TABLE 2 · CURRENT 5DR RUN</div><div class="result-kicker">Today’s Market View</div>',
       '<h2>'+escapeHtml(direction)+'</h2>',
       '<p class="run-timestamp">Run date/time: '+escapeHtml(runDateTime(run.generated_at||run.run_timestamp||run.created_at))+'</p>',
       '<div class="probability-line"><span class="bull">Up <strong>'+escapeHtml(prob.BULL??'—')+'%</strong></span><span class="range">Sideways <strong>'+escapeHtml(prob.RANGE??'—')+'%</strong></span><span class="bear">Down <strong>'+escapeHtml(prob.BEAR??'—')+'%</strong></span></div>',
       '<div class="nifty-signal-grid">',
-        '<div class="decision-card"><span>Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
-        '<div class="decision-card"><span>Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>How reliable and internally consistent the evidence is for this market view.</small></div>',
-        '<div class="decision-card"><span>Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>DES5 · Direction strength</span><strong>'+escapeHtml(directionStrength.value)+'</strong><small>'+escapeHtml(directionStrength.detail)+'</small></div>',
+        '<div class="decision-card"><span>Market Trust · Evidence confidence</span><strong>'+escapeHtml(confidence)+' · '+escapeHtml(result.market_trust??'—')+'/100</strong><small>Reliability and internal consistency of the evidence; it is confidence, not direction.</small></div>',
+        '<div class="decision-card"><span>Execution Edge · Trade setup strength</span><strong>'+escapeHtml(tradeSetupStrength.value)+'</strong><small>'+escapeHtml(tradeSetupStrength.detail)+'</small></div>',
       '</div>',
       '<div class="decision-grid">',
-        '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'Current gates passed':'Current gates are not met')+'</small></div>',
-        '<div class="decision-card"><span>Market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
+        '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'All six frozen tradeability gates passed.':'One or more frozen tradeability gates failed; see checklist below.')+'</small></div>',
+        '<div class="decision-card"><span>5-day market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
+        '<div class="decision-card"><span>Expected NIFTY zone · D+5</span><strong>'+(result.expected_nifty_zone?escapeHtml(result.expected_nifty_zone.low)+' – '+escapeHtml(result.expected_nifty_zone.high):'Legacy incomplete')+'</strong><small>Final-session expected range; not a guaranteed target.</small></div>',
+        '<div class="decision-card"><span>Event Shock</span><strong>'+(result.event_shock?escapeHtml(humanText(result.event_shock.level)):'Legacy incomplete')+'</strong><small>'+(result.event_shock?('Transmission '+escapeHtml(humanText(result.event_shock.transmission))+' · Convexity '+(result.event_shock.convexity_warranted?'YES':'NO')+' · Kill switch '+(result.event_shock.kill_switch?'ACTIVE':'inactive')):'Event transmission/convexity were not persisted in this legacy run.')+'</small></div>',
       '</div>',
-      '<div class="action-box"><span>Suggested action</span><strong>'+escapeHtml(action)+'</strong></div>',
-      '<div class="assessment-card"><div><span>Run assessment</span><strong>'+(meta.decision_setup?'Recorded':'Legacy run')+'</strong></div><p>'+(meta.decision_setup?(escapeHtml(friendlySetup(meta.decision_setup).objective)+' · '+escapeHtml(friendlySetup(meta.decision_setup).risk)+' · '+escapeHtml(friendlySetup(meta.decision_setup).priority)+' · '+escapeHtml(friendlySetup(meta.decision_setup).horizon)):'This result was created before run-assessment capture was enabled. New runs record the decision setup before analysis.')+'</p></div>',
+      '<div class="action-box"><span>Definitive recommendation</span><strong>'+escapeHtml(action)+'</strong></div>',
+      niftyGateChecklist(result,normalized),
+      '<div class="assessment-pair">'+
+        '<div class="assessment-card"><div><span>Forecast Assessment</span><strong>'+(result.forecast_assessment?'Governed':'Legacy incomplete')+'</strong></div><p>'+escapeHtml(result.forecast_assessment||'This published legacy run did not persist the mandatory Forecast Assessment. No retrospective assessment is being invented.')+'</p></div>'+
+        '<div class="assessment-card"><div><span>Recommendation Assessment</span><strong>'+(result.recommendation_assessment?'Governed':'Legacy incomplete')+'</strong></div><p>'+escapeHtml(result.recommendation_assessment||'This published legacy run did not persist the mandatory Recommendation Assessment. New V2.1.2 runs fail closed when it is missing.')+'</p></div>'+
+      '</div>',
       '<button class="analysis-toggle ghost" type="button" data-analysis-toggle>View full analysis</button>',
       '<div class="analysis-detail" data-analysis-detail hidden>',
       currentForecastDrilldown(result),
-      '<details class="why-details" open><summary>Why this view?</summary>',
+      niftyMetricBreakdown(result,normalized),
+      '<details class="why-details" open><summary>Detailed analysis · why this view?</summary>',
         '<div class="why-grid">',
-          '<div class="why-card"><strong>Price & structure</strong><p>'+escapeHtml(why.price.observed+' '+why.price.meaning)+'</p><small>'+escapeHtml(why.price.impact)+'</small></div>',
-          '<div class="why-card"><strong>Options & positioning</strong><p>'+escapeHtml(why.options.observed+' '+why.options.meaning)+'</p><small>'+escapeHtml(why.options.impact)+'</small></div>',
-          '<div class="why-card"><strong>Market participation</strong><p>'+escapeHtml(why.market.observed+' '+why.market.meaning)+'</p><small>'+escapeHtml(why.market.impact)+'</small></div>',
-          '<div class="why-card"><strong>Macro & events</strong><p>'+escapeHtml(why.macro.observed+' '+why.macro.meaning)+'</p><small>'+escapeHtml(why.macro.impact)+'</small></div>',
-          '<div class="why-card"><strong>Trade quality</strong><p>'+escapeHtml(why.trade.observed+' '+why.trade.meaning)+'</p><small>'+escapeHtml(why.trade.impact)+'</small></div>',
+          whyCard('Price & structure',why.price),
+          whyCard('Options & positioning',why.options),
+          whyCard('Market participation',why.market),
+          whyCard('Macro & events',why.macro),
+          whyCard('Trade quality',why.trade),
         '</div>',
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',

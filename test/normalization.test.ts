@@ -7,11 +7,19 @@ const fullNormalized = {
   component_scores:{PRICE_STRUCTURE:40,PVPO:35,PARTICIPATION:20,MACRO_CATALYSTS:10},
   market_trust_inputs:{price_confirmation:70,pvpo_confirmation:65,participation_confirmation:60,cross_engine_consistency:70,closing_confirmation:75,evidence_freshness_completeness:90},
   event_shock:'LOW',
+  event_transmission:'TWO_SIDED',
+  convexity_warranted:false,
   execution_inputs:{rr_score:75,premium_iv_theta_score:70,strike_expiry_fit_score:80,liquidity_spread_score:85,entry_invalidation_score:70},
   data_adequate:true,
   event_kill_switch:false,
   expected_rr:2.4,
-  horizon_slots:{'D+1':{},'D+2':{},'D+3':{},'D+4':{},'D+5':{}}
+  horizon_slots:{
+    'D+1':{direction:'RANGE',probabilities:{BULL:25,RANGE:50,BEAR:25},zone_low:23000,zone_high:23500,basis:'governed test path 1'},
+    'D+2':{direction:'RANGE',probabilities:{BULL:24,RANGE:52,BEAR:24},zone_low:22950,zone_high:23550,basis:'governed test path 2'},
+    'D+3':{direction:'RANGE',probabilities:{BULL:23,RANGE:54,BEAR:23},zone_low:22900,zone_high:23600,basis:'governed test path 3'},
+    'D+4':{direction:'RANGE',probabilities:{BULL:22,RANGE:56,BEAR:22},zone_low:22850,zone_high:23650,basis:'governed test path 4'},
+    'D+5':{direction:'RANGE',probabilities:{BULL:21,RANGE:58,BEAR:21},zone_low:22800,zone_high:23700,basis:'governed test path 5'}
+  }
 };
 const item = (normalized: Record<string, unknown>, source_ref = 'evidence://one') => ({ evidence_type: 'STRUCTURED', source_ref, captured_at: '2026-09-15T07:00:00.000Z', normalized });
 

@@ -30,9 +30,9 @@ export function validateEdgeStocksResult(body: unknown): string[] {
   else {
     if (presentation.standard_table_count !== 4) errors.push('presentation.standard_table_count must be exactly 4');
     if (presentation.table_1 !== 'EDGE_MASTER_ASSESSMENT') errors.push('presentation.table_1 must be EDGE_MASTER_ASSESSMENT');
-    if (presentation.table_2 !== 'CURRENT_STOCK_OUTCOME') errors.push('presentation.table_2 must be CURRENT_STOCK_OUTCOME');
-    if (presentation.table_3 !== 'DRILLDOWN') errors.push('presentation.table_3 must be DRILLDOWN');
-    if (presentation.table_4 !== 'ACTIVE_CALLS') errors.push('presentation.table_4 must be ACTIVE_CALLS');
+    if (presentation.table_2 !== 'ACTIVE_CALLS') errors.push('presentation.table_2 must be ACTIVE_CALLS');
+    if (presentation.table_3 !== 'CURRENT_STOCK_OUTCOME') errors.push('presentation.table_3 must be CURRENT_STOCK_OUTCOME');
+    if (presentation.table_4 !== 'DRILLDOWN') errors.push('presentation.table_4 must be DRILLDOWN');
   }
 
   const master = body.master_assessment;
@@ -66,13 +66,33 @@ export function validateEdgeStocksResult(body: unknown): string[] {
     if (!isNonEmptyString(d.decision_ladder)) errors.push('current_stock_outcome.decision_ladder is mandatory');
     if (!isObject(d.market_trust)) errors.push('current_stock_outcome.market_trust is mandatory');
     else {
-      requiredNumber(d.market_trust as JsonRecord, 'score', 0, 100, errors, 'current_stock_outcome.market_trust');
-      if (!isNonEmptyString((d.market_trust as JsonRecord).band)) errors.push('current_stock_outcome.market_trust.band is mandatory');
+      const mt=d.market_trust as JsonRecord;
+      requiredNumber(mt, 'score', 0, 100, errors, 'current_stock_outcome.market_trust');
+      if (!isNonEmptyString(mt.band)) errors.push('current_stock_outcome.market_trust.band is mandatory');
+      if (!isObject(mt.subscores)) errors.push('current_stock_outcome.market_trust.subscores is mandatory');
+      else for (const key of ['evidence_quality','freshness','completeness','directional_agreement','market_confirmation']) requiredNumber(mt.subscores as JsonRecord,key,0,100,errors,'current_stock_outcome.market_trust.subscores');
+      if (!isObject(mt.weights)) errors.push('current_stock_outcome.market_trust.weights is mandatory');
+      else {
+        const w=mt.weights as JsonRecord;
+        for (const key of ['evidence_quality','freshness','completeness','directional_agreement','market_confirmation']) requiredNumber(w,key,0,100,errors,'current_stock_outcome.market_trust.weights');
+        const total=Object.values(w).reduce<number>((sum,value)=>sum+(typeof value==='number'?value:0),0);
+        if(Math.abs(total-100)>0.01)errors.push('current_stock_outcome.market_trust.weights must sum to 100');
+      }
     }
     if (!isObject(d.bot)) errors.push('current_stock_outcome.bot is mandatory');
     else {
-      requiredNumber(d.bot as JsonRecord, 'score', 0, 100, errors, 'current_stock_outcome.bot');
-      if (!isNonEmptyString((d.bot as JsonRecord).grade)) errors.push('current_stock_outcome.bot.grade is mandatory');
+      const bot=d.bot as JsonRecord;
+      requiredNumber(bot, 'score', 0, 100, errors, 'current_stock_outcome.bot');
+      if (!isNonEmptyString(bot.grade)) errors.push('current_stock_outcome.bot.grade is mandatory');
+      if (!isObject(bot.subscores)) errors.push('current_stock_outcome.bot.subscores is mandatory');
+      else for (const key of ['forecast_edge','market_trust','structure_pattern_quality','pv_pvpo_confirmation','catalyst_asymmetry','execution_quality']) requiredNumber(bot.subscores as JsonRecord,key,0,100,errors,'current_stock_outcome.bot.subscores');
+      if (!isObject(bot.weights)) errors.push('current_stock_outcome.bot.weights is mandatory');
+      else {
+        const w=bot.weights as JsonRecord;
+        for (const key of ['forecast_edge','market_trust','structure_pattern_quality','pv_pvpo_confirmation','catalyst_asymmetry','execution_quality']) requiredNumber(w,key,0,100,errors,'current_stock_outcome.bot.weights');
+        const total=Object.values(w).reduce<number>((sum,value)=>sum+(typeof value==='number'?value:0),0);
+        if(Math.abs(total-100)>0.01)errors.push('current_stock_outcome.bot.weights must sum to 100');
+      }
     }
     if (!isObject(d.risk_override)) errors.push('current_stock_outcome.risk_override is mandatory');
     if (!isObject(d.expected_price_zone)) errors.push('current_stock_outcome.expected_price_zone is mandatory');
@@ -95,9 +115,15 @@ export function validateEdgeStocksResult(body: unknown): string[] {
         errors.push(`drilldown[${index}] must be an object`);
         return;
       }
-      for (const key of ['component','key_outcome','interpretation']) {
+      for (const key of ['component','key_outcome','interpretation','finding']) {
         if (!isNonEmptyString(row[key])) errors.push(`drilldown[${index}].${key} is mandatory`);
       }
+      if (typeof row.original_weight !== 'number' || !Number.isFinite(row.original_weight) || row.original_weight < 0) errors.push(`drilldown[${index}].original_weight is mandatory`);
+      for (const key of ['normalized_weight','weighted_contribution']) {
+        if (row[key] !== null && (typeof row[key] !== 'number' || !Number.isFinite(row[key]))) errors.push(`drilldown[${index}].${key} must be numeric or null`);
+      }
+      if (typeof row.conflict_flag !== 'boolean') errors.push(`drilldown[${index}].conflict_flag is mandatory`);
+      if (row.evidence_quality == null) errors.push(`drilldown[${index}].evidence_quality is mandatory`);
       if (!['VERIFIED','NOT_VERIFIED','NOT_AVAILABLE','NOT_SCORABLE','N/A'].includes(String(row.verification_status))) {
         errors.push(`drilldown[${index}].verification_status is invalid`);
       }

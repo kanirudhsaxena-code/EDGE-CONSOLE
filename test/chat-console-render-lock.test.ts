@@ -20,11 +20,12 @@ test('capture selectors are owned by the current Console',()=>{
     assert.match(html,new RegExp('id="'+id+'"'));
   }
   assert.match(app,/Today’s Market View/);
-  assert.match(app,/ASSESSMENT · TILL DATE/);
+  assert.match(app,/TABLE 1 · 5DR ASSESSMENT & EFFICACY/);
+  assert.match(app,/TABLE 2 · CURRENT 5DR RUN/);
   assert.match(stocks,/1 — EDGE MASTER ASSESSMENT/);
-  assert.match(stocks,/2 — CURRENT STOCK OUTCOME/);
-  assert.match(stocks,/3 — DRILL-DOWN/);
-  assert.match(stocks,/4 — ACTIVE CALLS/);
+  assert.match(stocks,/2 — ACTIVE CALLS/);
+  assert.match(stocks,/3 — CURRENT STOCK OUTCOME/);
+  assert.match(stocks,/4 — DRILL-DOWN/);
 });
 
 test('governed Chat workflow fails closed unless live Console sections are captured',()=>{
@@ -51,7 +52,7 @@ test('EDGE NIFTY Chat capture expands full analysis before reading Console text'
   assert.match(capture,/detail\.hidden=false/);
   assert.match(capture,/querySelectorAll\('details'\)\.forEach/);
   assert.match(capture,/node\.open=true/);
-  assert.match(workflow,/5-day forecast — day-wise direction & range/);
+  assert.match(workflow,/5-day forecast/);
   assert.match(workflow,/Why this view\?/);
   assert.match(workflow,/What could change the view\?/);
   assert.match(workflow,/Future performance scorecard/);

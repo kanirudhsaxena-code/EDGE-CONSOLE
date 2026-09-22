@@ -1,4 +1,4 @@
-import { REQUIRED_5DR_INPUTS, isNonEmptyString, isObject, type JsonRecord } from './normalization';
+import { REQUIRED_5DR_INPUTS, isNonEmptyString, isObject, validateNormalizedInput, type JsonRecord } from './normalization';
 
 export const USER_SCREENSHOT_CATEGORIES = ['PRICE_TECHNICALS', 'DERIVATIVES_OI'] as const;
 export const SYSTEM_RESEARCH_CATEGORIES = ['MARKET_TRUST', 'EVENT_SHOCK', 'EXECUTION_RISK'] as const;
@@ -63,7 +63,13 @@ export function validateIntelligenceHandoff(body: unknown): string[] {
     errors.push('normalized must be an object');
   } else {
     for (const key of REQUIRED_5DR_INPUTS) {
-      if (!(key in body.normalized)) errors.push(`missing normalized input ${key}`);
+      if (!(key in body.normalized)) {
+        errors.push(`missing normalized input ${key}`);
+        continue;
+      }
+      for (const detail of validateNormalizedInput(key, body.normalized[key])) {
+        errors.push(`normalized.${key}: ${detail}`);
+      }
     }
   }
   return errors;

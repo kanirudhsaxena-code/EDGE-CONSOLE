@@ -13,9 +13,9 @@ const valid = {
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
-    table_2:'CURRENT_STOCK_OUTCOME',
-    table_3:'DRILLDOWN',
-    table_4:'ACTIVE_CALLS'
+    table_2:'ACTIVE_CALLS',
+    table_3:'CURRENT_STOCK_OUTCOME',
+    table_4:'DRILLDOWN'
   },
   master_assessment:{
     recommendations:6,unique_stocks:4,open_recommendations:6,closed_recommendations:0,
@@ -28,11 +28,11 @@ const valid = {
   active_calls:[],
   current_stock_outcome:{
     des:-3.5,directional_agreement:52.1,effective_conviction:.0243,
-    market_trust:{score:69.474,band:'MODERATE'},
-    bot:{score:68.941,grade:'B'},
+    market_trust:{score:69.474,band:'MODERATE',subscores:{evidence_quality:70,freshness:100,completeness:75,directional_agreement:52.1,market_confirmation:70},weights:{evidence_quality:30,freshness:20,completeness:15,directional_agreement:20,market_confirmation:15}},
+    bot:{score:68.941,grade:'B',subscores:{forecast_edge:60,market_trust:69.474,structure_pattern_quality:75,pv_pvpo_confirmation:65,catalyst_asymmetry:70,execution_quality:70},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},
     risk_override:{status:'CLEAR',code:null},
     expected_price_zone:{low:2162.5,high:2240.86},
-    execution:{instrument:'NONE'},
+    execution:{instrument:'NONE',execution_quality_score:70},
     probabilities:{bull:4.02,base:73.663,bear:22.317},
     definitive_forecast:'BASE_RANGE',
     forecast_horizon:'D+5',
@@ -40,7 +40,7 @@ const valid = {
     decision_ladder:'INVESTIGATION'
   },
   drilldown:[
-    {component:'PRICE_STRUCTURE',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
+    {component:'PRICE_STRUCTURE',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:false,finding:'Price structure weakened below the governed range.',verification_status:'VERIFIED',key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
   ]
 };
 
