@@ -30,9 +30,9 @@ export function validateEdgeStocksResult(body: unknown): string[] {
   else {
     if (presentation.standard_table_count !== 4) errors.push('presentation.standard_table_count must be exactly 4');
     if (presentation.table_1 !== 'EDGE_MASTER_ASSESSMENT') errors.push('presentation.table_1 must be EDGE_MASTER_ASSESSMENT');
-    if (presentation.table_2 !== 'CURRENT_STOCK_OUTCOME') errors.push('presentation.table_2 must be CURRENT_STOCK_OUTCOME');
-    if (presentation.table_3 !== 'DRILLDOWN') errors.push('presentation.table_3 must be DRILLDOWN');
-    if (presentation.table_4 !== 'ACTIVE_CALLS') errors.push('presentation.table_4 must be ACTIVE_CALLS');
+    if (presentation.table_2 !== 'ACTIVE_CALLS') errors.push('presentation.table_2 must be ACTIVE_CALLS');
+    if (presentation.table_3 !== 'CURRENT_STOCK_OUTCOME') errors.push('presentation.table_3 must be CURRENT_STOCK_OUTCOME');
+    if (presentation.table_4 !== 'DRILLDOWN') errors.push('presentation.table_4 must be DRILLDOWN');
   }
 
   const master = body.master_assessment;
