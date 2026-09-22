@@ -302,34 +302,50 @@ function canonicalAssessmentContext(canonical){
 }
 function assessmentDayCell(label,day,zone,rec){
   const d=day&&typeof day==='object'?day:{},z=zone&&typeof zone==='object'?zone:{},r=rec&&typeof rec==='object'?rec:{};
-  const status=String(d.status||'').toUpperCase(),eligible=Number(d.eligible_matured??0),scorable=Number(d.scorable||0),missing=Number(d.missing_unscorable??Math.max(eligible-scorable,0));
+  const eligible=Number(d.eligible_matured??0),scorable=Number(d.scorable||0),missing=Number(d.missing_unscorable??Math.max(eligible-scorable,0));
   const hits=Number(d.hits||0),zoneHits=Number(z.zone_hits??d.zone_hits??0),zoneScorable=Number(z.scorable??d.scorable??0);
   const dirPct=d.hit_rate_pct!=null?Number(d.hit_rate_pct):scorable?hits/scorable*100:null;
   const zonePct=z.zone_hit_rate_pct!=null?Number(z.zone_hit_rate_pct):(d.zone_hit_rate_pct!=null?Number(d.zone_hit_rate_pct):(zoneScorable?zoneHits/zoneScorable*100:null));
   const coverage=d.coverage_pct!=null?Number(d.coverage_pct):(eligible?scorable/eligible*100:null);
+  const margin=d.avg_directional_margin_points??d.average_directional_margin_points??null;
+  const zoneError=d.avg_zone_error_points??d.average_zone_error_points??null;
+  const brier=d.avg_brier_score??d.brier_score??null;
   const resolved=Number(r.resolved||0),recHits=Number(r.hits||0),recMisses=Number(r.misses||0),recPct=r.hit_rate_pct!=null?Number(r.hit_rate_pct):(resolved?recHits/resolved*100:null);
   let forecastHtml='';
   if(eligible===0){
     forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Not due</b><small>Awaiting governed checkpoint</small></div>';
   }else if(scorable===0){
-    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen day-path context missing</small></div>';
+    forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen forecast context unavailable</small></div>';
   }else{
-    forecastHtml='<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' scorable</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+(missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen day-path context missing</small></div>':'');
+    forecastHtml='<div><span>Directional accuracy</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' matured eligible scorable</small></div>'+
+      '<div><span>Zone hit rate</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+
+      '<div><span>Avg directional margin</span><b>'+(margin==null?'Not scorable':escapeHtml(Number(margin).toFixed(2))+' pts')+'</b><small>Signed NIFTY points in favour of the frozen forecast.</small></div>'+
+      '<div><span>Avg zone error</span><b>'+(zoneError==null?'Not scorable':escapeHtml(Number(zoneError).toFixed(2))+' pts')+'</b><small>Average distance from the frozen zone when missed; lower is better.</small></div>'+
+      '<div><span>Probability calibration · Brier</span><b>'+(brier==null?'Not scorable':escapeHtml(Number(brier).toFixed(4)))+'</b><small>Three-scenario probability score; lower is better, 0 is perfect. Legacy single-probability rows are not reconstructed.</small></div>'+
+      (missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen context is incomplete.</small></div>':'');
   }
-  const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
+  const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' wins · '+recMisses+' loss'+(recMisses===1?'':'es')+'</small></div><div><span>Standardized model P/L</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+' · not user P/L</small></div>':'<div><span>Recommendation hit rate</span><b>Not scorable</b><small>No recommendation resolved on this horizon</small></div>';
   return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
 }
 function slotValue(slot,keys){for(const key of keys){if(slot&&slot[key]!=null&&slot[key]!=='')return slot[key]}return null}
 function pendingForecastDayCell(label,slot){
   const has=slot&&typeof slot==='object'&&Object.keys(slot).length>0;
-  if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported day-specific direction/range was stored for this slot.</small></div></div>';
+  if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported daily scenario/range was stored for this slot.</small></div></div>';
   const direction=slotValue(slot,['direction','bias','directional_label','forecast']);
-  const probability=slotValue(slot,['probability','direction_probability','confidence']);
+  const probs=slot.probabilities&&typeof slot.probabilities==='object'?slot.probabilities:null;
+  const legacyProbability=slotValue(slot,['probability','direction_probability','confidence']);
   const low=slotValue(slot,['zone_low','range_low','expected_zone_low','low']);
   const high=slotValue(slot,['zone_high','range_high','expected_zone_high','high']);
   const date=slotValue(slot,['trading_date','date','target_date']);
+  const basis=slotValue(slot,['basis','notes']);
   const zoneText=(low!=null||high!=null)?((low??'—')+' – '+(high??'—')):'Not verified';
-  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b><small>'+(probability!=null?escapeHtml(probability)+'% probability':'No slot probability stored')+'</small></div><div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div></div>'
+  const scenarioHtml=probs
+    ? '<div class="scenario-mini-line"><span>Bull <b>'+escapeHtml(probs.BULL??'—')+'%</b></span><span>Range <b>'+escapeHtml(probs.RANGE??'—')+'%</b></span><span>Bear <b>'+escapeHtml(probs.BEAR??'—')+'%</b></span></div>'
+    : '<small>'+(legacyProbability!=null?'Legacy selected-scenario probability '+escapeHtml(legacyProbability)+'%; full Bull/Range/Bear vector was not stored.':'Full Bull/Range/Bear probability vector not stored.')+'</small>';
+  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong>'+
+    '<div><span>Selected direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b>'+scenarioHtml+'</div>'+
+    '<div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Evidence-supported session range.</small></div>'+
+    '<div><span>Evidence basis</span><b>'+escapeHtml(basis||'Not available')+'</b><small>Why this daily scenario was selected; missing evidence is not inferred.</small></div></div>'
 }
 const CANONICAL_HORIZON_DISPLAY=[
   {label:'D',internal:'D+1'},
@@ -350,7 +366,7 @@ function renderPendingForecasts(pending){
 function currentForecastDrilldown(result){
   const slots=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots:{};
   const populated=CANONICAL_HORIZON_DISPLAY.filter(h=>slots[h.internal]&&typeof slots[h.internal]==='object'&&Object.keys(slots[h.internal]).length>0).length;
-  return '<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>D is the canonical target trading session; D+1 through D+4 are the next four NSE sessions. Unverified fields are never guessed.</p></div><div class="scorecard-days current-forecast-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
+  return '<details class="current-forecast-details"><summary>5-day forecast — D through D+4 scenarios & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>D is the canonical target trading session; D+1 through D+4 are the next four NSE sessions. New runs show Bull/Range/Bear probabilities totaling 100% for every day; legacy missing vectors are never reconstructed.</p></div><div class="scorecard-days current-forecast-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
 }
 function assessmentMetricForDisplay(metrics,label,index){
   const source=metrics&&typeof metrics==='object'?metrics:{};
