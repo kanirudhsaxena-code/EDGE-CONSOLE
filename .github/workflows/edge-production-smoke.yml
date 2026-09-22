@@ -64,10 +64,10 @@ jobs:
           grep -Fq 'ACTIVE_NIFTY_REQUEST_KEY' /tmp/app.js
           grep -Fq 'fetchExactNiftyRequest' /tmp/app.js
           ! grep -Fq 'Continue EDGE NIFTY' /tmp/app.js
-          grep -Fq 'Drill down — day-wise forecast, range & outcomes' /tmp/app.js
+          grep -Fq 'TABLE 1 · 5DR ASSESSMENT & EFFICACY' /tmp/app.js
           grep -Fq 'Matured eligible' /tmp/app.js
-          grep -Fq 'No evidence-supported day-specific direction/range was stored for this slot.' /tmp/app.js
-          grep -Fq '5-day forecast — day-wise direction & range' /tmp/app.js
+          grep -Fq 'No evidence-supported daily scenario/range was stored for this slot.' /tmp/app.js
+          grep -Fq 'TABLE 2 · CURRENT 5DR RUN' /tmp/app.js
           grep -Fq 'pending-forecast-details' /tmp/app.js
           grep -Fq 'current-forecast-details' /tmp/app.js
           grep -Fq 'matured eligible' /tmp/app.js
@@ -77,8 +77,8 @@ jobs:
           grep -Fq 'matured unscorable' /tmp/app.js
           grep -Fq 'Official canonical · latest governed target' /tmp/app.js
           grep -Fq 'Legacy canonical forecasts awaiting assessment' /tmp/app.js
-          grep -Fq '5-day forecast — D through D+4 direction & range' /tmp/app.js
-          grep -Fq 'D is the canonical target trading session' /tmp/app.js
+          grep -Fq '5-day forecast — D through D+4 scenarios & range' /tmp/app.js
+          grep -Fq 'New runs show Bull/Range/Bear probabilities totaling 100% for every day' /tmp/app.js
           grep -Fq 'This operational run affects official accuracy only if it becomes the selected canonical' /tmp/app.js
           grep -qi '^cache-control:.*no-store' /tmp/ui-headers.txt
           ! grep -q 'automated-5dr-v1-20260919' /tmp/index.html
@@ -200,7 +200,7 @@ jobs:
           pres=r['presentation']
           assert pres['standard_table_count']==4, pres
           assert [pres[f'table_{i}'] for i in range(1,5)] == [
-            'EDGE_MASTER_ASSESSMENT','CURRENT_STOCK_OUTCOME','DRILLDOWN','ACTIVE_CALLS'
+            'EDGE_MASTER_ASSESSMENT','ACTIVE_CALLS','CURRENT_STOCK_OUTCOME','DRILLDOWN'
           ], pres
           m=r['master_assessment']
           assert 'official_scorable_recommendations' in m, m
@@ -225,9 +225,9 @@ jobs:
             -o /tmp/edge-live.js
           grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js
           grep -q '1 — EDGE MASTER ASSESSMENT' /tmp/edge-live.js
-          grep -q '2 — CURRENT STOCK OUTCOME' /tmp/edge-live.js
-          grep -q '3 — DRILL-DOWN' /tmp/edge-live.js
-          grep -q '4 — ACTIVE CALLS' /tmp/edge-live.js
+          grep -q '2 — ACTIVE CALLS' /tmp/edge-live.js
+          grep -q '3 — CURRENT STOCK OUTCOME' /tmp/edge-live.js
+          grep -q '4 — DRILL-DOWN' /tmp/edge-live.js
           grep -q 'edge-user-output' /tmp/edge-live.js
           grep -q 'Evidence confidence' /tmp/edge-live.js
           grep -q 'Outcome checks recorded' /tmp/edge-live.js
@@ -246,9 +246,9 @@ jobs:
           text=open('/tmp/edge-live.js',encoding='utf-8').read()
           positions=[text.index(x) for x in (
               '1 — EDGE MASTER ASSESSMENT',
-              '2 — CURRENT STOCK OUTCOME',
-              '3 — DRILL-DOWN',
-              '4 — ACTIVE CALLS',
+              '2 — ACTIVE CALLS',
+              '3 — CURRENT STOCK OUTCOME',
+              '4 — DRILL-DOWN',
           )]
           assert positions==sorted(positions), positions
           PY
