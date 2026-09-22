@@ -66,6 +66,20 @@ export function validate5drResult(result:unknown,requireReleaseCompleteness=fals
   if(!Array.isArray(result.tradeability_blockers))errors.push('result.tradeability_blockers must be an array');
   if(!['BUY_CE','BUY_PE','BUY_CONVEXITY','NO_TRADE'].includes(String(result.recommendation)))errors.push('result.recommendation must use frozen 5DR vocabulary');
   if(!isObject(result.tradeability_gate))errors.push('result.tradeability_gate is mandatory');
+  if(result.forecast_horizon!=='D+5')errors.push('result.forecast_horizon must be D+5');
+  if(!isObject(result.expected_nifty_zone))errors.push('result.expected_nifty_zone is mandatory');
+  else{
+    if(typeof result.expected_nifty_zone.low!=='number'||!Number.isFinite(result.expected_nifty_zone.low as number)||(result.expected_nifty_zone.low as number)<=0)errors.push('result.expected_nifty_zone.low must be positive');
+    if(typeof result.expected_nifty_zone.high!=='number'||!Number.isFinite(result.expected_nifty_zone.high as number)||(result.expected_nifty_zone.high as number)<=0)errors.push('result.expected_nifty_zone.high must be positive');
+    if(typeof result.expected_nifty_zone.low==='number'&&typeof result.expected_nifty_zone.high==='number'&&result.expected_nifty_zone.high<result.expected_nifty_zone.low)errors.push('result.expected_nifty_zone.high must be >= low');
+  }
+  if(!isObject(result.event_shock))errors.push('result.event_shock is mandatory');
+  else{
+    if(!['LOW','MODERATE','HIGH','EXTREME'].includes(String(result.event_shock.level)))errors.push('result.event_shock.level is invalid');
+    if(!['BULLISH','BEARISH','TWO_SIDED'].includes(String(result.event_shock.transmission)))errors.push('result.event_shock.transmission is invalid');
+    if(typeof result.event_shock.convexity_warranted!=='boolean')errors.push('result.event_shock.convexity_warranted must be boolean');
+    if(typeof result.event_shock.kill_switch!=='boolean')errors.push('result.event_shock.kill_switch must be boolean');
+  }
   if(!isObject(result.engine_diagnostics))errors.push('result.engine_diagnostics is mandatory');
   if(!isNonEmptyString(result.forecast_assessment))errors.push('result.forecast_assessment is mandatory');
   if(!isNonEmptyString(result.recommendation_assessment))errors.push('result.recommendation_assessment is mandatory');
