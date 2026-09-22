@@ -24,26 +24,26 @@ export function validate5drResult(result:unknown,requireReleaseCompleteness=fals
   if(!isObject(horizons))errors.push('result.horizon_slots must be an object');
   else for(const horizon of requiredHorizons){
     const slot=horizons[horizon];
-    if(!isObject(slot)){errors.push(\`result.horizon_slots.\${horizon} must be a complete object\`);continue}
+    if(!isObject(slot)){errors.push(`result.horizon_slots.${horizon} must be a complete object`);continue}
     const direction=String(slot.direction??'');
-    if(!['BULLISH','RANGE','BEARISH'].includes(direction))errors.push(\`result.horizon_slots.\${horizon}.direction is invalid\`);
+    if(!['BULLISH','RANGE','BEARISH'].includes(direction))errors.push(`result.horizon_slots.${horizon}.direction is invalid`);
     const probs=slot.probabilities;
-    if(!isObject(probs))errors.push(\`result.horizon_slots.\${horizon}.probabilities must contain BULL/RANGE/BEAR\`);
+    if(!isObject(probs))errors.push(`result.horizon_slots.${horizon}.probabilities must contain BULL/RANGE/BEAR`);
     else{
       const keys=['BULL','RANGE','BEAR'];
-      for(const key of keys)if(typeof probs[key]!=='number'||!Number.isFinite(probs[key] as number)||(probs[key] as number)<0||(probs[key] as number)>100)errors.push(\`result.horizon_slots.\${horizon}.probabilities.\${key} must be 0-100\`);
+      for(const key of keys)if(typeof probs[key]!=='number'||!Number.isFinite(probs[key] as number)||(probs[key] as number)<0||(probs[key] as number)>100)errors.push(`result.horizon_slots.${horizon}.probabilities.${key} must be 0-100`);
       if(keys.every(key=>typeof probs[key]==='number'&&Number.isFinite(probs[key] as number))){
         const sum=keys.reduce((acc,key)=>acc+Number(probs[key]),0);
-        if(Math.abs(sum-100)>0.02)errors.push(\`result.horizon_slots.\${horizon}.probabilities must sum to 100\`);
+        if(Math.abs(sum-100)>0.02)errors.push(`result.horizon_slots.${horizon}.probabilities must sum to 100`);
         const selected=direction==='BULLISH'?'BULL':direction==='BEARISH'?'BEAR':'RANGE';
         const max=Math.max(...keys.map(key=>Number(probs[key])));
-        if(Math.abs(Number(probs[selected])-max)>0.02)errors.push(\`result.horizon_slots.\${horizon}.direction must match highest scenario probability\`);
+        if(Math.abs(Number(probs[selected])-max)>0.02)errors.push(`result.horizon_slots.${horizon}.direction must match highest scenario probability`);
       }
     }
-    if(typeof slot.zone_low!=='number'||!Number.isFinite(slot.zone_low as number)||(slot.zone_low as number)<=0)errors.push(\`result.horizon_slots.\${horizon}.zone_low must be positive\`);
-    if(typeof slot.zone_high!=='number'||!Number.isFinite(slot.zone_high as number)||(slot.zone_high as number)<=0)errors.push(\`result.horizon_slots.\${horizon}.zone_high must be positive\`);
-    if(typeof slot.zone_low==='number'&&typeof slot.zone_high==='number'&&slot.zone_high<slot.zone_low)errors.push(\`result.horizon_slots.\${horizon}.zone_high must be >= zone_low\`);
-    if(!isNonEmptyString(slot.basis))errors.push(\`result.horizon_slots.\${horizon}.basis is mandatory\`);
+    if(typeof slot.zone_low!=='number'||!Number.isFinite(slot.zone_low as number)||(slot.zone_low as number)<=0)errors.push(`result.horizon_slots.${horizon}.zone_low must be positive`);
+    if(typeof slot.zone_high!=='number'||!Number.isFinite(slot.zone_high as number)||(slot.zone_high as number)<=0)errors.push(`result.horizon_slots.${horizon}.zone_high must be positive`);
+    if(typeof slot.zone_low==='number'&&typeof slot.zone_high==='number'&&slot.zone_high<slot.zone_low)errors.push(`result.horizon_slots.${horizon}.zone_high must be >= zone_low`);
+    if(!isNonEmptyString(slot.basis))errors.push(`result.horizon_slots.${horizon}.basis is mandatory`);
   }
 
   if(typeof result.des5!=='number'||!Number.isFinite(result.des5))errors.push('result.des5 must be a finite number');
@@ -54,7 +54,7 @@ export function validate5drResult(result:unknown,requireReleaseCompleteness=fals
   if(!isObject(result.probabilities))errors.push('result.probabilities must be an object');
   else{
     const keys=['BULL','RANGE','BEAR'];
-    for(const label of keys)if(typeof result.probabilities[label]!=='number'||!Number.isFinite(result.probabilities[label] as number))errors.push(\`result.probabilities.\${label} must be a finite number\`);
+    for(const label of keys)if(typeof result.probabilities[label]!=='number'||!Number.isFinite(result.probabilities[label] as number))errors.push(`result.probabilities.${label} must be a finite number`);
     if(keys.every(key=>typeof result.probabilities[key]==='number'&&Number.isFinite(result.probabilities[key] as number))){
       const sum=keys.reduce((acc,key)=>acc+Number(result.probabilities[key]),0);
       if(Math.abs(sum-100)>0.02)errors.push('result.probabilities must sum to 100');
