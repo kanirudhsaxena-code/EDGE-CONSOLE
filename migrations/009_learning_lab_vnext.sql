@@ -119,6 +119,6 @@ CREATE INDEX IF NOT EXISTS learning_approval_events_vnext_candidate_idx
   ON learning_approval_events_vnext(candidate_id, decided_at DESC);
 
 COMMENT ON TABLE learning_observations_vnext IS 'Immutable VNext Learning Lab evidence. Not an official efficacy population by itself.';
-COMMENT ON TABLE learning_daily_snapshots_vnext IS 'Immutable daily Learning Lab read model; production forecast release is independent.';
-COMMENT ON TABLE learning_candidates_vnext IS 'Governed challenger candidates; records cannot authorize production mutation.';
+COMMENT ON TABLE learning_daily_snapshots_vnext IS 'Immutable daily Learning Lab read model, production forecast release is independent.';
+COMMENT ON TABLE learning_candidates_vnext IS 'Governed challenger candidates, records cannot authorize production mutation.';
 COMMENT ON TABLE learning_approval_events_vnext IS 'User governance decisions. APPROVE authorizes build/validation only, not production promotion.';
