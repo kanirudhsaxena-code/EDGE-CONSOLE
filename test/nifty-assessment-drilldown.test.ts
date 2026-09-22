@@ -116,10 +116,10 @@ test('5DR assessment import uses governed 5DR route family',()=>{
   assert.ok(!workflow.includes('/api/assessment-import'));
 });
 
-test('production smoke waits for v18 legacy-canonical UI before validation',()=>{
+test('production smoke waits for v19 D-through-D+4 UI before validation',()=>{
   const workflow=readFileSync('.github/workflows/edge-production-smoke.yml','utf8');
   assert.ok(workflow.includes('Official canonical status'));
-  assert.ok(workflow.includes('edge-ui-v18-20260922'));
+  assert.ok(workflow.includes('edge-ui-v19-20260922'));
   assert.ok(workflow.includes('/tmp/deployed-index.html'));
 });
 
