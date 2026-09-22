@@ -280,14 +280,16 @@ export function renderEdgeV13(report){
     '<div class="action-box"><span>Suggested action</span><strong>'+esc(userActionText(d))+'</strong></div>'+
     executionCard(d)+
     '<details class="change-details"><summary>What could change the view?</summary><ul>'+(changeItems.length?changeItems.map(x=>'<li>'+esc(x)+'</li>').join(''):'<li>No material change condition was published.</li>')+'</ul></details>'+
-    '<details class="edge-advanced-details"><summary>Advanced decision details</summary><div class="edge-user-grid compact">'+
-      metricCard('Internal direction score',num(d.des,2),'Technical audit score (DES): negative leans bearish, positive leans bullish. It is not a recommendation by itself.')+
-      metricCard('Signals pointing the same way',pct(d.directional_agreement),'How much the underlying evidence agrees on direction. Higher agreement means fewer conflicting signals.')+
-      metricCard('Overall conviction after checks',pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100),'Final strength after evidence quality and risk checks are applied.')+
-      metricCard('Extra safety block',d.risk_override?.status==='ACTIVE'?('Active · '+human(d.risk_override.code||'—')):'None','An active safety block can prevent a trade even when the directional view looks attractive.')+
-      metricCard('Decision stage',human(d.decision_ladder||'—'),'Where the setup currently sits in the governed decision process.')+
-      metricCard('Trade-quality grade',num(d.bot?.score,1)+' · '+human(d.bot?.grade||'—'),'Internal BOT grade retained for audit; the user-facing action above remains the decision to follow.')+
-    '</div></details>'+
+    '<details class="edge-advanced-details" open><summary>Metric breakdown & legends</summary><div class="edge-user-grid compact">'+
+      metricCard('DES · Directional Evidence Score',num(d.des,2),'−100 to +100 evidence balance. It is direction, not probability or a recommendation.')+
+      metricCard('Market Trust',num(d.market_trust?.score,1)+'/100 · '+human(d.market_trust?.band||'—'),'Confidence in evidence quality, freshness, completeness, agreement and market confirmation.')+
+      metricCard('Directional Agreement',pct(d.directional_agreement),'Coherence of positive versus negative weighted evidence.')+
+      metricCard('Effective Conviction',pct(d.effective_conviction==null?null:Number(d.effective_conviction)*100),'|DES| × Market Trust after normalization.')+
+      metricCard('BOT Hunter',num(d.bot?.score,1)+' · '+human(d.bot?.grade||'—'),'Opportunity quality. A++ ≥90 · A+ ≥80 · A ≥70 · B ≥60 · C <60.')+
+      metricCard('Decision Ladder',ladderMeaning(d.decision_ladder),'Governed capital-commitment classification; it does not force deployment.')+
+      metricCard('Risk Override',d.risk_override?.status==='ACTIVE'?('Active · '+human(d.risk_override.code||'—')):'Clear','O1/O2/O3 or hard evidence gates can override normal arithmetic.')+
+      metricCard('Execution Quality',ex.execution_quality_score==null?'Not executable':num(ex.execution_quality_score,1)+'/100 · '+human(ex.execution_quality_level||'—'),'Entry / stop / targets / risk structure quality.')+
+    '</div>'+trustBreakdown(d)+botBreakdown(d)+edgeStockLegends()+'</details>'+
   '</section>';
 
   const drillCards=drill.length?drill.map(row=>{
@@ -295,10 +297,14 @@ export function renderEdgeV13(report){
     const outcome=scoreText(row.score_or_level);
     const finding=drillFinding(row);
     const meaning=componentMeaning(row.component);
+    const weight=row.normalized_weight??row.original_weight;
+    const contribution=row.weighted_contribution;
     return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(componentDisplayName(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(outcome)+'</span></div>'+
-      '<div class="edge-explanation-block"><span>FINDING</span><p>'+esc(finding)+'</p></div>'+
-      '<div class="edge-explanation-block"><span>WHY IT MATTERS</span><p>'+esc(meaning)+'</p></div>'+
-      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified':'Evidence limited')+'</span></div></div>';
+      '<div class="edge-drill-metrics"><span>Raw score <b>'+esc(row.score_or_level??'N/A')+'</b></span><span>Original weight <b>'+esc(row.original_weight==null?'—':num(row.original_weight,1)+'%')+'</b></span><span>Used weight <b>'+esc(weight==null?'—':num(weight,1)+'%')+'</b></span><span>Contribution <b>'+esc(contribution==null?'—':num(contribution,2))+'</b></span></div>'+
+      '<div class="edge-explanation-block"><span>WHAT WE SAW</span><p>'+esc(finding)+'</p></div>'+
+      '<div class="edge-explanation-block"><span>WHAT IT MEANS</span><p>'+esc(row.interpretation||'No evidence-grounded interpretation was persisted.')+'</p></div>'+
+      '<div class="edge-explanation-block"><span>WHY IT MATTERS NOW</span><p>'+esc(meaning)+'</p></div>'+
+      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified · '+human(row.evidence_quality||'—'):'Evidence limited')+'</span>'+(row.conflict_flag?'<span class="evidence-chip limited">Material conflict</span>':'')+'</div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
   const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>4 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
