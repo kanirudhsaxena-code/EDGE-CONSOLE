@@ -22,9 +22,9 @@ test('capture selectors are owned by the current Console',()=>{
   assert.match(app,/Today’s Market View/);
   assert.match(app,/ASSESSMENT · TILL DATE/);
   assert.match(stocks,/1 — EDGE MASTER ASSESSMENT/);
-  assert.match(stocks,/2 — CURRENT STOCK OUTCOME/);
-  assert.match(stocks,/3 — DRILL-DOWN/);
-  assert.match(stocks,/4 — ACTIVE CALLS/);
+  assert.match(stocks,/2 — ACTIVE CALLS/);
+  assert.match(stocks,/3 — CURRENT STOCK OUTCOME/);
+  assert.match(stocks,/4 — DRILL-DOWN/);
 });
 
 test('governed Chat workflow fails closed unless live Console sections are captured',()=>{
