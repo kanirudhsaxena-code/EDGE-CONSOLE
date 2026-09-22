@@ -31,7 +31,10 @@ test('ChatGPT dispatch workflow transports a governed research bundle, not a tic
 
 test('EDGE Stocks pre-open canonical workflow is redundant and research-fail-closed',()=>{
   const y=fs.readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
-  assert.match(y,/cron: '10,20,25 3 \* \* 1-5'/);
+  assert.match(y,/cron: '55 2 \\* \\* 1-5'/);
+  assert.match(y,/cron: '20,25 3 \\* \\* 1-5'/);
+  assert.match(y,/warmup=now\.replace\(hour=8,minute=40/);
+  assert.match(y,/cutoff=now\.replace\(hour=8,minute=55/);
   assert.match(y,/api\/edge-stocks\/canonical-targets/);
   assert.match(y,/canonical_attempt/);
   assert.match(y,/EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED/);
