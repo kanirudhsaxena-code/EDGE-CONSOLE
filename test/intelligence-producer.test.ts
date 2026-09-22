@@ -11,14 +11,14 @@ const judgment:IntelligenceJudgment={
     MACRO_CATALYSTS:{global_risk_environment:0,india_macro_rbi_inr_rates:1,crude_commodities_geopolitics:-1,scheduled_high_impact_catalysts:0}
   },
   market_trust_inputs:{price_confirmation:70,pvpo_confirmation:65,participation_confirmation:55,cross_engine_consistency:65,closing_confirmation:70,evidence_freshness_completeness:90},
-  event_shock:'LOW',execution_inputs:{rr_score:80,premium_iv_theta_score:70,strike_expiry_fit_score:75,liquidity_spread_score:85,entry_invalidation_score:75},
+  event_shock:'LOW',event_shock_transmission:'TWO_SIDED',convexity_warranted:false,execution_inputs:{rr_score:80,premium_iv_theta_score:70,strike_expiry_fit_score:75,liquidity_spread_score:85,entry_invalidation_score:75},
   data_adequate:true,expected_rr:2.5,horizon_slots:{
-    'D+1':{direction:'BULLISH',probability:58,zone_low:23000,zone_high:23300,basis:'Price structure'},
-    'D+2':{direction:'BULLISH',probability:57,zone_low:22950,zone_high:23400,basis:'Price structure'},
-    'D+3':{direction:'RANGE',probability:55,zone_low:22900,zone_high:23450,basis:'Mixed confirmation'},
-    'D+4':{direction:'RANGE',probability:54,zone_low:22850,zone_high:23500,basis:'Mixed confirmation'},
-    'D+5':{direction:'RANGE',probability:53,zone_low:22800,zone_high:23550,basis:'Wider uncertainty'}
-  },limitations:[]
+  'D+1':{direction:'BULLISH',probabilities:{BULL:58,RANGE:30,BEAR:12},zone_low:23000,zone_high:23300,basis:'Price structure'},
+  'D+2':{direction:'BULLISH',probabilities:{BULL:57,RANGE:31,BEAR:12},zone_low:22950,zone_high:23400,basis:'Price structure'},
+  'D+3':{direction:'RANGE',probabilities:{BULL:25,RANGE:55,BEAR:20},zone_low:22900,zone_high:23450,basis:'Mixed confirmation'},
+  'D+4':{direction:'RANGE',probabilities:{BULL:25,RANGE:54,BEAR:21},zone_low:22850,zone_high:23500,basis:'Mixed confirmation'},
+  'D+5':{direction:'RANGE',probabilities:{BULL:25,RANGE:53,BEAR:22},zone_low:22800,zone_high:23550,basis:'Wider uncertainty'}
+},limitations:[]
 };
 
 test('deterministically applies frozen internal directional weights',()=>{
@@ -82,4 +82,12 @@ test('remains fail closed if primary and fallback inference are both unavailable
   assert.equal(result.judgment,null);
   assert.equal(result.normalized,null);
   assert.ok(result.errors[0].includes('all governed intelligence inference models unavailable'));
+});
+
+
+test('rejects obsolete single-probability daily forecast shape',()=>{
+  const legacy={...judgment,horizon_slots:{...judgment.horizon_slots,'D+5':{direction:'BULLISH',probability:35,zone_low:23000,zone_high:23600,basis:'obsolete'}}};
+  const result=validateIntelligenceJudgment(legacy,new Set(judgment.source_refs));
+  assert.equal(result.judgment,null);
+  assert.ok(result.errors.some(error=>error.includes('D+5')&&error.includes('probabilities')));
 });
