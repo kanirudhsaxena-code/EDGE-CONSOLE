@@ -127,6 +127,28 @@ async function saveNormalizedEvidence(request: Request, env: Env, requestId: str
   return json({ ok: executable, request_id: requestId, normalized_items: evidence.length, adapter_stage: metadata.adapter_stage, blockers: assessment, next_step: executable ? 'Execute governed 5DR runner' : 'Supply missing or resolve conflicting normalized inputs' }, executable ? 200 : 409);
 }
 
+async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonRecord;predecessor:JsonRecord|null}|null>{
+  const assessmentRows=await sql\`select source_id,assessed_at,headline,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1\`;
+  if(!assessmentRows.length||!isObject(assessmentRows[0].metrics))return null;
+  const metrics=assessmentRows[0].metrics as JsonRecord;
+  const day=isObject(metrics.day_metrics)?metrics.day_metrics as JsonRecord:{};
+  const labels=['D','D+1','D+2','D+3','D+4'];
+  const ledger=Array.isArray(metrics.recommendation_ledger)?metrics.recommendation_ledger:[];
+  const expectedCount=Number(metrics.all_recommendations_count??ledger.length);
+  const snapshotComplete=metrics.assessment_snapshot_complete===true&&labels.every(label=>isObject(day[label]));
+  const ledgerComplete=metrics.recommendation_ledger_complete===true&&ledger.length===expectedCount;
+  if(!snapshotComplete||!ledgerComplete)return null;
+  const assessedAt=String(assessmentRows[0].assessed_at||'');
+  if(!assessedAt||Number.isNaN(Date.parse(assessedAt)))return null;
+  const ageMs=Date.now()-Date.parse(assessedAt);
+  if(ageMs < -5*60_000||ageMs > 24*60*60_000)return null;
+  const predecessorRows=await sql\`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true and status='SUCCESS' order by generated_at desc limit 1\`;
+  const predecessor=predecessorRows.length&&isObject(predecessorRows[0].result)
+    ? {run_id:String(predecessorRows[0].run_id),generated_at:predecessorRows[0].generated_at,result:predecessorRows[0].result as JsonRecord}
+    : null;
+  return {assessment_context:{source_id:String(assessmentRows[0].source_id),assessed_at:assessedAt,headline:isNonEmptyString(assessmentRows[0].headline)?String(assessmentRows[0].headline):null,snapshot_complete:true,recommendation_ledger_complete:true,metrics},predecessor};
+}
+
 async function executionPacket(env: Env, requestId: string): Promise<Response> {
   if (!env.DATABASE_URL) return json({ error: 'Database is not configured' }, 503);
   const sql = neon(env.DATABASE_URL);
@@ -135,7 +157,9 @@ async function executionPacket(env: Env, requestId: string): Promise<Response> {
   if (!['READY_FOR_ENGINE', 'PROCESSING'].includes(String(rows[0].status))) return json({ error: 'request_id is not eligible for execution' }, 409);
   const metadata = isObject(rows[0].metadata) ? rows[0].metadata as JsonRecord : {};
   if (metadata.adapter_stage !== 'NORMALIZED_READY' || !Array.isArray(metadata.normalized_evidence) || !metadata.normalized_evidence.length) return json({ error: 'request is not normalization-ready', blockers: metadata.normalization_assessment ?? null, next_step: 'Complete normalized evidence before execution' }, 409);
-  return json({ request_id: String(rows[0].request_id), provenance_mode: String(rows[0].provenance_mode), framework_version: String(rows[0].framework_version), output_contract_version: String(rows[0].output_contract_version), evidence: metadata.normalized_evidence });
+  const context=await fiveDrExecutionContext(sql);
+  if(!context)return json({error:'5DR assessment-first release gate blocked: canonical assessment snapshot or recommendation ledger is missing/incomplete/stale',next_step:'Run canonical lifecycle assessment handoff before engine execution'},409);
+  return json({ request_id: String(rows[0].request_id), provenance_mode: String(rows[0].provenance_mode), framework_version: String(rows[0].framework_version), output_contract_version: String(rows[0].output_contract_version), evidence: metadata.normalized_evidence, ...context });
 }
 
 async function failRequest(request: Request, env: Env, requestId: string): Promise<Response> {
