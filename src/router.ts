@@ -678,7 +678,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       component.includes('EVENT_SHOCK') ? 'Event-risk evidence is therefore affecting the risk overlay rather than creating direction by itself.' :
       component.includes('CHART_PATTERN') ? 'The active chart-pattern signal is therefore contributing to the near-term setup.' :
       'This governed component is contributing to the overall EDGE direction and conviction.';
-    return `Legacy active run: the original narrative field was not persisted. The immutable verified component score is ${Number.isFinite(score) ? score.toFixed(0) : 'N/A'} (${tone}); ${consequence}`;
+    return 'Legacy active run: the original narrative field was not persisted. The immutable verified component score is '+(Number.isFinite(score) ? score.toFixed(0) : 'N/A')+' ('+tone+'); '+consequence;
   };
   const componentKey = (value: unknown): string => String(value || '').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
   const researchFinding = (componentRaw: unknown): string | undefined => {
