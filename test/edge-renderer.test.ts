@@ -41,15 +41,15 @@ const report = {
   },
   active_calls:[{ticker:'TCS',recommendation_id:'EDGE-TCS-X',call_timestamp:'2026-09-17T11:15:00Z',definitive_forecast:'BASE_RANGE',definitive_recommendation:'NO TRADE; NO OPTION TRADE.',expected_price_zone:{low:3000,high:3200},outcome_verdict:'OPEN'}],
   current_stock_outcome:{
-    des:-30,market_trust:{score:92,band:'VERY HIGH'},directional_agreement:80,effective_conviction:.276,
+    des:-30,market_trust:{score:92,band:'VERY HIGH',subscores:{evidence_quality:95,freshness:100,completeness:90,directional_agreement:80,market_confirmation:95},weights:{evidence_quality:30,freshness:20,completeness:15,directional_agreement:20,market_confirmation:15}},directional_agreement:80,effective_conviction:.276,
     probabilities:{bull:5,base:60,bear:35},definitive_forecast:'BASE_RANGE',expected_price_zone:{low:3000,high:3200},
     forecast_horizon:'D+5',risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
-    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B'},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
+    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B',subscores:{forecast_edge:55,market_trust:92,structure_pattern_quality:60,pv_pvpo_confirmation:55,catalyst_asymmetry:50,execution_quality:60},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
   },
   drilldown:[
-    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
-    {component:'PV_PVPO',score_or_level:-1,verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
-    {component:'VALUATION',score_or_level:'N/A',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
+    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,original_weight:10,normalized_weight:11.1,weighted_contribution:5.55,evidence_quality:'HIGH',conflict_flag:false,finding:'Verified fundamentals evidence was positive.',verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
+    {component:'PV_PVPO',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:true,finding:'Price and participation weakened.',verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
+    {component:'VALUATION',score_or_level:'N/A',original_weight:7,normalized_weight:null,weighted_contribution:null,evidence_quality:'NOT_VERIFIED',conflict_flag:false,finding:'Verified valuation evidence was unavailable.',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
   ]
 };
 
