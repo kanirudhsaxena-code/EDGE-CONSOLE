@@ -27,34 +27,33 @@ jobs:
           test -n "$CF_ACCESS_CLIENT_ID"
           test -n "$CF_ACCESS_CLIENT_SECRET"
           python - <<'PY'
-          import json, os, time, urllib.parse, urllib.request, urllib.error
+          import json, os, time, urllib.parse, subprocess
           from datetime import datetime
           from zoneinfo import ZoneInfo
 
           IST=ZoneInfo("Asia/Kolkata")
           base=os.environ["CONSOLE_URL"].rstrip("/")
-          headers={
-              "Content-Type":"application/json",
-              "Accept":"application/json",
-              "CF-Access-Client-Id":os.environ["CF_ACCESS_CLIENT_ID"],
-              "CF-Access-Client-Secret":os.environ["CF_ACCESS_CLIENT_SECRET"],
-          }
-
           def request_json(url,method="GET",payload=None):
-              req=urllib.request.Request(
-                  url,
-                  data=None if payload is None else json.dumps(payload).encode("utf-8"),
-                  headers=headers,
-                  method=method,
-              )
-              try:
-                  with urllib.request.urlopen(req,timeout=30) as response:
-                      return response.status,json.loads(response.read().decode("utf-8"))
-              except urllib.error.HTTPError as exc:
-                  raw=exc.read().decode("utf-8","replace")
-                  try: body=json.loads(raw)
-                  except Exception: body={"error":raw[:1000]}
-                  return exc.code,body
+              args=[
+                  "curl","--location","--silent","--show-error",
+                  "-H","Content-Type: application/json",
+                  "-H","Accept: application/json",
+                  "-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                  "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",
+                  "-X",method,
+                  "-w","\\n%{http_code}",
+              ]
+              if payload is not None:
+                  args += ["--data-binary",json.dumps(payload,separators=(",",":"))]
+              args.append(url)
+              proc=subprocess.run(args,text=True,capture_output=True)
+              raw=proc.stdout or ""
+              body_text,_,code_text=raw.rpartition("\n")
+              try: code=int(code_text.strip())
+              except Exception: code=0
+              try: body=json.loads(body_text) if body_text.strip() else {}
+              except Exception: body={"error":body_text[:1000] or proc.stderr[:1000]}
+              return code,body
 
           status,targets_payload=request_json(base+"/api/edge-stocks/canonical-targets")
           if status!=200:
