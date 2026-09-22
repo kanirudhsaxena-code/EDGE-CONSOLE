@@ -3,7 +3,8 @@ name: EDGE NIFTY Pre-open Canonical Attempts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '10,20,25 3 * * 1-5'
+    - cron: '55 2 * * 1-5'
+    - cron: '20,25 3 * * 1-5'
 
 permissions:
   contents: read
@@ -48,7 +49,18 @@ jobs:
               if proc.returncode!=0:
                   raise RuntimeError((proc.stderr or proc.stdout or "curl transport failed").strip())
               return json.loads(proc.stdout)
-          now=datetime.now(ZoneInfo("Asia/Kolkata"))
+          IST=ZoneInfo("Asia/Kolkata")
+          now=datetime.now(IST)
+          warmup=now.replace(hour=8,minute=40,second=0,microsecond=0)
+          cutoff=now.replace(hour=8,minute=55,second=59,microsecond=999999)
+          if now < warmup:
+              sleep_seconds=(warmup-now).total_seconds()
+              print(f"prewarm_wait_seconds={int(sleep_seconds)}")
+              time.sleep(sleep_seconds)
+              now=datetime.now(IST)
+          if now > cutoff:
+              print(f"PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW actual={now.isoformat()}")
+              raise SystemExit(0)
           slot=now.strftime("%H:%M")
           body={
               "force_new":True,
