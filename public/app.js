@@ -314,7 +314,7 @@ function assessmentDayCell(label,day,zone,rec){
   }else if(scorable===0){
     forecastHtml='<div class="scorecard-pending"><span>Forecast</span><b>Matured · not scorable</b><small>0/'+eligible+' scorable · frozen day-path context missing</small></div>';
   }else{
-    forecastHtml='<div><span>Direction</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' scorable</small></div><div><span>Zone</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div>'+(missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen day-path context missing</small></div>':'');
+    forecastHtml='<div><span>Directional accuracy</span><b>'+pct(dirPct)+'</b><small>'+hits+'/'+scorable+' correct · '+scorable+'/'+eligible+' scorable</small></div><div><span>Zone hit rate</span><b>'+pct(zonePct)+'</b><small>'+zoneHits+'/'+zoneScorable+' hits · coverage '+pct(coverage)+'</small></div><div><span>Average directional margin</span><b>'+(d.avg_directional_margin_points==null?'—':escapeHtml(Number(d.avg_directional_margin_points).toFixed(1))+' pts')+'</b><small>Signed NIFTY-point margin in favour of the frozen forecast.</small></div><div><span>Average zone error</span><b>'+(d.avg_zone_error_points==null?'—':escapeHtml(Number(d.avg_zone_error_points).toFixed(1))+' pts')+'</b><small>Average distance from the nearest frozen zone boundary when missed.</small></div>'+(missing?'<div class="scorecard-pending"><span>Data completeness</span><b>'+missing+' matured unscorable</b><small>Historical frozen day-path context missing</small></div>':'');
   }
   const recHtml=resolved?'<div><span>Recommendation hit rate</span><b>'+pct(recPct)+'</b><small>'+recHits+'/'+resolved+' hits · '+recMisses+' miss'+(recMisses===1?'':'es')+'</small></div><div><span>Gain / loss</span><b>'+pct(r.overall_pnl_pct)+'</b><small>Hits '+pct(r.hit_pnl_pct)+' · Misses '+pct(r.miss_pnl_pct)+'</small></div>':'<div><span>Recommendation hit rate</span><b>—</b><small>No recommendation resolved on this horizon</small></div><div><span>Gain / loss</span><b>—</b><small>No realized P/L on this horizon</small></div>';
   return '<div class="scorecard-day"><strong>'+escapeHtml(label)+'</strong>'+forecastHtml+recHtml+'</div>'
@@ -324,12 +324,17 @@ function pendingForecastDayCell(label,slot){
   const has=slot&&typeof slot==='object'&&Object.keys(slot).length>0;
   if(!has)return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+'</strong><div class="scorecard-pending"><span>Day-specific forecast</span><b>Not verified</b><small>No evidence-supported day-specific direction/range was stored for this slot.</small></div></div>';
   const direction=slotValue(slot,['direction','bias','directional_label','forecast']);
-  const probability=slotValue(slot,['probability','direction_probability','confidence']);
+  const probs=slot.probabilities&&typeof slot.probabilities==='object'?slot.probabilities:null;
+  const legacyProbability=slotValue(slot,['probability','direction_probability','confidence']);
   const low=slotValue(slot,['zone_low','range_low','expected_zone_low','low']);
   const high=slotValue(slot,['zone_high','range_high','expected_zone_high','high']);
+  const basis=slotValue(slot,['basis','evidence_basis']);
   const date=slotValue(slot,['trading_date','date','target_date']);
   const zoneText=(low!=null||high!=null)?((low??'—')+' – '+(high??'—')):'Not verified';
-  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b><small>'+(probability!=null?escapeHtml(probability)+'% probability':'No slot probability stored')+'</small></div><div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div></div>'
+  const probabilityHtml=probs
+    ?'<div class="day-probability-row"><span class="bull">Bull <b>'+escapeHtml(probs.BULL??'—')+'%</b></span><span class="range">Range <b>'+escapeHtml(probs.RANGE??'—')+'%</b></span><span class="bear">Bear <b>'+escapeHtml(probs.BEAR??'—')+'%</b></span></div>'
+    :(legacyProbability!=null?'<div class="legacy-probability-warning"><b>LEGACY PROBABILITY INCOMPLETE</b><small>Only the historical selected-scenario confidence ('+escapeHtml(legacyProbability)+'%) was stored. Bull/Range/Bear were not persisted and are not reconstructed or used for three-class calibration.</small></div>':'<div class="legacy-probability-warning"><b>Probability vector not verified</b><small>This slot cannot enter three-class probability calibration.</small></div>');
+  return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Selected direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b></div>'+probabilityHtml+'<div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div><div><span>Evidence basis</span><b>'+escapeHtml(basis||'Not preserved')+'</b><small>'+(basis?'Why this day-level path was selected.':'Legacy or incomplete slot; no basis is invented.')+'</small></div></div>'
 }
 const CANONICAL_HORIZON_DISPLAY=[
   {label:'D',internal:'D+1'},
