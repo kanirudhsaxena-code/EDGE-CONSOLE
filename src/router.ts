@@ -501,9 +501,12 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
 
   const activeRows = await sql`
     select r.*, l.expiry_trading_date, p.current_price, p.current_return_pct, p.outcome_verdict,
-           mt.directional_agreement_score,
+           mt.evidence_quality_score, mt.freshness_score, mt.completeness_score,
+           mt.directional_agreement_score, mt.market_confirmation_score,
            coalesce(mt.market_trust_score, r.market_trust_score) as resolved_market_trust_score,
            coalesce(mt.market_trust_band, r.market_trust_band) as resolved_market_trust_band,
+           b.forecast_edge, b.market_trust as bot_market_trust, b.structure_pattern_quality,
+           b.pv_pvpo_confirmation, b.catalyst_asymmetry, b.execution_quality as bot_execution_quality,
            coalesce(b.bot_score, r.bot_score) as resolved_bot_score,
            coalesce(b.bot_grade, r.bot_grade) as resolved_bot_grade,
            coalesce(b.decision_ladder, r.decision_ladder) as resolved_decision_ladder,
@@ -575,7 +578,8 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     }
   }
   const componentRows = await sql`
-    select component, raw_score, evidence_quality, availability_status, conflict_flag, notes
+    select component, original_weight, raw_score, normalized_direction, evidence_quality,
+           availability_status, normalized_weight, weighted_contribution, conflict_flag, gate_override_flag, notes
       from component_scores
      where recommendation_id = ${String(active.recommendation_id)}
      order by component
@@ -721,7 +725,14 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     return {
       component: String(row.component),
       score_or_level: row.raw_score ?? 'N/A',
+      original_weight: numberOrNull(row.original_weight),
+      normalized_direction: numberOrNull(row.normalized_direction),
+      normalized_weight: numberOrNull(row.normalized_weight),
+      weighted_contribution: numberOrNull(row.weighted_contribution),
+      evidence_quality: row.evidence_quality ?? 'NOT_VERIFIED',
       verification_status: verification,
+      conflict_flag: row.conflict_flag === true,
+      gate_override_flag: row.gate_override_flag ?? null,
       key_outcome: keyOutcome,
       finding: plainFinding(row.component,row.raw_score,verification,notes),
       interpretation,
@@ -768,9 +779,9 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     presentation: {
       standard_table_count: 4,
       table_1: 'EDGE_MASTER_ASSESSMENT',
-      table_2: 'CURRENT_STOCK_OUTCOME',
-      table_3: 'DRILLDOWN',
-      table_4: 'ACTIVE_CALLS'
+      table_2: 'ACTIVE_CALLS',
+      table_3: 'CURRENT_STOCK_OUTCOME',
+      table_4: 'DRILLDOWN'
     },
     master_assessment: {
       recommendations: integerOrZero(master.recommendations),
@@ -839,7 +850,17 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     })),
     current_stock_outcome: {
       des,
-      market_trust: { score: marketTrust, band: marketTrustBand },
+      market_trust: {
+        score: marketTrust,
+        band: marketTrustBand,
+        subscores: {
+          evidence_quality: numberOrNull(active.evidence_quality_score),
+          freshness: numberOrNull(active.freshness_score),
+          completeness: numberOrNull(active.completeness_score),
+          directional_agreement: directionalAgreement,
+          market_confirmation: numberOrNull(active.market_confirmation_score)
+        }
+      },
       directional_agreement: directionalAgreement,
       effective_conviction: Number(effectiveConviction.toFixed(6)),
       probabilities: {
@@ -853,7 +874,18 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
       primary_action: primaryAction,
       decision_ladder: decisionLadder,
-      bot: { score: botScore, grade: botGrade },
+      bot: {
+        score: botScore,
+        grade: botGrade,
+        subscores: {
+          forecast_edge: numberOrNull(active.forecast_edge),
+          market_trust: numberOrNull(active.bot_market_trust),
+          structure_pattern_quality: numberOrNull(active.structure_pattern_quality),
+          pv_pvpo_confirmation: numberOrNull(active.pv_pvpo_confirmation),
+          catalyst_asymmetry: numberOrNull(active.catalyst_asymmetry),
+          execution_quality: numberOrNull(active.bot_execution_quality)
+        }
+      },
       execution: {
         instrument: active.instrument ?? 'NONE',
         entry_low: numberOrNull(active.entry_low),
