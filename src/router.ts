@@ -128,7 +128,7 @@ async function saveNormalizedEvidence(request: Request, env: Env, requestId: str
 }
 
 async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonRecord;predecessor:JsonRecord|null}|null>{
-  const assessmentRows=await sql\`select source_id,assessed_at,headline,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1\`;
+  const assessmentRows=await sql`select source_id,assessed_at,headline,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
   if(!assessmentRows.length||!isObject(assessmentRows[0].metrics))return null;
   const metrics=assessmentRows[0].metrics as JsonRecord;
   const day=isObject(metrics.day_metrics)?metrics.day_metrics as JsonRecord:{};
@@ -142,7 +142,7 @@ async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonR
   if(!assessedAt||Number.isNaN(Date.parse(assessedAt)))return null;
   const ageMs=Date.now()-Date.parse(assessedAt);
   if(ageMs < -5*60_000||ageMs > 24*60*60_000)return null;
-  const predecessorRows=await sql\`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true and status='SUCCESS' order by generated_at desc limit 1\`;
+  const predecessorRows=await sql`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true and status='SUCCESS' order by generated_at desc limit 1`;
   const predecessor=predecessorRows.length&&isObject(predecessorRows[0].result)
     ? {run_id:String(predecessorRows[0].run_id),generated_at:predecessorRows[0].generated_at,result:predecessorRows[0].result as JsonRecord}
     : null;
