@@ -77,8 +77,8 @@ test('drill-down uses finding, explanation and outcome without fabricating legac
   assert.ok(html.includes('WHAT IT MEANS'));
   assert.ok(html.includes('WHY IT MATTERS NOW'));
   assert.ok(!html.includes('<b>Outcome:</b>'));
-  assert.ok(html.includes('This older run preserved a verified component score of 1 (positive)'));
-  assert.ok(html.includes('did not preserve the detailed source narrative'));
+  assert.ok(html.includes('The verified historical score is available, but the original detailed interpretation was not persisted.'))
+  assert.ok(html.includes('No additional market fact is inferred.'))
   assert.ok(!html.includes('Legacy active run'));
   assert.ok(!html.includes('original narrative field was not persisted'));
   assert.ok(!html.includes('immutable verified component score'));
