@@ -106,6 +106,7 @@
         "horizon_slots",
         "recommendation_ledger_complete",
         "probabilities",
+        "definitive_forecast",
         "des5",
         "directional_label",
         "market_trust",
@@ -582,6 +583,13 @@
             }
           },
           "additionalProperties": false
+        },
+        "definitive_forecast": {
+          "enum": [
+            "BULLISH",
+            "RANGE",
+            "BEARISH"
+          ]
         }
       },
       "additionalProperties": true
