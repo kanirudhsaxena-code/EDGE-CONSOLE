@@ -32,7 +32,7 @@ test('pending historical forecasts and current five-day forecast are collapsed b
   const app=readFileSync('public/app.js','utf8');
   assert.ok(app.includes('<details class="pending-forecast-block pending-forecast-details">'));
   assert.ok(app.includes('function currentForecastDrilldown(result)'));
-  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary>'));
+  assert.ok(app.includes('<details class="current-forecast-details"><summary>5-day forecast — D through D+4 scenarios & range</summary>'));
   assert.ok(!app.includes('<details class="pending-forecast-block pending-forecast-details" open>'));
   assert.ok(!app.includes('<details class="current-forecast-details" open>'));
 });
@@ -171,4 +171,26 @@ test('NIFTY canonical horizon presentation maps internal five slots to D through
   assert.ok(app.includes("const labels=['D','D+1','D+2','D+3','D+4']"));
   assert.ok(app.includes('D is the canonical target trading session'));
   assert.ok(app.includes('assessmentMetricForDisplay'));
+});
+
+
+test('NIFTY current-run UI exposes master-spec metrics, legends and six trade gates',()=>{
+  const app=readFileSync('public/app.js','utf8');
+  for(const phrase of [
+    'DES5 · Direction strength',
+    'Market Trust · Evidence confidence',
+    'Execution Edge · Trade setup strength',
+    'SINGLE TRADEABILITY GATE',
+    'Forecast Assessment',
+    'Recommendation Assessment',
+    'Metric breakdown & legends',
+    'WHAT WE SAW',
+    'WHAT IT MEANS',
+    'WHY IT MATTERS NOW'
+  ]) assert.ok(app.includes(phrase),phrase);
+  for(const gate of ['Data adequate','Market Trust ≥ 50','|DES5| ≥ 30','Execution Edge ≥ 65','Kill Switch inactive','Expected R:R ≥ 2.0']) assert.ok(app.includes(gate),gate);
+  assert.ok(app.includes('result.definitive_forecast||result.directional_label'));
+  assert.ok(app.includes('Bull <b>'));
+  assert.ok(app.includes('Range <b>'));
+  assert.ok(app.includes('Bear <b>'));
 });
