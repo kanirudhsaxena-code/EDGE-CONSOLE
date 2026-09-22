@@ -331,26 +331,38 @@ function pendingForecastDayCell(label,slot){
   const zoneText=(low!=null||high!=null)?((low??'—')+' – '+(high??'—')):'Not verified';
   return '<div class="scorecard-day pending-forecast-day"><strong>'+escapeHtml(label)+(date?' · '+escapeHtml(new Date(date).toLocaleDateString('en-IN')):'')+'</strong><div><span>Direction</span><b>'+escapeHtml(direction?humanText(direction):'Not verified')+'</b><small>'+(probability!=null?escapeHtml(probability)+'% probability':'No slot probability stored')+'</small></div><div><span>Expected range / zone</span><b>'+escapeHtml(zoneText)+'</b><small>Only evidence-supported ranges are shown.</small></div></div>'
 }
+const CANONICAL_HORIZON_DISPLAY=[
+  {label:'D',internal:'D+1'},
+  {label:'D+1',internal:'D+2'},
+  {label:'D+2',internal:'D+3'},
+  {label:'D+3',internal:'D+4'},
+  {label:'D+4',internal:'D+5'}
+];
 function renderPendingForecasts(pending){
   const rows=Array.isArray(pending)?pending:[];
   if(!rows.length)return '<div class="scorecard-context"><p>No published forecasts are currently waiting for future assessment checkpoints.</p></div>';
   return rows.slice(0,5).map(run=>{
-    const probs=run.probabilities||{},slots=run.horizon_slots||{},labels=['D+1','D+2','D+3','D+4','D+5'];
+    const probs=run.probabilities||{},slots=run.horizon_slots||{};
     const title=(run.generated_at?runDateTime(run.generated_at):run.run_id||'Pending forecast')+' · '+friendlyDirection(run.directional_label);
-    return '<details class="pending-forecast-block pending-forecast-details"><summary>'+escapeHtml(title)+'</summary><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This operational run affects official accuracy only if it becomes the selected canonical and its governed checkpoints mature.</small></div><div class="scorecard-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></details>'
+    return '<details class="pending-forecast-block pending-forecast-details"><summary>'+escapeHtml(title)+'</summary><div class="scorecard-context"><span>Pending forecast</span><strong>'+escapeHtml(run.generated_at?runDateTime(run.generated_at):run.run_id||'—')+'</strong><p>'+escapeHtml(friendlyDirection(run.directional_label))+' · Up '+escapeHtml(probs.BULL??'—')+'% · Sideways '+escapeHtml(probs.RANGE??'—')+'% · Down '+escapeHtml(probs.BEAR??'—')+'%</p><small>Market Trust '+escapeHtml(run.market_trust??'—')+'/100 · '+(run.tradeable?'Tradeable':'No trade')+'. This operational run affects official accuracy only if it becomes the selected canonical and its governed checkpoints mature.</small></div><div class="scorecard-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
   }).join('')
 }
 function currentForecastDrilldown(result){
-  const slots=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots:{},labels=['D+1','D+2','D+3','D+4','D+5'];
-  const populated=labels.filter(label=>slots[label]&&typeof slots[label]==='object'&&Object.keys(slots[label]).length>0).length;
-  return '<details class="current-forecast-details"><summary>5-day forecast — day-wise direction & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>Direction and expected range/zone are shown for each trading-session horizon. Unverified fields are never guessed.</p></div><div class="scorecard-days current-forecast-days">'+labels.map(label=>pendingForecastDayCell(label,slots[label])).join('')+'</div></details>'
+  const slots=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots:{};
+  const populated=CANONICAL_HORIZON_DISPLAY.filter(h=>slots[h.internal]&&typeof slots[h.internal]==='object'&&Object.keys(slots[h.internal]).length>0).length;
+  return '<details class="current-forecast-details"><summary>5-day forecast — D through D+4 direction & range</summary><div class="scorecard-context"><span>Current run forecast path</span><strong>'+populated+'/5 day slots populated</strong><p>D is the canonical target trading session; D+1 through D+4 are the next four NSE sessions. Unverified fields are never guessed.</p></div><div class="scorecard-days current-forecast-days">'+CANONICAL_HORIZON_DISPLAY.map(h=>pendingForecastDayCell(h.label,slots[h.internal])).join('')+'</div></details>'
+}
+function assessmentMetricForDisplay(metrics,label,index){
+  const source=metrics&&typeof metrics==='object'?metrics:{};
+  if(Object.prototype.hasOwnProperty.call(source,'D'))return source[label];
+  return source['D+'+(index+1)];
 }
 function renderAssessmentDetails(details,pending){
-  const labels=['D+1','D+2','D+3','D+4','D+5'];
+  const labels=['D','D+1','D+2','D+3','D+4'];
   let maturedHtml='<p class="assessment-empty-copy">No matured outcome records yet.</p>';
   if(details.length){
     const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},day=m.day_wise||m.daywise||{},zone=m.zone_wise||m.zonewise||{},rec=m.day_recommendation_metrics||{};
-    maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>These rows affect the accuracy and return statistics above.</small></div>','<div class="scorecard-days">'+labels.map(label=>assessmentDayCell(label,day[label],zone[label],rec[label])).join('')+'</div>'].join('')
+    maturedHtml=['<div class="scorecard-context"><span>Matured performance · last assessed</span><strong>'+escapeHtml(latest.assessed_at?new Date(latest.assessed_at).toLocaleDateString('en-IN'):'—')+'</strong><p>'+escapeHtml(latest.outcome||'Latest cumulative assessment')+'</p><small>D is the canonical target trading session; these rows affect the accuracy and return statistics above.</small></div>','<div class="scorecard-days">'+labels.map((label,index)=>assessmentDayCell(label,assessmentMetricForDisplay(day,label,index),assessmentMetricForDisplay(zone,label,index),assessmentMetricForDisplay(rec,label,index))).join('')+'</div>'].join('')
   }
   return '<div class="assessment-drill-section"><div class="step-label">Matured historical performance</div>'+maturedHtml+'</div><div class="assessment-drill-section"><div class="step-label">Legacy canonical forecasts awaiting assessment</div>'+renderPendingForecasts(pending)+'</div>'
 }
@@ -369,7 +381,7 @@ function renderAssessment(container,payload){
       '<div class="assessment-metric"><span>Return on hits</span><strong>'+pct(ret.hits_return_pct)+'</strong><small>Successful canonical calls</small></div>',
       '<div class="assessment-metric"><span>Return on misses</span><strong>'+pct(ret.misses_return_pct)+'</strong><small>Unsuccessful canonical calls</small></div>',
     '</div>',
-    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns do not increase denominators.</p><p><strong>Matured eligible</strong> means the D+n trading date has passed. <strong>Scorable</strong> additionally requires the original frozen day-wise forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently unscorable because legacy frozen context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
+    '<div class="scorecard-context assessment-pending-note"><p><strong>Official efficacy uses one selected DAILY_CANONICAL forecast per target trading date.</strong> Fresh reruns do not increase denominators.</p><p><strong>Matured eligible</strong> means the D or D+n trading session has passed. <strong>Scorable</strong> additionally requires the original frozen day-wise forecast context. '+(missing?escapeHtml(missing)+' matured checkpoint'+(missing===1?' is':'s are')+' currently unscorable because legacy frozen context is missing.':'All matured eligible checkpoints are currently scorable.')+'</p></div>',
     '<details class="assessment-detail-row"><summary>Drill down — day-wise forecast, range & outcomes</summary><div class="assessment-history">'+renderAssessmentDetails(details,pending)+'</div></details>'
   ].join('')
 }
