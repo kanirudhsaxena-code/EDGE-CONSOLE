@@ -127,21 +127,73 @@ async function saveNormalizedEvidence(request: Request, env: Env, requestId: str
   return json({ ok: executable, request_id: requestId, normalized_items: evidence.length, adapter_stage: metadata.adapter_stage, blockers: assessment, next_step: executable ? 'Execute governed 5DR runner' : 'Supply missing or resolve conflicting normalized inputs' }, executable ? 200 : 409);
 }
 
-async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonRecord;predecessor:JsonRecord|null}|null>{
-  const assessmentRows=await sql`select source_id,assessed_at,headline,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
-  if(!assessmentRows.length||!isObject(assessmentRows[0].metrics))return null;
-  const metrics=assessmentRows[0].metrics as JsonRecord;
+const FIVE_DR_ASSESSMENT_HANDOFF_URL='https://raw.githubusercontent.com/kanirudhsaxena-code/5DR-V2/state/assessment-handoff/runtime/5dr-assessment-handoff.json';
+const FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS=2*60*60_000;
+
+function fiveDrAssessmentMetricsComplete(value:unknown):boolean{
+  if(!isObject(value))return false;
+  const metrics=value as JsonRecord;
   const day=isObject(metrics.day_metrics)?metrics.day_metrics as JsonRecord:{};
   const labels=['D','D+1','D+2','D+3','D+4'];
   const ledger=Array.isArray(metrics.recommendation_ledger)?metrics.recommendation_ledger:[];
   const expectedCount=Number(metrics.all_recommendations_count??ledger.length);
-  const snapshotComplete=metrics.assessment_snapshot_complete===true&&labels.every(label=>isObject(day[label]));
-  const ledgerComplete=metrics.recommendation_ledger_complete===true&&ledger.length===expectedCount;
-  if(!snapshotComplete||!ledgerComplete)return null;
+  return metrics.assessment_snapshot_complete===true
+    && labels.every(label=>isObject(day[label]))
+    && metrics.recommendation_ledger_complete===true
+    && Number.isFinite(expectedCount)
+    && expectedCount>=0
+    && ledger.length===expectedCount;
+}
+
+async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refreshed:boolean;detail?:string}>{
+  try{
+    const response=await fetch(FIVE_DR_ASSESSMENT_HANDOFF_URL,{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
+    if(!response.ok)return {ok:false,refreshed:false,detail:'assessment handoff fetch failed: HTTP '+response.status};
+    const handoff:unknown=await response.json();
+    if(!isObject(handoff)||handoff.schema_version!=='5DR_ASSESSMENT_HANDOFF_V1')return {ok:false,refreshed:false,detail:'assessment handoff schema mismatch'};
+    const generatedAt=String(handoff.generated_at??'');
+    if(!generatedAt||Number.isNaN(Date.parse(generatedAt)))return {ok:false,refreshed:false,detail:'assessment handoff generated_at is invalid'};
+    const handoffAge=Date.now()-Date.parse(generatedAt);
+    if(handoffAge < -5*60_000||handoffAge > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:false,refreshed:false,detail:'assessment handoff is stale'};
+    const assessment=isObject(handoff.assessment)?handoff.assessment as JsonRecord:null;
+    if(!assessment||assessment.engine!=='5DR'||!isNonEmptyString(assessment.forecast_id)||!isNonEmptyString(assessment.assessed_at)||!isObject(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff payload is invalid'};
+    if(!fiveDrAssessmentMetricsComplete(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff snapshot or recommendation ledger is incomplete'};
+
+    const latest=await sql`select created_at,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
+    if(latest.length&&isObject(latest[0].metrics)&&fiveDrAssessmentMetricsComplete(latest[0].metrics)){
+      const createdAt=String(latest[0].created_at??'');
+      const age=createdAt&&!Number.isNaN(Date.parse(createdAt))?Date.now()-Date.parse(createdAt):Number.POSITIVE_INFINITY;
+      if(age>=-5*60_000&&age<=FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:true,refreshed:false};
+    }
+
+    const sourceId=String(assessment.forecast_id);
+    const assessedAt=String(assessment.assessed_at);
+    await sql`
+      insert into assessment_rollups (engine,source_id,assessed_at,headline,score,metrics)
+      values (
+        '5DR',${sourceId},${assessedAt}::timestamptz,
+        ${isNonEmptyString(assessment.outcome)?String(assessment.outcome):null},
+        ${typeof assessment.score==='number'?assessment.score:null},
+        ${JSON.stringify(assessment.metrics)}::jsonb
+      )
+    `;
+    return {ok:true,refreshed:true};
+  }catch(error){
+    return {ok:false,refreshed:false,detail:error instanceof Error?error.message:String(error)};
+  }
+}
+
+async function fiveDrExecutionContext(sql:any):Promise<{assessment_context:JsonRecord;predecessor:JsonRecord|null}|null>{
+  const assessmentRows=await sql`select source_id,assessed_at,headline,metrics,created_at from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
+  if(!assessmentRows.length||!isObject(assessmentRows[0].metrics))return null;
+  const metrics=assessmentRows[0].metrics as JsonRecord;
+  if(!fiveDrAssessmentMetricsComplete(metrics))return null;
   const assessedAt=String(assessmentRows[0].assessed_at||'');
   if(!assessedAt||Number.isNaN(Date.parse(assessedAt)))return null;
-  const ageMs=Date.now()-Date.parse(assessedAt);
-  if(ageMs < -5*60_000||ageMs > 24*60*60_000)return null;
+  const snapshotCreatedAt=String(assessmentRows[0].created_at||'');
+  if(!snapshotCreatedAt||Number.isNaN(Date.parse(snapshotCreatedAt)))return null;
+  const ageMs=Date.now()-Date.parse(snapshotCreatedAt);
+  if(ageMs < -5*60_000||ageMs > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return null;
   const predecessorRows=await sql`select run_id,generated_at,result from analysis_runs where engine='5DR' and published=true and status='SUCCESS' order by generated_at desc limit 1`;
   const predecessor=predecessorRows.length&&isObject(predecessorRows[0].result)
     ? {run_id:String(predecessorRows[0].run_id),generated_at:predecessorRows[0].generated_at,result:predecessorRows[0].result as JsonRecord}
@@ -157,8 +209,9 @@ async function executionPacket(env: Env, requestId: string): Promise<Response> {
   if (!['READY_FOR_ENGINE', 'PROCESSING'].includes(String(rows[0].status))) return json({ error: 'request_id is not eligible for execution' }, 409);
   const metadata = isObject(rows[0].metadata) ? rows[0].metadata as JsonRecord : {};
   if (metadata.adapter_stage !== 'NORMALIZED_READY' || !Array.isArray(metadata.normalized_evidence) || !metadata.normalized_evidence.length) return json({ error: 'request is not normalization-ready', blockers: metadata.normalization_assessment ?? null, next_step: 'Complete normalized evidence before execution' }, 409);
+  const assessmentRefresh=await refreshFiveDrAssessmentState(sql);
   const context=await fiveDrExecutionContext(sql);
-  if(!context)return json({error:'5DR assessment-first release gate blocked: canonical assessment snapshot or recommendation ledger is missing/incomplete/stale',next_step:'Run canonical lifecycle assessment handoff before engine execution'},409);
+  if(!context)return json({error:'5DR assessment-first release gate blocked: canonical assessment snapshot or recommendation ledger is missing/incomplete/stale',assessment_refresh:assessmentRefresh,next_step:'Refresh canonical lifecycle assessment handoff before engine execution'},409);
   return json({ request_id: String(rows[0].request_id), provenance_mode: String(rows[0].provenance_mode), framework_version: String(rows[0].framework_version), output_contract_version: String(rows[0].output_contract_version), evidence: metadata.normalized_evidence, ...context });
 }
 
@@ -246,14 +299,17 @@ async function fiveDrAssessmentImport(request: Request, env: Env): Promise<Respo
   const sourceId = String(body.forecast_id);
   const assessedAt = String(body.assessed_at);
   const existing = await sql`
-    select id
+    select id,metrics
       from assessment_rollups
      where engine='5DR'
        and source_id=${sourceId}
        and assessed_at=${assessedAt}::timestamptz
+     order by created_at desc,id desc
      limit 1
   `;
-  if (existing.length) return json({ ok: true, duplicate: true, source_id: sourceId });
+  if (existing.length && isObject(existing[0].metrics) && fiveDrAssessmentMetricsComplete(existing[0].metrics)) {
+    return json({ ok: true, duplicate: true, source_id: sourceId });
+  }
 
   await sql`
     insert into assessment_rollups (engine,source_id,assessed_at,headline,score,metrics)
