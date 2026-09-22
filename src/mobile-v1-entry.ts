@@ -381,14 +381,11 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     await sql`update analysis_requests set status='PROCESSING',error=null,updated_at=now() where request_id=${requestId}`;
     return json({...normalizedBody,ok:true,status:'PROCESSING',adapter_stage:'NORMALIZED_READY',engine_dispatch:previous,idempotent:true});
   }
-  const executionPacket={
-    request_id:requestId,
-    provenance_mode:String(rows[0].provenance_mode),
-    framework_version:String(rows[0].framework_version),
-    output_contract_version:String(rows[0].output_contract_version),
-    evidence:Array.isArray(metadata.normalized_evidence)?metadata.normalized_evidence:[]
-  };
-  if(!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
+  const origin=new URL(requestUrl).origin;
+  const packetResponse=await router.fetch(new Request(\`\${origin}/api/5dr/run-requests/\${encodeURIComponent(requestId)}/execution-packet\`,{method:'GET'}),env as any);
+  const executionPacket=await responseJson(packetResponse);
+  if(!packetResponse.ok)return json({...normalizedBody,...executionPacket},packetResponse.status);
+  if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
   const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
   const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
