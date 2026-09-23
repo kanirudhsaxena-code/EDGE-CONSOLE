@@ -33,7 +33,16 @@ jobs:
           echo "DEPLOY_TAG=$TAG" >> "$GITHUB_ENV"
           npx wrangler deploy \
             --tag "$TAG" \
-            --message "EDGE-CONSOLE git=$GITHUB_SHA workflow=$GITHUB_RUN_ID"
+            --message "EDGE-CONSOLE git=$GITHUB_SHA workflow=$GITHUB_RUN_ID" \
+            | tee /tmp/wrangler-deploy.txt
+          VERSION_ID="$(sed -nE 's/.*Current Version ID: ([0-9a-fA-F-]{36}).*/\1/p' /tmp/wrangler-deploy.txt | tail -1)"
+          if ! printf '%s' "$VERSION_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo 'Wrangler did not emit a valid Current Version ID'
+            cat /tmp/wrangler-deploy.txt
+            exit 1
+          fi
+          echo "DEPLOY_VERSION_ID=$VERSION_ID" >> "$GITHUB_ENV"
+          echo "deployed_version=$VERSION_ID tag=$TAG"
       - name: Verify tagged version is the active deployment
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
@@ -45,19 +54,21 @@ jobs:
           node <<'NODE'
           const fs=require('fs');
           const tag=process.env.DEPLOY_TAG;
+          const versionId=process.env.DEPLOY_VERSION_ID;
           const versions=JSON.parse(fs.readFileSync('/tmp/versions.json','utf8'));
           const deployments=JSON.parse(fs.readFileSync('/tmp/deployments.json','utf8'));
-          let versionId=null;
+          let match=null;
           const walk=(node)=>{
-            if(versionId||node===null||typeof node!=='object')return;
-            if(!Array.isArray(node)&&String(node.tag??'')===tag){
-              const candidate=String(node.id??node.version_id??node.versionId??'');
-              if(candidate)versionId=candidate;
+            if(match||node===null||typeof node!=='object')return;
+            if(!Array.isArray(node)){
+              const ids=[node.id,node.version_id,node.versionId].filter(v=>typeof v==='string');
+              if(ids.includes(versionId)){match=node;return;}
             }
             for(const value of Object.values(node))walk(value);
           };
           walk(versions);
-          if(!versionId)throw new Error(`Tagged version ${tag} was not returned by Wrangler`);
+          if(!match)throw new Error(`Deployed version ${versionId} was not returned by Wrangler versions list`);
+          if(!JSON.stringify(match).includes(tag))throw new Error(`Version ${versionId} does not carry governed tag ${tag}`);
           if(!JSON.stringify(deployments).includes(versionId))throw new Error(`Version ${versionId} is not present in current deployment history`);
           console.log(`verified_active_version=${versionId} tag=${tag}`);
           NODE
