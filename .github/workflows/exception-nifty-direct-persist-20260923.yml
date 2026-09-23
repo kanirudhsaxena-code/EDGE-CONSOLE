@@ -13,15 +13,15 @@ permissions:
 jobs:
   run:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     env:
       CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
       REQUEST_ID: 5drreq_d2f611c4-24c2-4f22-8a43-e6a3612dff65
-      FIVEDR_REF: ad2afc81e3fcaee86e9f647abcce1ec8d138ceeb
+      FIVEDR_REF: 4c04992e17a785c06c1d4d5c6a2df95af14d19c5
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Checkout exact frozen 5DR engine
+      - name: Checkout matching production 5DR V2.1.2 engine
         run: |
           set -euo pipefail
           git init fivedr
@@ -49,7 +49,7 @@ jobs:
           print(f"execution_packet_ok request_id={p['request_id']} evidence_items={len(p['evidence'])}")
           PY
 
-      - name: Execute frozen engine and persist through authenticated route
+      - name: Execute matching engine and persist through authenticated route
         run: |
           set -euo pipefail
           (cd fivedr && python -m src.runner --input ../request.json --publish > ../envelope.json)
@@ -59,6 +59,7 @@ jobs:
           assert p.get('request_id')==os.environ['REQUEST_ID']
           assert p.get('status')=='SUCCESS'
           assert p.get('published') is True
+          assert (p.get('result') or {}).get('output_contract_version')=='5DR_V2_1_2'
           print(f"NIFTY_ENGINE_SUCCESS run_id={p['run_id']} generated_at={p['generated_at']}")
           PY
           code=$(curl --location --silent --show-error \
@@ -91,7 +92,7 @@ jobs:
             'result':env.get('result'),
           }
           open('nifty-exception-persisted.json','w').write(json.dumps(out,indent=2,sort_keys=True))
-          print(json.dumps(out,sort_keys=True))
+          print('NIFTY_EXCEPTION_PERSISTED '+json.dumps(out,sort_keys=True))
           PY
 
       - uses: actions/upload-artifact@v4
