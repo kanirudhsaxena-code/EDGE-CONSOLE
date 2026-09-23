@@ -1,0 +1,264 @@
+name: G3 Cross-Repo Learning Lab Acceptance
+
+on:
+  pull_request:
+    paths:
+      - '.github/workflows/g3-cross-repo-learning-lab-acceptance.yml'
+      - '.github/workflows/learning-lab-daily-import.yml'
+      - 'src/learning-lab.ts'
+      - 'src/index.ts'
+      - 'migrations/009_learning_lab_vnext.sql'
+      - 'test/learning-lab-vnext.test.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  contract-acceptance:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout EDGE Console G3 branch
+        uses: actions/checkout@v4
+
+      - name: Checkout accepted 5DR G3 producer
+        uses: actions/checkout@v4
+        with:
+          repository: kanirudhsaxena-code/5DR-V2
+          ref: 2cb30d76d7b43f727f2e2c567995a89cd426fdde
+          path: g3-5dr
+
+      - name: Checkout accepted EDGE G3 producer
+        uses: actions/checkout@v4
+        with:
+          repository: kanirudhsaxena-code/EDGE---V1
+          ref: 8624c50571e2fdf7fb26426a85c343d87fa8d548
+          path: g3-edge
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install test runtimes
+        run: |
+          python -m pip install --upgrade pip pytest
+          npm install --no-audit --no-fund
+
+      - name: Rehearse additive G3 migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          PSQL="psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1"
+          $PSQL <<'SQL'
+          CREATE TABLE engine_registry (
+            engine text PRIMARY KEY
+          );
+          INSERT INTO engine_registry(engine) VALUES ('5DR'),('EDGE_STOCKS');
+
+          CREATE TABLE recommendations (
+            recommendation_id text PRIMARY KEY
+          );
+          INSERT INTO recommendations(recommendation_id) VALUES ('g3-rehearsal-rec');
+
+          CREATE TABLE schema_meta (
+            schema_version integer PRIMARY KEY,
+            applied_at timestamptz NOT NULL
+          );
+          SQL
+
+          # Apply each exact migration twice to prove syntax plus idempotence.
+          $PSQL -f migrations/009_learning_lab_vnext.sql
+          $PSQL -f migrations/009_learning_lab_vnext.sql
+          $PSQL -f g3-edge/migrations/006_learning_lab_vnext.sql
+          $PSQL -f g3-edge/migrations/006_learning_lab_vnext.sql
+
+          # Additive objects exist and pre-existing baseline rows remain intact.
+          test "$($PSQL -Atc "select count(*) from engine_registry")" = "2"
+          test "$($PSQL -Atc "select count(*) from recommendations")" = "1"
+          test "$($PSQL -Atc "select count(*) from schema_meta where schema_version=6")" = "1"
+          test "$($PSQL -Atc "select count(*) from pg_tables where schemaname='public' and tablename in ('learning_observations_vnext','learning_daily_snapshots_vnext','learning_hypotheses_vnext','learning_candidates_vnext','learning_approval_events_vnext','edge_learning_observations_vnext','edge_learning_daily_snapshots_vnext')")" = "7"
+
+          # Firewalls and integrity constraints must fail closed.
+          if $PSQL -c "insert into learning_candidates_vnext(candidate_id,engine,status,proposal,content_hash,automatic_adoption,production_change_allowed) values ('bad-prod','5DR','CANDIDATE','{}','x',false,true)"; then
+            echo "production_change_allowed constraint failed open"
+            exit 1
+          fi
+          if $PSQL -c "insert into edge_learning_observations_vnext(observation_id,recommendation_id,ticker,target_trading_date,run_role,official_efficacy_eligible,dimension,observation_type,source_ref,observed_at,content_hash) values ('bad-edge','g3-rehearsal-rec','LTF','2026-09-23','DIAGNOSTIC',false,'TEST','ERROR','g3',now(),'x')"; then
+            echo "non-canonical exclusion constraint failed open"
+            exit 1
+          fi
+          if $PSQL -c "insert into learning_daily_snapshots_vnext(snapshot_id,engine,cycle_id,as_of,snapshot_status,runs_analyzed,canonical_runs,diagnostic_runs,manual_runs,shadow_runs,matured_outcomes,scorable_outcomes,data_gap_outcomes,new_observations,active_hypotheses,active_challengers,approval_required,data_quality_state,content_hash) values ('bad-counts','5DR','bad-counts',now(),'COMPLETE',1,1,1,0,0,0,0,0,0,0,0,0,'PASS','x')"; then
+            echo "snapshot population constraint failed open"
+            exit 1
+          fi
+          echo "g3_migration_rehearsal_passed"
+
+      - name: Verify producer snapshot contracts
+        run: |
+          (cd g3-5dr && python -m pytest -q tests/test_learning_snapshot.py)
+          (cd g3-edge && python -m pytest -q tests/test_learning_snapshot.py)
+
+      - name: Emit representative 5DR handoff from producer code
+        run: |
+          cd g3-5dr
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from src.learning_snapshot import LearningRunContext, build_daily_snapshot, build_observation_envelope
+
+          observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00","Z")
+          observation=build_observation_envelope(
+              {
+                  "horizon":"D+1",
+                  "dimension":"PROBABILITY_CALIBRATION",
+                  "observation_type":"SUCCESS",
+                  "outcome_classification":"DIRECTION_HIT",
+                  "metrics":{"zone_hit":True},
+                  "evidence":{"source_ref":"g3-acceptance:5dr"},
+                  "checkpoint_evaluation_id":1,
+              },
+              LearningRunContext(
+                  run_id="g3-acceptance-5dr",
+                  run_role="CANONICAL",
+                  official_efficacy_eligible=True,
+                  target_trading_date="2026-09-23",
+                  source_ref="g3-acceptance:5dr",
+                  observed_at=observed_at,
+              ),
+          )
+          snapshot=build_daily_snapshot(
+              cycle_id="G3-ACCEPTANCE-5DR",
+              as_of=observed_at,
+              runs=[{"run_role":"CANONICAL","target_trading_date":"2026-09-23"}],
+              observations=[observation],
+              matured_outcomes=[{"scorable":True,"data_gap":False}],
+              methodology_versions={"model":"5DR_V2_1"},
+              source_lineage={"acceptance":"cross-repo"},
+          )
+          handoff={
+              "schema_version":"MDOS_LEARNING_LAB_HANDOFF_V1",
+              "generated_at":observed_at,
+              "engine":"5DR",
+              "snapshot":snapshot,
+              "observations":[observation],
+              "candidates":[],
+              "methodology_changed":False,
+              "automatic_adoption_enabled":False,
+              "production_change_allowed":False,
+          }
+          Path("../g3-5dr-handoff.json").write_text(json.dumps(handoff,separators=(",",":"),sort_keys=True)+"\n",encoding="utf-8")
+          PY
+
+      - name: Emit representative EDGE handoff from producer code
+        run: |
+          cd g3-edge
+          python - <<'PY'
+          import json
+          from datetime import datetime, timezone
+          from pathlib import Path
+          from src.learning_snapshot import build_daily_snapshot, build_outcome_observation
+
+          observed_at=datetime.now(timezone.utc).isoformat().replace("+00:00","Z")
+          observation=build_outcome_observation({
+              "recommendation_id":"g3-edge-rec-1",
+              "run_id":"g3-acceptance-edge",
+              "ticker":"LTF",
+              "target_trading_date":"2026-09-23",
+              "run_role":"CANONICAL",
+              "official_efficacy_eligible":True,
+              "outcome_verdict":"WIN",
+              "model_return_pct":1.0,
+              "direction_hit":True,
+              "zone_result":"HIT",
+              "mfe_pct":1.2,
+              "mae_pct":-0.2,
+              "observed_at":observed_at,
+              "source_ref":"g3-acceptance:edge",
+          })
+          if observation is None:
+              raise SystemExit("EDGE acceptance observation was not emitted")
+          snapshot=build_daily_snapshot(
+              cycle_id="G3-ACCEPTANCE-EDGE",
+              as_of=observed_at,
+              runs=[{"ticker":"LTF","run_role":"CANONICAL","target_trading_date":"2026-09-23"}],
+              observations=[observation],
+              matured_outcomes=[{"scorable":True,"data_gap":False}],
+              source_lineage={"acceptance":"cross-repo"},
+          )
+          handoff={
+              "schema_version":"MDOS_LEARNING_LAB_HANDOFF_V1",
+              "generated_at":observed_at,
+              "engine":"EDGE_STOCKS",
+              "snapshot":snapshot,
+              "observations":[observation],
+              "candidates":[],
+              "methodology_changed":False,
+              "automatic_adoption_enabled":False,
+              "production_change_allowed":False,
+          }
+          Path("../g3-edge-handoff.json").write_text(json.dumps(handoff,separators=(",",":"),sort_keys=True)+"\n",encoding="utf-8")
+          PY
+
+      - name: Validate both producer handoffs with Console contract
+        run: |
+          cat > g3-cross-repo-validate.ts <<'TS'
+          import {readFileSync} from 'node:fs';
+          import {validateLearningObservation,validateLearningSnapshot} from './src/learning-lab.ts';
+
+          type Handoff={
+            schema_version?:unknown;
+            generated_at?:unknown;
+            engine?:unknown;
+            snapshot?:unknown;
+            observations?:unknown;
+            candidates?:unknown;
+            methodology_changed?:unknown;
+            automatic_adoption_enabled?:unknown;
+            production_change_allowed?:unknown;
+          };
+
+          for(const path of ['g3-5dr-handoff.json','g3-edge-handoff.json']){
+            const handoff=JSON.parse(readFileSync(path,'utf8')) as Handoff;
+            if(handoff.schema_version!=='MDOS_LEARNING_LAB_HANDOFF_V1')throw new Error(path+': schema mismatch');
+            if(!['5DR','EDGE_STOCKS'].includes(String(handoff.engine)))throw new Error(path+': engine mismatch');
+            if(handoff.methodology_changed!==false)throw new Error(path+': methodology firewall failed');
+            if(handoff.automatic_adoption_enabled!==false)throw new Error(path+': automatic-adoption firewall failed');
+            if(handoff.production_change_allowed!==false)throw new Error(path+': production-change firewall failed');
+            if(!Array.isArray(handoff.observations))throw new Error(path+': observations missing');
+            if(!Array.isArray(handoff.candidates))throw new Error(path+': candidates missing');
+
+            const snapshotErrors=validateLearningSnapshot(handoff.snapshot);
+            if(snapshotErrors.length)throw new Error(path+': snapshot rejected: '+snapshotErrors.join('; '));
+            for(const observation of handoff.observations){
+              const errors=validateLearningObservation(observation);
+              if(errors.length)throw new Error(path+': observation rejected: '+errors.join('; '));
+            }
+            console.log('cross_repo_handoff_valid',path,handoff.engine,'observations='+handoff.observations.length);
+          }
+          TS
+          npx tsx g3-cross-repo-validate.ts
+          rm g3-cross-repo-validate.ts
+
+      - name: Verify Console contract tests
+        run: |
+          npm test
+          npm run typecheck
