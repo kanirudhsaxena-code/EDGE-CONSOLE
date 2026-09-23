@@ -12,8 +12,12 @@ test('G5 deploys are tagged to immutable git provenance and health-checked',()=>
   assert.match(deploy,/wrangler deploy/);
   assert.match(deploy,/--tag "\$TAG"/);
   assert.match(deploy,/--message "EDGE-CONSOLE git=\$GITHUB_SHA workflow=\$GITHUB_RUN_ID"/);
+  assert.match(deploy,/tee \/tmp\/wrangler-deploy\.txt/);
+  assert.match(deploy,/Current Version ID/);
+  assert.match(deploy,/DEPLOY_VERSION_ID/);
   assert.match(deploy,/wrangler versions list --json/);
   assert.match(deploy,/wrangler deployments list --json/);
+  assert.match(deploy,/Version \$\{versionId\} does not carry governed tag \$\{tag\}/);
   assert.match(deploy,/Verify tagged version is the active deployment/);
   assert.match(deploy,/Verify production health after tagged deploy/);
   assert.match(deploy,/EDGE_RESEARCH_BUNDLE_V1/);
