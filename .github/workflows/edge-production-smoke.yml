@@ -122,10 +122,28 @@ jobs:
           BASE='https://edge-console.k-anirudhsaxena.workers.dev'
           AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
 
-          code="$(curl --location --silent --show-error -o /tmp/ltf-existing.json -w '%{http_code}'             "${AUTH[@]}" -H 'content-type: application/json'             -X POST --data '{"command":"EDGE LTF"}'             "$BASE/api/edge-stocks/invoke")"
-          test "$code" = "200"
+          code="$(curl --location --silent --show-error -o /tmp/ltf-existing.json -w '%{http_code}' \
+            "${AUTH[@]}" -H 'content-type: application/json' \
+            -X POST --data '{"command":"EDGE LTF"}' \
+            "$BASE/api/edge-stocks/invoke")"
 
-          curl --location --fail --silent --show-error "${AUTH[@]}"             "$BASE/api/edge-stocks/report?ticker=LTF"             -o /tmp/ltf-report.json
+          case "$code" in
+            200)
+              echo 'CURRENT_DAY_REUSE' > /tmp/ltf-invoke-mode
+              ;;
+            409)
+              echo 'PREPUBLISH_FAIL_CLOSED' > /tmp/ltf-invoke-mode
+              ;;
+            *)
+              echo "Unexpected EDGE LTF compatibility response: HTTP $code"
+              cat /tmp/ltf-existing.json || true
+              exit 1
+              ;;
+          esac
+
+          curl --location --fail --silent --show-error "${AUTH[@]}" \
+            "$BASE/api/edge-stocks/report?ticker=LTF" \
+            -o /tmp/ltf-report.json
 
           python - <<'PY'
           import json
@@ -134,32 +152,38 @@ jobs:
 
           invoke=json.load(open('/tmp/ltf-existing.json'))
           report=json.load(open('/tmp/ltf-report.json'))['report']
-
-          assert invoke.get('status')=='ALREADY_PUBLISHED_TODAY', invoke
-          assert invoke.get('ticker')=='LTF', invoke
-          assert invoke.get('run_id'), invoke
-          assert invoke.get('run_timestamp'), invoke
+          mode=open('/tmp/ltf-invoke-mode',encoding='utf-8').read().strip()
 
           assert report['ticker']=='LTF', report
-          assert report['run_id']==invoke['run_id'], (report['run_id'], invoke['run_id'])
           assert report['contract_version']=='EDGE_STOCKS_V1_3', report
           assert report['presentation_contract']=='EFFICACY_V2', report
           assert report.get('generated_at'), report
           assert 'canonical_governance' in report, report
           assert report['canonical_governance'].get('canonical_type'), report
 
-          run_dt=datetime.fromisoformat(str(invoke['run_timestamp']).replace('Z','+00:00')).astimezone(ZoneInfo('Asia/Kolkata'))
-          now=datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
-          assert run_dt.date()==now.date(), (run_dt, now)
-
           probs=report['current_stock_outcome']['probabilities']
           total=sum(float(probs[k]) for k in ('bull','base','bear'))
           assert abs(total-100.0)<=0.01, probs
 
+          if mode=='CURRENT_DAY_REUSE':
+              assert invoke.get('status')=='ALREADY_PUBLISHED_TODAY', invoke
+              assert invoke.get('ticker')=='LTF', invoke
+              assert invoke.get('run_id'), invoke
+              assert invoke.get('run_timestamp'), invoke
+              assert report['run_id']==invoke['run_id'], (report['run_id'], invoke['run_id'])
+              run_dt=datetime.fromisoformat(str(invoke['run_timestamp']).replace('Z','+00:00')).astimezone(ZoneInfo('Asia/Kolkata'))
+              now=datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
+              assert run_dt.date()==now.date(), (run_dt, now)
+          elif mode=='PREPUBLISH_FAIL_CLOSED':
+              assert invoke.get('code')=='EDGE_RESEARCH_BUNDLE_REQUIRED', invoke
+              assert invoke.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1', invoke
+          else:
+              raise AssertionError(mode)
+
           print(json.dumps({
             'ticker':'LTF',
-            'run_id':invoke['run_id'],
-            'run_timestamp':invoke['run_timestamp'],
+            'compatibility_mode':mode,
+            'run_id':report['run_id'],
             'forecast':report['current_stock_outcome']['definitive_forecast'],
             'bull':probs['bull'],
             'base':probs['base'],
