@@ -25,6 +25,8 @@ test('same forecast and assessed_at may be upgraded when prior imported metrics 
   assert.match(block,/select id,metrics/);
   assert.match(block,/fiveDrAssessmentMetricsComplete\(existing\[0\]\.metrics\)/);
   assert.match(block,/insert into assessment_rollups/);
+  assert.match(block,/on conflict \(engine,source_id,assessed_at\) do update/);
+  assert.match(block,/metrics=excluded\.metrics/);
 });
 
 test('assessment completeness requires D through D+4 and exact recommendation ledger count',()=>{
