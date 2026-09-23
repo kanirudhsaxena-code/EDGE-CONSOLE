@@ -12,6 +12,9 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -20,10 +23,73 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
       - run: npm test
-      - name: Deploy Cloudflare Worker
-        run: npx wrangler deploy
+      - name: Deploy tagged Cloudflare Worker version
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          TAG="git-${GITHUB_SHA:0:12}"
+          echo "DEPLOY_TAG=$TAG" >> "$GITHUB_ENV"
+          npx wrangler deploy \
+            --tag "$TAG" \
+            --message "EDGE-CONSOLE git=$GITHUB_SHA workflow=$GITHUB_RUN_ID"
+      - name: Verify tagged version is the active deployment
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          npx wrangler versions list --json > /tmp/versions.json
+          npx wrangler deployments list --json > /tmp/deployments.json
+          node <<'NODE'
+          const fs=require('fs');
+          const tag=process.env.DEPLOY_TAG;
+          const versions=JSON.parse(fs.readFileSync('/tmp/versions.json','utf8'));
+          const deployments=JSON.parse(fs.readFileSync('/tmp/deployments.json','utf8'));
+          let versionId=null;
+          const walk=(node)=>{
+            if(versionId||node===null||typeof node!=='object')return;
+            if(!Array.isArray(node)&&String(node.tag??'')===tag){
+              const candidate=String(node.id??node.version_id??node.versionId??'');
+              if(candidate)versionId=candidate;
+            }
+            for(const value of Object.values(node))walk(value);
+          };
+          walk(versions);
+          if(!versionId)throw new Error(`Tagged version ${tag} was not returned by Wrangler`);
+          if(!JSON.stringify(deployments).includes(versionId))throw new Error(`Version ${versionId} is not present in current deployment history`);
+          console.log(`verified_active_version=${versionId} tag=${tag}`);
+          NODE
+      - name: Verify production health after tagged deploy
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          for i in $(seq 1 12); do
+            if curl --location --fail --silent --show-error \
+              -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+              -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+              -H 'Cache-Control: no-cache' \
+              "$BASE/api/edge-stocks/health?deploy=${DEPLOY_TAG}" -o /tmp/deploy-health.json; then
+              if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/deploy-health.json'))
+          assert d.get('ok') is True, d
+          assert d.get('edge_database_configured') is True, d
+          assert d.get('research_contract_version') == 'EDGE_RESEARCH_BUNDLE_V1', d
+          assert d.get('research_authority') == 'CHATGPT', d
+          assert d.get('fresh_web_research_required') is True, d
+          PY
+              then
+                exit 0
+              fi
+            fi
+            sleep 5
+          done
+          echo "Tagged deployment did not pass production health verification"
+          cat /tmp/deploy-health.json || true
+          exit 1
       - name: Note preserved runtime secrets
         run: echo "Existing Cloudflare Worker secrets are preserved across deploys; no secret rewrite is required."
