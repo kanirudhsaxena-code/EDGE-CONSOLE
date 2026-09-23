@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <title>EDGE Learning Lab Governance</title>
+  <style>
+    :root{color-scheme:dark;--bg:#080b10;--card:#11161f;--card2:#171e29;--text:#f5f7fb;--muted:#96a2b4;--line:#263142;--good:#55d889;--warn:#f6c85f;--bad:#ff6b78;--accent:#8ab4ff}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:980px;margin:auto;padding:18px 14px 48px}.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:18px}.eyebrow{font-size:12px;letter-spacing:.12em;color:var(--accent);font-weight:800}.top h1{font-size:26px;margin:5px 0 4px}.muted{color:var(--muted);font-size:13px;line-height:1.5}.tabs,.actions{display:flex;gap:8px;flex-wrap:wrap}button,a.button{border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:11px;padding:10px 13px;font-weight:700;text-decoration:none;cursor:pointer}button.active{border-color:var(--accent);box-shadow:0 0 0 1px var(--accent) inset}.panel{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:15px;margin:12px 0}.status{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}.pill{padding:6px 9px;border-radius:999px;font-size:12px;font-weight:900;letter-spacing:.05em}.pill.LIVE{background:#143622;color:var(--good)}.pill.PARTIAL,.pill.STALE{background:#3a3114;color:var(--warn)}.pill.FAILED{background:#3c161c;color:var(--bad)}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px}.metric{background:var(--card2);border-radius:12px;padding:11px}.metric span{display:block;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em}.metric strong{display:block;font-size:20px;margin-top:5px}.section-title{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:10px}.section-title h2{font-size:17px;margin:0}.candidate{border:1px solid var(--line);border-radius:14px;padding:13px;margin:10px 0;background:#0d1219}.candidate h3{margin:0 0 7px;font-size:15px}.candidate-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.box{background:var(--card2);border-radius:10px;padding:10px}.box b{font-size:11px;color:var(--muted);display:block;margin-bottom:5px;text-transform:uppercase}.box pre,details pre{white-space:pre-wrap;word-break:break-word;margin:0;font-size:12px;line-height:1.45;color:#dce5f3}.decision{margin-top:11px;display:flex;gap:8px;flex-wrap:wrap}.approve{border-color:#246f45;background:#123822}.defer{border-color:#796626;background:#3b3318}.reject{border-color:#7a2a33;background:#3b171c}.firewall{border-left:3px solid var(--accent);padding-left:11px;margin-top:10px}.empty{padding:16px;text-align:center;color:var(--muted);border:1px dashed var(--line);border-radius:12px}.error{color:var(--bad)}.decision-row{border-top:1px solid var(--line);padding:9px 0;font-size:13px}.decision-row:first-child{border-top:0}details{margin-top:10px}summary{cursor:pointer;color:var(--accent);font-weight:700}@media(max-width:720px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.candidate-grid{grid-template-columns:1fr}.top{display:block}.tabs{margin-top:12px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <div>
+      <div class="eyebrow">MDOS · PHASE 2.0 · G4</div>
+      <h1>Learning Lab Governance</h1>
+      <div class="muted">Review the immutable Learning Lab state, inspect challenger evidence, and explicitly approve only the next build/validation step.</div>
+    </div>
+    <div class="actions"><a class="button" href="/">Console</a><button id="refresh">Refresh</button></div>
+  </div>
+
+  <div class="tabs">
+    <button class="active" data-engine="5DR">EDGE NIFTY / 5DR</button>
+    <button data-engine="EDGE_STOCKS">EDGE STOCKS</button>
+  </div>
+
+  <section class="panel status">
+    <div><div class="eyebrow">LEARNING STATE</div><h2 id="stateTitle" style="margin:4px 0">Loading…</h2><div id="stateDetail" class="muted">Fetching the latest governed snapshot.</div></div>
+    <span id="statePill" class="pill">…</span>
+  </section>
+
+  <section class="panel">
+    <div class="section-title"><h2>Snapshot</h2><span id="snapshotId" class="muted">—</span></div>
+    <div id="metrics" class="grid"></div>
+    <details><summary>Snapshot drill-down</summary><pre id="snapshotJson">—</pre></details>
+  </section>
+
+  <section class="panel">
+    <div class="section-title"><h2>Approval queue</h2><span id="approvalCount" class="muted">0 pending</span></div>
+    <div class="firewall muted"><strong style="color:var(--text)">Governance firewall:</strong> Approve means <b>APPROVED_FOR_BUILD</b> only. It cannot alter production logic, frozen methodology, canonical selection, official efficacy, or the protected 08:40 canonical path.</div>
+    <div id="candidates"></div>
+  </section>
+
+  <section class="panel">
+    <div class="section-title"><h2>Recent governance decisions</h2></div>
+    <div id="decisions"></div>
+  </section>
+</main>
+<script>
+(()=>{
+  const $=id=>document.getElementById(id), tabs=[...document.querySelectorAll('[data-engine]')];
+  let engine='5DR';
+  const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
+  const pretty=v=>JSON.stringify(v??{},null,2);
+  const date=v=>{const d=new Date(v);return Number.isNaN(d.getTime())?'—':d.toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})};
+  const metric=(label,value)=>`<div class="metric"><span>${esc(label)}</span><strong>${esc(value)}</strong></div>`;
+
+  async function load(){
+    $('stateTitle').textContent='Loading…';$('statePill').textContent='…';$('statePill').className='pill';
+    try{
+      const r=await fetch('/api/learning-lab/governance-view?engine='+encodeURIComponent(engine),{cache:'no-store'});
+      const data=await r.json();if(!r.ok)throw new Error(data.error||'Governance view failed');
+      const s=data.snapshot||{}, p=data.presentation_state||{state:'FAILED',reason:'NO_STATE'};
+      $('statePill').textContent=p.state;$('statePill').className='pill '+p.state;
+      const titles={LIVE:'Current learning snapshot',PARTIAL:'Partial learning snapshot',STALE:'Learning snapshot is stale',FAILED:'Learning state unavailable'};
+      $('stateTitle').textContent=titles[p.state]||p.state;
+      $('stateDetail').textContent=`As of ${date(s.as_of)} · ${String(s.data_quality_state||'quality state unavailable')} · ${String(p.reason||'')}`;
+      $('snapshotId').textContent=s.snapshot_id||'No snapshot';
+      $('metrics').innerHTML=[
+        metric('Runs analyzed',s.runs_analyzed??0),metric('Canonical',s.canonical_runs??0),metric('Matured outcomes',s.matured_outcomes??0),metric('Scorable',s.scorable_outcomes??0),
+        metric('Data gaps',s.data_gap_outcomes??0),metric('New observations',s.new_observations??0),metric('Challengers',s.active_challengers??0),metric('Approval required',s.approval_required??0)
+      ].join('');
+      $('snapshotJson').textContent=pretty({presentation_state:p,methodology_versions:s.methodology_versions,source_lineage:s.source_lineage,snapshot:s.snapshot});
+      renderCandidates(data.candidates||[]);renderDecisions(data.recent_decisions||[]);
+    }catch(e){
+      $('stateTitle').textContent='Learning state unavailable';$('stateDetail').textContent=String(e.message||e);$('statePill').textContent='FAILED';$('statePill').className='pill FAILED';
+      $('metrics').innerHTML='';$('snapshotId').textContent='—';$('snapshotJson').textContent='—';$('candidates').innerHTML='<div class="empty error">Unable to load approval queue.</div>';$('decisions').innerHTML='';
+    }
+  }
+
+  function renderCandidates(items){
+    $('approvalCount').textContent=`${items.length} pending`;
+    if(!items.length){$('candidates').innerHTML='<div class="empty">No challenger currently requires approval.</div>';return}
+    $('candidates').innerHTML=items.map(c=>`<article class="candidate" data-id="${esc(c.candidate_id)}">
+      <h3>${esc(c.candidate_id)}</h3><div class="muted">Created ${date(c.created_at)} · ${esc(c.status)}</div>
+      <div class="candidate-grid" style="margin-top:10px"><div class="box"><b>Proposal</b><pre>${esc(pretty(c.proposal))}</pre></div><div class="box"><b>Validation state</b><pre>${esc(pretty(c.validation_state))}</pre></div><div class="box"><b>Baseline</b><pre>${esc(pretty(c.baseline_metrics))}</pre></div><div class="box"><b>Challenger</b><pre>${esc(pretty(c.challenger_metrics))}</pre></div></div>
+      <div class="decision"><button class="approve" data-action="APPROVE">Approve for build</button><button class="defer" data-action="DEFER">Defer</button><button class="reject" data-action="REJECT">Reject</button></div>
+    </article>`).join('');
+    [...document.querySelectorAll('.candidate button[data-action]')].forEach(b=>b.addEventListener('click',()=>decide(b.closest('.candidate').dataset.id,b.dataset.action,b)));
+  }
+
+  function renderDecisions(items){
+    if(!items.length){$('decisions').innerHTML='<div class="empty">No governance decision recorded yet.</div>';return}
+    $('decisions').innerHTML=items.map(d=>`<div class="decision-row"><strong>${esc(d.action)}</strong> · ${esc(d.candidate_id)} → ${esc(d.new_status)}<div class="muted">${date(d.decided_at)} · decision event ${esc(d.approval_event_id)}</div></div>`).join('');
+  }
+
+  async function decide(candidateId,action,button){
+    const wording=action==='APPROVE'?'Approve this challenger for build/validation only? This does not promote it to production.':`${action[0]+action.slice(1).toLowerCase()} this challenger?`;
+    if(!confirm(wording))return;
+    const note=prompt('Optional decision note:','')||'';
+    const buttons=[...button.closest('.decision').querySelectorAll('button')];buttons.forEach(x=>x.disabled=true);
+    try{
+      const r=await fetch('/api/learning-lab/candidate-decision',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({candidate_id:candidateId,action,note,decision_context:{surface:'CONSOLE_G4_UI',engine}})});
+      const data=await r.json();if(!r.ok)throw new Error(data.error||'Decision failed');
+      alert(action==='APPROVE'?'Approved for build/validation. Production remains unchanged.':'Decision recorded.');await load();
+    }catch(e){alert(String(e.message||e));buttons.forEach(x=>x.disabled=false)}
+  }
+
+  tabs.forEach(t=>t.addEventListener('click',()=>{engine=t.dataset.engine;tabs.forEach(x=>x.classList.toggle('active',x===t));load()}));
+  $('refresh').addEventListener('click',load);load();
+})();
+</script>
+</body>
+</html>
