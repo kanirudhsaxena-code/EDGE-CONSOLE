@@ -176,6 +176,11 @@ async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refresh
         ${typeof assessment.score==='number'?assessment.score:null},
         ${JSON.stringify(assessment.metrics)}::jsonb
       )
+      on conflict (engine,source_id,assessed_at) do update
+      set headline=excluded.headline,
+          score=excluded.score,
+          metrics=excluded.metrics,
+          created_at=now()
     `;
     return {ok:true,refreshed:true};
   }catch(error){
@@ -319,6 +324,11 @@ async function fiveDrAssessmentImport(request: Request, env: Env): Promise<Respo
       ${typeof body.score === 'number' ? body.score : null},
       ${JSON.stringify(body.metrics)}::jsonb
     )
+      on conflict (engine,source_id,assessed_at) do update
+      set headline=excluded.headline,
+          score=excluded.score,
+          metrics=excluded.metrics,
+          created_at=now()
   `;
   return json({ ok: true, source_id: sourceId }, 201);
 }
