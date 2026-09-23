@@ -1,7 +1,7 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "edge-console",
-  "main": "src/mobile-v1-entry.ts",
+  "main": "src/production-entry.ts",
   "compatibility_date": "2026-09-11",
   "assets": {
     "directory": "./public",
