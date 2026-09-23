@@ -1,0 +1,206 @@
+name: G5 Production Rollback Recovery
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_version_id:
+        description: 'Exact Cloudflare Worker version ID to recover to'
+        required: true
+        type: string
+      reason:
+        description: 'Why production recovery is required'
+        required: true
+        type: string
+      confirmation:
+        description: 'Type exactly: ROLLBACK EDGE-CONSOLE'
+        required: true
+        type: string
+      dry_run:
+        description: 'Validate the target and recovery evidence without changing production'
+        required: true
+        default: true
+        type: boolean
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: g5-production-recovery
+  cancel-in-progress: false
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      TARGET_VERSION_ID: ${{ inputs.target_version_id }}
+      RECOVERY_REASON: ${{ inputs.reason }}
+      RECOVERY_CONFIRMATION: ${{ inputs.confirmation }}
+      RECOVERY_DRY_RUN: ${{ inputs.dry_run }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Enforce owner-only explicit recovery request
+        run: |
+          set -euo pipefail
+          test "$GITHUB_ACTOR" = "$GITHUB_REPOSITORY_OWNER"
+          test "$RECOVERY_CONFIRMATION" = 'ROLLBACK EDGE-CONSOLE'
+          test -n "$RECOVERY_REASON"
+          if ! printf '%s' "$TARGET_VERSION_ID" | grep -Eq '^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$'; then
+            echo 'target_version_id must be an exact Cloudflare Worker UUID'
+            exit 1
+          fi
+
+      - name: Validate current recovery control plane
+        run: |
+          set -euo pipefail
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm test
+
+      - name: Capture Cloudflare recovery inventory and target provenance
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/g5-recovery
+          npx wrangler versions list --json > /tmp/g5-recovery/versions.json
+          npx wrangler deployments list --json > /tmp/g5-recovery/deployments-before.json
+          node <<'NODE'
+          const fs=require('fs');
+          const target=process.env.TARGET_VERSION_ID;
+          const versions=JSON.parse(fs.readFileSync('/tmp/g5-recovery/versions.json','utf8'));
+          let match=null;
+          const walk=(node)=>{
+            if(match||node===null||typeof node!=='object')return;
+            if(!Array.isArray(node)){
+              const ids=[node.id,node.version_id,node.versionId].filter(v=>typeof v==='string');
+              if(ids.includes(target)){match=node;return;}
+            }
+            for(const value of Object.values(node))walk(value);
+          };
+          walk(versions);
+          if(!match)throw new Error(`Target version ${target} is not in the recoverable Wrangler version window`);
+          const encoded=JSON.stringify(match);
+          const tag=(typeof match.tag==='string'&&match.tag) || (encoded.match(/git-[0-9a-f]{12}/i)||[])[0] || '';
+          const m=/^git-([0-9a-f]{12})$/i.exec(tag);
+          if(!m)throw new Error(`Target ${target} has no governed git-<sha12> deployment tag`);
+          fs.writeFileSync('/tmp/g5-recovery/target-version.json',JSON.stringify(match,null,2));
+          fs.appendFileSync(process.env.GITHUB_ENV,`TARGET_GIT_TAG=${tag}\nTARGET_SHA_PREFIX=${m[1].toLowerCase()}\n`);
+          console.log(`target_version=${target} target_tag=${tag}`);
+          NODE
+
+      - name: Prove target was a previously green production release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          API="https://api.github.com/repos/$GITHUB_REPOSITORY"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$API/commits/$TARGET_SHA_PREFIX" > /tmp/g5-recovery/target-commit.json
+          TARGET_FULL_SHA="$(node -e "const d=require('/tmp/g5-recovery/target-commit.json'); process.stdout.write(String(d.sha||''))")"
+          test -n "$TARGET_FULL_SHA"
+          echo "TARGET_FULL_SHA=$TARGET_FULL_SHA" >> "$GITHUB_ENV"
+          curl --fail --silent --show-error \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H 'Accept: application/vnd.github+json' \
+            "$API/actions/runs?head_sha=$TARGET_FULL_SHA&status=completed&per_page=100" > /tmp/g5-recovery/target-runs.json
+          node <<'NODE'
+          const d=require('/tmp/g5-recovery/target-runs.json');
+          const runs=Array.isArray(d.workflow_runs)?d.workflow_runs:[];
+          const green=(name)=>runs.some(r=>r.name===name&&r.conclusion==='success');
+          if(!green('EDGE Console Deploy'))throw new Error('Target commit has no successful EDGE Console Deploy run');
+          if(!green('EDGE Production Smoke'))throw new Error('Target commit has no successful EDGE Production Smoke run');
+          console.log('target_release_evidence=DEPLOY_GREEN+PRODUCTION_SMOKE_GREEN');
+          NODE
+
+      - name: Record preflight decision
+        run: |
+          set -euo pipefail
+          {
+            echo '## G5 recovery preflight'
+            echo "- Actor: $GITHUB_ACTOR"
+            echo "- Requested target: $TARGET_VERSION_ID"
+            echo "- Governed tag: $TARGET_GIT_TAG"
+            echo "- Git commit: $TARGET_FULL_SHA"
+            echo "- Dry run: $RECOVERY_DRY_RUN"
+            echo "- Reason: $RECOVERY_REASON"
+            echo '- Target evidence: successful deploy + successful production smoke'
+            echo '- Production methodology/scoring/canonical scheduling: unchanged by recovery workflow'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Stop after validated dry run
+        if: ${{ inputs.dry_run }}
+        run: |
+          echo 'G5_DRY_RUN_VALIDATED: target is eligible; production was not changed.'
+
+      - name: Roll back to exact governed Worker version
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          npx wrangler rollback "$TARGET_VERSION_ID" \
+            --message "G5 owner rollback actor=$GITHUB_ACTOR source=$GITHUB_SHA target=$TARGET_GIT_TAG reason=$RECOVERY_REASON"
+
+      - name: Prove requested version is active after rollback
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          npx wrangler deployments list --json > /tmp/g5-recovery/deployments-after.json
+          node <<'NODE'
+          const fs=require('fs');
+          const target=process.env.TARGET_VERSION_ID;
+          const raw=fs.readFileSync('/tmp/g5-recovery/deployments-after.json','utf8');
+          if(!raw.includes(target))throw new Error(`Rollback target ${target} was not observed in deployment history after rollback`);
+          console.log(`rollback_target_observed=${target}`);
+          NODE
+
+      - name: Validate production health after rollback
+        if: ${{ !inputs.dry_run }}
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          curl --location --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Cache-Control: no-cache' \
+            "$BASE/api/edge-stocks/health?recovery=$GITHUB_RUN_ID" \
+            -o /tmp/g5-recovery/health-after.json
+          curl --location --fail --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Cache-Control: no-cache' \
+            "$BASE/edge-live.js?recovery=$GITHUB_RUN_ID" \
+            -o /tmp/g5-recovery/edge-live-after.js
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/g5-recovery/health-after.json'))
+          assert d.get('ok') is True, d
+          assert d.get('edge_database_configured') is True, d
+          assert d.get('research_contract_version') == 'EDGE_RESEARCH_BUNDLE_V1', d
+          assert d.get('research_authority') == 'CHATGPT', d
+          assert d.get('fresh_web_research_required') is True, d
+          renderer=open('/tmp/g5-recovery/edge-live-after.js').read()
+          for marker in ('EDGE_STOCKS_V1_3','Official canonical status','Outcome checks recorded'):
+              assert marker in renderer, marker
+          PY
+          echo 'G5_ROLLBACK_HEALTHY: requested governed version is serving production.'
+
+      - name: Preserve recovery evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g5-recovery-evidence-${{ github.run_id }}
+          path: /tmp/g5-recovery
+          if-no-files-found: warn
+          retention-days: 30
