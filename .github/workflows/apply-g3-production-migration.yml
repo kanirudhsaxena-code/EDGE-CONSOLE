@@ -1,0 +1,76 @@
+name: Apply G3 Console Production Migration
+
+on:
+  push:
+    branches:
+      - vnext/learning-lab-foundation-20260922
+    paths:
+      - '.github/workflows/apply-g3-production-migration.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install PostgreSQL client
+        run: python -m pip install "psycopg[binary]>=3.2,<4"
+      - name: Apply additive Console G3 migration
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          import psycopg
+
+          sql = Path("migrations/009_learning_lab_vnext.sql").read_text(encoding="utf-8")
+          with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+              with conn.cursor() as cur:
+                  cur.execute(sql)
+              conn.commit()
+          print("console_g3_migration_applied")
+          PY
+      - name: Verify Console G3 production schema
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          import psycopg
+
+          required = {
+              "learning_observations_vnext",
+              "learning_daily_snapshots_vnext",
+              "learning_hypotheses_vnext",
+              "learning_candidates_vnext",
+              "learning_approval_events_vnext",
+          }
+          with psycopg.connect(os.environ["DATABASE_URL"]) as conn:
+              with conn.cursor() as cur:
+                  cur.execute("""
+                    select tablename from pg_tables
+                    where schemaname='public'
+                      and tablename = any(%s)
+                  """, (list(required),))
+                  found={row[0] for row in cur.fetchall()}
+                  missing=required-found
+                  if missing:
+                      raise SystemExit(f"missing Console G3 tables: {sorted(missing)}")
+                  cur.execute("""
+                    select engine from engine_registry
+                    where engine in ('5DR','EDGE_STOCKS')
+                    order by engine
+                  """)
+                  engines=[row[0] for row in cur.fetchall()]
+                  if engines != ['5DR','EDGE_STOCKS']:
+                      raise SystemExit(f"engine_registry missing required engines: {engines}")
+          print("console_g3_production_schema_verified")
+          PY
