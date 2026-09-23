@@ -144,5 +144,140 @@ select run_id,generated_at,freshness_at,result
  limit 12`;
 const pending=pendingRows.map((p:any)=>{const result=isObject(p.result)?p.result:{},probs=isObject(result.probabilities)?result.probabilities:{},slots=isObject(result.horizon_slots)?result.horizon_slots:{};return{run_id:p.run_id,generated_at:p.generated_at,freshness_at:p.freshness_at,directional_label:result.directional_label??null,probabilities:probs,horizon_slots:slots,tradeable:result.tradeable===true,market_trust:typeof result.market_trust==='number'?result.market_trust:null,execution_edge:typeof result.execution_edge==='number'?result.execution_edge:null}});
 return json({summary:{engine:'5DR',canonical, population_rule:String(overall.population_rule??rec.population_rule??'SELECTED_DAILY_CANONICAL_ONLY'),matured_runs:forecastEligible,matured_eligible_checkpoints:forecastEligible,scorable_checkpoints:forecastTotal,missing_unscorable_checkpoints:forecastMissing,scorable_coverage_pct:forecastCoverage,pending_forecasts:pending.length,assessment_as_of:row.assessed_at,forecast:{population:'SCORABLE_MATURED_CANONICAL_CHECKPOINTS',eligible_total:forecastEligible,total:forecastTotal,missing_unscorable:forecastMissing,coverage_pct:forecastCoverage,hits:forecastHits,accuracy_pct:typeof overall.directional_accuracy_pct==='number'?overall.directional_accuracy_pct:(forecastTotal?Number((forecastHits/forecastTotal*100).toFixed(2)):null)},recommendation:{population:'RESOLVED_CANONICAL_ACTIONABLE_RECOMMENDATIONS',total:recTotal,hits:recHits,accuracy_pct:typeof rec.hit_rate_pct==='number'?rec.hit_rate_pct:(recTotal?Number((recHits/recTotal*100).toFixed(2)):null),no_trade_calls:Number(rec.no_trade_calls??0)},returns:{population:'CANONICAL_ACTIONABLE_RECOMMENDATIONS',absolute_return_pct:typeof returns.cumulative_resolved_pnl_pct==='number'?returns.cumulative_resolved_pnl_pct:null,hits_return_pct:typeof returns.hit_pnl_pct==='number'?returns.hit_pnl_pct:null,misses_return_pct:typeof returns.miss_pnl_pct==='number'?returns.miss_pnl_pct:null}},pending_forecasts:pending,details:[{run_id:row.source_id,assessment_horizon:'TILL_DATE',outcome:row.headline,score:row.score,metrics:{canonical_selection:canonical,day_wise:day,zone_wise:Object.fromEntries(Object.entries(day).map(([k,v]:any)=>[k,isObject(v)?{zone_hits:v.zone_hits,scorable:v.scorable,eligible_matured:v.eligible_matured,missing_unscorable:v.missing_unscorable,coverage_pct:v.coverage_pct,zone_hit_rate_pct:v.zone_hit_rate_pct}:v])),recommendation_metrics:rec,day_recommendation_metrics:dayRec,return_metrics:returns},assessed_at:row.assessed_at}]})
-}}const rows=await sql`select oa.run_id,oa.assessment_horizon,oa.outcome,oa.score,oa.metrics,oa.assessed_at,ar.generated_at from outcome_assessments oa join analysis_runs ar on ar.run_id=oa.run_id where ar.engine=${engine} and ar.published=true order by oa.assessed_at asc`;let forecastTotal=0,forecastHits=0,recommendationTotal=0,recommendationHits=0,overallReturn=0,hitReturn=0,missReturn=0,returnCount=0,hitReturnCount=0,missReturnCount=0;const details=rows.map((row:any)=>{const m=isObject(row.metrics)?row.metrics:{};const fh=typeof m.forecast_hit==='boolean'?m.forecast_hit:null,rh=typeof m.recommendation_hit==='boolean'?m.recommendation_hit:null;const ret=typeof m.absolute_return_pct==='number'?m.absolute_return_pct:(typeof m.return_pct==='number'?m.return_pct:null);if(fh!==null){forecastTotal++;if(fh)forecastHits++}if(rh!==null){recommendationTotal++;if(rh)recommendationHits++}if(typeof ret==='number'&&Number.isFinite(ret)){overallReturn+=ret;returnCount++;const isHit=rh??fh;if(isHit===true){hitReturn+=ret;hitReturnCount++}else if(isHit===false){missReturn+=ret;missReturnCount++}}return {run_id:row.run_id,assessment_horizon:row.assessment_horizon,outcome:row.outcome,score:row.score,metrics:m,assessed_at:row.assessed_at,generated_at:row.generated_at}});return json({summary:{engine,matured_runs:rows.length,forecast:{total:forecastTotal,hits:forecastHits,accuracy_pct:forecastTotal?Number((forecastHits/forecastTotal*100).toFixed(1)):null},recommendation:{total:recommendationTotal,hits:recommendationHits,accuracy_pct:recommendationTotal?Number((recommendationHits/recommendationTotal*100).toFixed(1)):null},returns:{absolute_return_pct:returnCount?Number(overallReturn.toFixed(2)):null,hits_return_pct:hitReturnCount?Number(hitReturn.toFixed(2)):null,misses_return_pct:missReturnCount?Number(missReturn.toFixed(2)):null}},details})}if(url.pathname==='/api/5dr/runs'&&request.method==='POST'){if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);let body:unknown;try{body=await request.json()}catch{return json({error:'Invalid JSON body'},400)}const errors=validate5drEnvelope(body);if(errors.length)return json({error:'5DR contract validation failed',details:errors},422);const payload=body as JsonRecord,provenance=payload.provenance as JsonRecord,sql=neon(env.DATABASE_URL),existing=await sql`select run_id from analysis_runs where run_id=${String(payload.run_id)} limit 1`;if(existing.length)return json({error:'run_id already exists; runs are immutable'},409);const requestId=isNonEmptyString(payload.request_id)?String(payload.request_id):null;if(requestId){const requests=await sql`select request_id,status from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;if(!requests.length)return json({error:'request_id not found'},422);if(!['READY_FOR_ENGINE','PROCESSING'].includes(String(requests[0].status)))return json({error:'request_id is not eligible for completion'},409)}const status=String(payload.status),requestedPublish=payload.published===true;if(requestedPublish&&status!=='SUCCESS')return json({error:'Only SUCCESS runs may be published'},422);const requestRows=requestId?await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`:[],requestMetadata=requestRows.length&&isObject(requestRows[0].metadata)?requestRows[0].metadata:{},releasePolicy=effectiveRunReleasePolicy(requestMetadata,requestedPublish,payload.learning_eligible!==false);const sources=Array.isArray(provenance.sources)?provenance.sources:[],freshnessAt=isNonEmptyString(provenance.freshness_at)?provenance.freshness_at:null,warnings=Array.isArray(payload.warnings)?payload.warnings:[];await sql`insert into analysis_runs (run_id,engine,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,learning_eligible,published) values (${String(payload.run_id)},'5DR',${String(payload.contract_version)},${String(payload.framework_version)},${status},${String(provenance.mode)},${JSON.stringify(sources)}::jsonb,${freshnessAt},${String(payload.generated_at)},${JSON.stringify(payload.result)}::jsonb,${JSON.stringify(warnings)}::jsonb,${releasePolicy.learning_eligible},${releasePolicy.published})`;if(requestId){const nextMeta={...requestMetadata,adapter_stage:'COMPLETED',completion:{status:releasePolicy.completion_status,run_id:String(payload.run_id),sandbox:releasePolicy.sandbox,completed_at:new Date().toISOString()}};await sql`update analysis_requests set status='COMPLETED',run_id=${String(payload.run_id)},metadata=${JSON.stringify(nextMeta)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;await sql`update evidence_uploads set status='ATTACHED',run_id=${String(payload.run_id)} where request_id=${requestId}`}return json({ok:true,run_id:payload.run_id,engine:'5DR',published:releasePolicy.published,learning_eligible:releasePolicy.learning_eligible,sandbox:releasePolicy.sandbox,contract:'5DR_V2_1_2',request_id:requestId},201)}return json({error:'Not found'},404)}
+}}const rows=await sql`select oa.run_id,oa.assessment_horizon,oa.outcome,oa.score,oa.metrics,oa.assessed_at,ar.generated_at from outcome_assessments oa join analysis_runs ar on ar.run_id=oa.run_id where ar.engine=${engine} and ar.published=true order by oa.assessed_at asc`;let forecastTotal=0,forecastHits=0,recommendationTotal=0,recommendationHits=0,overallReturn=0,hitReturn=0,missReturn=0,returnCount=0,hitReturnCount=0,missReturnCount=0;const details=rows.map((row:any)=>{const m=isObject(row.metrics)?row.metrics:{};const fh=typeof m.forecast_hit==='boolean'?m.forecast_hit:null,rh=typeof m.recommendation_hit==='boolean'?m.recommendation_hit:null;const ret=typeof m.absolute_return_pct==='number'?m.absolute_return_pct:(typeof m.return_pct==='number'?m.return_pct:null);if(fh!==null){forecastTotal++;if(fh)forecastHits++}if(rh!==null){recommendationTotal++;if(rh)recommendationHits++}if(typeof ret==='number'&&Number.isFinite(ret)){overallReturn+=ret;returnCount++;const isHit=rh??fh;if(isHit===true){hitReturn+=ret;hitReturnCount++}else if(isHit===false){missReturn+=ret;missReturnCount++}}return {run_id:row.run_id,assessment_horizon:row.assessment_horizon,outcome:row.outcome,score:row.score,metrics:m,assessed_at:row.assessed_at,generated_at:row.generated_at}});return json({summary:{engine,matured_runs:rows.length,forecast:{total:forecastTotal,hits:forecastHits,accuracy_pct:forecastTotal?Number((forecastHits/forecastTotal*100).toFixed(1)):null},recommendation:{total:recommendationTotal,hits:recommendationHits,accuracy_pct:recommendationTotal?Number((recommendationHits/recommendationTotal*100).toFixed(1)):null},returns:{absolute_return_pct:returnCount?Number(overallReturn.toFixed(2)):null,hits_return_pct:hitReturnCount?Number(hitReturn.toFixed(2)):null,misses_return_pct:missReturnCount?Number(missReturn.toFixed(2)):null}},details})}if(url.pathname==='/api/internal/g3-schema-migrate-20260923'&&request.method==='POST'){
+  if(request.headers.get('x-mdos-g3-migration')!=='approved-20260923')return json({error:'Not found'},404);
+  const databaseUrl=env.DATABASE_URL;
+  if(!databaseUrl)return json({error:'Database is not configured'},503);
+  const sql=neon(databaseUrl);
+  try{
+    const engineRows=await sql`select engine from engine_registry where engine in ('5DR','EDGE_STOCKS') order by engine`;
+    const engines=engineRows.map((row:any)=>String(row.engine));
+    if(engines.length!==2||engines[0]!=='5DR'||engines[1]!=='EDGE_STOCKS')return json({error:'Required engine registry rows missing',engines},409);
+
+    await sql`CREATE TABLE IF NOT EXISTS learning_observations_vnext (
+      id bigserial PRIMARY KEY,
+      observation_id text NOT NULL UNIQUE,
+      engine text NOT NULL REFERENCES engine_registry(engine),
+      source_run_id text NOT NULL,
+      run_role text NOT NULL CHECK (run_role IN ('CANONICAL','DIAGNOSTIC','MANUAL','SHADOW')),
+      official_efficacy_eligible boolean NOT NULL DEFAULT false,
+      target_trading_date date NOT NULL,
+      horizon text NOT NULL,
+      dimension text NOT NULL,
+      observation_type text NOT NULL,
+      outcome_classification text,
+      metrics jsonb NOT NULL DEFAULT '{}'::jsonb,
+      evidence jsonb NOT NULL DEFAULT '{}'::jsonb,
+      exclusion_reason text,
+      observed_at timestamptz NOT NULL,
+      source_ref text NOT NULL,
+      content_hash text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CHECK (official_efficacy_eligible OR exclusion_reason IS NOT NULL OR run_role = 'CANONICAL')
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_observations_vnext_engine_target_idx ON learning_observations_vnext(engine, target_trading_date DESC, observed_at DESC)`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_observations_vnext_run_idx ON learning_observations_vnext(engine, source_run_id, observed_at DESC)`;
+
+    await sql`CREATE TABLE IF NOT EXISTS learning_daily_snapshots_vnext (
+      id bigserial PRIMARY KEY,
+      snapshot_id text NOT NULL UNIQUE,
+      engine text NOT NULL REFERENCES engine_registry(engine),
+      cycle_id text NOT NULL,
+      as_of timestamptz NOT NULL,
+      snapshot_status text NOT NULL CHECK (snapshot_status IN ('COMPLETE','PARTIAL')),
+      runs_analyzed integer NOT NULL CHECK (runs_analyzed >= 0),
+      canonical_runs integer NOT NULL CHECK (canonical_runs >= 0),
+      diagnostic_runs integer NOT NULL CHECK (diagnostic_runs >= 0),
+      manual_runs integer NOT NULL CHECK (manual_runs >= 0),
+      shadow_runs integer NOT NULL CHECK (shadow_runs >= 0),
+      matured_outcomes integer NOT NULL CHECK (matured_outcomes >= 0),
+      scorable_outcomes integer NOT NULL CHECK (scorable_outcomes >= 0),
+      data_gap_outcomes integer NOT NULL CHECK (data_gap_outcomes >= 0),
+      new_observations integer NOT NULL CHECK (new_observations >= 0),
+      active_hypotheses integer NOT NULL CHECK (active_hypotheses >= 0),
+      active_challengers integer NOT NULL CHECK (active_challengers >= 0),
+      approval_required integer NOT NULL CHECK (approval_required >= 0),
+      data_quality_state text NOT NULL,
+      methodology_versions jsonb NOT NULL DEFAULT '{}'::jsonb,
+      source_lineage jsonb NOT NULL DEFAULT '{}'::jsonb,
+      snapshot jsonb NOT NULL DEFAULT '{}'::jsonb,
+      content_hash text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      UNIQUE(engine, cycle_id),
+      CHECK (canonical_runs + diagnostic_runs + manual_runs + shadow_runs <= runs_analyzed),
+      CHECK (scorable_outcomes + data_gap_outcomes <= matured_outcomes)
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_daily_snapshots_vnext_engine_asof_idx ON learning_daily_snapshots_vnext(engine, as_of DESC, id DESC)`;
+
+    await sql`CREATE TABLE IF NOT EXISTS learning_hypotheses_vnext (
+      id bigserial PRIMARY KEY,
+      hypothesis_id text NOT NULL UNIQUE,
+      engine text NOT NULL REFERENCES engine_registry(engine),
+      dimension text NOT NULL,
+      status text NOT NULL CHECK (status IN ('OBSERVING','HYPOTHESIS','CANDIDATE','VALIDATING','PENDING_USER_APPROVAL','APPROVED_FOR_BUILD','REJECTED','DEFERRED')),
+      title text NOT NULL,
+      hypothesis jsonb NOT NULL,
+      source_population jsonb NOT NULL DEFAULT '{}'::jsonb,
+      content_hash text NOT NULL,
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_hypotheses_vnext_engine_status_idx ON learning_hypotheses_vnext(engine, status, created_at DESC)`;
+
+    await sql`CREATE TABLE IF NOT EXISTS learning_candidates_vnext (
+      id bigserial PRIMARY KEY,
+      candidate_id text NOT NULL UNIQUE,
+      engine text NOT NULL REFERENCES engine_registry(engine),
+      hypothesis_id text REFERENCES learning_hypotheses_vnext(hypothesis_id),
+      status text NOT NULL CHECK (status IN ('CANDIDATE','VALIDATING','PENDING_USER_APPROVAL','APPROVED_FOR_BUILD','REJECTED','DEFERRED')),
+      proposal jsonb NOT NULL,
+      baseline_metrics jsonb NOT NULL DEFAULT '{}'::jsonb,
+      challenger_metrics jsonb NOT NULL DEFAULT '{}'::jsonb,
+      validation_state jsonb NOT NULL DEFAULT '{}'::jsonb,
+      content_hash text NOT NULL,
+      automatic_adoption boolean NOT NULL DEFAULT false CHECK (automatic_adoption = false),
+      production_change_allowed boolean NOT NULL DEFAULT false CHECK (production_change_allowed = false),
+      created_at timestamptz NOT NULL DEFAULT now()
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_candidates_vnext_engine_status_idx ON learning_candidates_vnext(engine, status, created_at DESC)`;
+
+    await sql`CREATE TABLE IF NOT EXISTS learning_approval_events_vnext (
+      id bigserial PRIMARY KEY,
+      approval_event_id text NOT NULL UNIQUE,
+      candidate_id text NOT NULL REFERENCES learning_candidates_vnext(candidate_id),
+      candidate_hash text NOT NULL,
+      action text NOT NULL CHECK (action IN ('APPROVE','REJECT','DEFER')),
+      prior_status text NOT NULL CHECK (prior_status = 'PENDING_USER_APPROVAL'),
+      new_status text NOT NULL CHECK (new_status IN ('APPROVED_FOR_BUILD','REJECTED','DEFERRED')),
+      decided_by text NOT NULL,
+      decided_at timestamptz NOT NULL,
+      decision_context jsonb NOT NULL DEFAULT '{}'::jsonb,
+      created_at timestamptz NOT NULL DEFAULT now(),
+      CHECK (
+        (action = 'APPROVE' AND new_status = 'APPROVED_FOR_BUILD') OR
+        (action = 'REJECT' AND new_status = 'REJECTED') OR
+        (action = 'DEFER' AND new_status = 'DEFERRED')
+      )
+    )`;
+    await sql`CREATE INDEX IF NOT EXISTS learning_approval_events_vnext_candidate_idx ON learning_approval_events_vnext(candidate_id, decided_at DESC)`;
+
+    const verifyRows=await sql`
+      select tablename from pg_tables
+      where schemaname='public'
+        and tablename in (
+          'learning_observations_vnext',
+          'learning_daily_snapshots_vnext',
+          'learning_hypotheses_vnext',
+          'learning_candidates_vnext',
+          'learning_approval_events_vnext'
+        )
+      order by tablename
+    `;
+    const tables=verifyRows.map((row:any)=>String(row.tablename));
+    if(tables.length!==5)return json({error:'G3 schema verification failed',tables},500);
+    return json({ok:true,applied:true,verified:true,tables,production_methodology_changed:false},200);
+  }catch(error){
+    return json({error:'G3 schema migration failed',detail:String(error)},500);
+  }
+}
+if(url.pathname==='/api/5dr/runs'&&request.method==='POST'){if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);let body:unknown;try{body=await request.json()}catch{return json({error:'Invalid JSON body'},400)}const errors=validate5drEnvelope(body);if(errors.length)return json({error:'5DR contract validation failed',details:errors},422);const payload=body as JsonRecord,provenance=payload.provenance as JsonRecord,sql=neon(env.DATABASE_URL),existing=await sql`select run_id from analysis_runs where run_id=${String(payload.run_id)} limit 1`;if(existing.length)return json({error:'run_id already exists; runs are immutable'},409);const requestId=isNonEmptyString(payload.request_id)?String(payload.request_id):null;if(requestId){const requests=await sql`select request_id,status from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;if(!requests.length)return json({error:'request_id not found'},422);if(!['READY_FOR_ENGINE','PROCESSING'].includes(String(requests[0].status)))return json({error:'request_id is not eligible for completion'},409)}const status=String(payload.status),requestedPublish=payload.published===true;if(requestedPublish&&status!=='SUCCESS')return json({error:'Only SUCCESS runs may be published'},422);const requestRows=requestId?await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`:[],requestMetadata=requestRows.length&&isObject(requestRows[0].metadata)?requestRows[0].metadata:{},releasePolicy=effectiveRunReleasePolicy(requestMetadata,requestedPublish,payload.learning_eligible!==false);const sources=Array.isArray(provenance.sources)?provenance.sources:[],freshnessAt=isNonEmptyString(provenance.freshness_at)?provenance.freshness_at:null,warnings=Array.isArray(payload.warnings)?payload.warnings:[];await sql`insert into analysis_runs (run_id,engine,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,learning_eligible,published) values (${String(payload.run_id)},'5DR',${String(payload.contract_version)},${String(payload.framework_version)},${status},${String(provenance.mode)},${JSON.stringify(sources)}::jsonb,${freshnessAt},${String(payload.generated_at)},${JSON.stringify(payload.result)}::jsonb,${JSON.stringify(warnings)}::jsonb,${releasePolicy.learning_eligible},${releasePolicy.published})`;if(requestId){const nextMeta={...requestMetadata,adapter_stage:'COMPLETED',completion:{status:releasePolicy.completion_status,run_id:String(payload.run_id),sandbox:releasePolicy.sandbox,completed_at:new Date().toISOString()}};await sql`update analysis_requests set status='COMPLETED',run_id=${String(payload.run_id)},metadata=${JSON.stringify(nextMeta)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;await sql`update evidence_uploads set status='ATTACHED',run_id=${String(payload.run_id)} where request_id=${requestId}`}return json({ok:true,run_id:payload.run_id,engine:'5DR',published:releasePolicy.published,learning_eligible:releasePolicy.learning_eligible,sandbox:releasePolicy.sandbox,contract:'5DR_V2_1_2',request_id:requestId},201)}return json({error:'Not found'},404)}
 export default{async fetch(request:Request,env:Env):Promise<Response>{const url=new URL(request.url);if(url.pathname.startsWith('/api/'))return api(request,env);const asset=await env.ASSETS.fetch(request);const headers=new Headers(asset.headers);headers.set('cache-control','no-store, max-age=0');headers.set('pragma','no-cache');headers.set('expires','0');return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers})}};
