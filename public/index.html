@@ -7,6 +7,7 @@
   <title>EDGE Console</title>
   <link rel="manifest" href="/manifest.webmanifest" />
   <link rel="stylesheet" href="/styles.css?v=edge-ui-v19-20260922" />
+  <link rel="stylesheet" href="/learning-lab.css?v=vnext-g4-20260923" />
 </head>
 <body>
   <main class="shell">
@@ -33,16 +34,33 @@
     </section>
 
     <section id="fiveDrPanel" class="module-panel active">
+      <div class="module-subsection-label"><span>1.1</span><strong>Assessment</strong></div>
       <div id="assessmentSummary" class="assessment-summary-card"><div class="run muted">Loading till-date assessment…</div></div>
+
+      <div class="module-subsection-label"><span>1.2</span><strong>Learning Lab</strong></div>
+      <section id="fiveDrLearningLab" class="learning-lab-card card" data-learning-engine="5DR" aria-live="polite">
+        <div class="learning-lab-loading">Loading latest NIFTY Learning Lab snapshot…</div>
+      </section>
+
+      <div class="module-subsection-label"><span>1.3</span><strong>Current run output</strong></div>
       <div class="integration card">
         <div class="section-head compact"><div><div class="eyebrow">EDGE NIFTY</div><h3>Current result</h3></div><span id="fiveDrState" class="badge">Checking</span></div>
         <div id="fiveDrSummary" class="stack"><div class="run muted">Checking latest EDGE NIFTY publication…</div></div>
+        <div class="module-subsection-hint"><span>1.4</span> Current run drill-down is available inside the result’s full-analysis and advanced-detail sections.</div>
       </div>
     </section>
 
     <section id="edgeStocksPanel" class="module-panel" hidden>
+      <div class="module-subsection-label"><span>2.1</span><strong>Assessment</strong></div>
       <div id="stocksAssessmentSummary" class="assessment-summary-card" hidden></div>
-      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><form id="edgeCommandForm" class="run edge-command-form"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. Every press starts a new governed EDGE analysis using currently valid fresh research; it never reuses an earlier result as the new run. It does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="stocksSummary" class="stack"></div></div>
+
+      <div class="module-subsection-label"><span>2.2</span><strong>Learning Lab</strong></div>
+      <section id="stocksLearningLab" class="learning-lab-card card" data-learning-engine="EDGE_STOCKS" aria-live="polite">
+        <div class="learning-lab-loading">Loading latest EDGE Stocks Learning Lab snapshot…</div>
+      </section>
+
+      <div class="module-subsection-label"><span>2.3</span><strong>Current run output</strong></div>
+      <div class="integration card"><div class="section-head compact"><div><div class="eyebrow">EDGE STOCKS</div><h3>Latest stock decision</h3></div><span class="badge">Ready</span></div><form id="edgeCommandForm" class="run edge-command-form"><label>Prompt-driven EDGE command<input id="edgeCommandInput" type="text" value="EDGE LTF" autocomplete="off" spellcheck="false" /></label><p class="muted">Use: EDGE &lt;ticker/company&gt;. Every press starts a new governed EDGE analysis using currently valid fresh research; it never reuses an earlier result as the new run. It does not place trades.</p><button id="edgeCommandButton" type="submit" class="primary">Run EDGE</button><div id="edgeCommandStatus" class="upload-status" aria-live="polite"></div></form><div id="stocksSummary" class="stack"></div><div class="module-subsection-hint"><span>2.4</span> Current run drill-down is available inside the result’s full-analysis and advanced-detail sections.</div></div>
     </section>
 
     <section id="edgeIpoPanel" class="module-panel" hidden>
@@ -110,5 +128,6 @@
   <script type="module" src="/app.js?v=edge-ui-v19-20260922"></script>
   <script type="module" src="/resume.js?v=edge-ui-v19-20260922"></script>
   <script type="module" src="/edge-live.js?v=edge-ui-v19-20260922"></script>
+  <script type="module" src="/learning-lab.js?v=vnext-g4-20260923"></script>
 </body>
 </html>
