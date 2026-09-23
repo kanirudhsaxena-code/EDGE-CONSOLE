@@ -17,7 +17,19 @@ permissions:
 jobs:
   contract-acceptance:
     runs-on: ubuntu-24.04
-    timeout-minutes: 8
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     steps:
       - name: Checkout EDGE Console G3 branch
         uses: actions/checkout@v4
@@ -48,6 +60,56 @@ jobs:
         run: |
           python -m pip install --upgrade pip pytest
           npm install --no-audit --no-fund
+
+      - name: Rehearse additive G3 migrations on PostgreSQL 17
+        env:
+          PGPASSWORD: postgres
+        run: |
+          set -euo pipefail
+          PSQL="psql -h 127.0.0.1 -U postgres -d postgres -v ON_ERROR_STOP=1"
+          $PSQL <<'SQL'
+          CREATE TABLE engine_registry (
+            engine text PRIMARY KEY
+          );
+          INSERT INTO engine_registry(engine) VALUES ('5DR'),('EDGE_STOCKS');
+
+          CREATE TABLE recommendations (
+            recommendation_id text PRIMARY KEY
+          );
+          INSERT INTO recommendations(recommendation_id) VALUES ('g3-rehearsal-rec');
+
+          CREATE TABLE schema_meta (
+            schema_version integer PRIMARY KEY,
+            applied_at timestamptz NOT NULL
+          );
+          SQL
+
+          # Apply each exact migration twice to prove syntax plus idempotence.
+          $PSQL -f migrations/009_learning_lab_vnext.sql
+          $PSQL -f migrations/009_learning_lab_vnext.sql
+          $PSQL -f g3-edge/migrations/006_learning_lab_vnext.sql
+          $PSQL -f g3-edge/migrations/006_learning_lab_vnext.sql
+
+          # Additive objects exist and pre-existing baseline rows remain intact.
+          test "$($PSQL -Atc "select count(*) from engine_registry")" = "2"
+          test "$($PSQL -Atc "select count(*) from recommendations")" = "1"
+          test "$($PSQL -Atc "select count(*) from schema_meta where schema_version=6")" = "1"
+          test "$($PSQL -Atc "select count(*) from pg_tables where schemaname='public' and tablename in ('learning_observations_vnext','learning_daily_snapshots_vnext','learning_hypotheses_vnext','learning_candidates_vnext','learning_approval_events_vnext','edge_learning_observations_vnext','edge_learning_daily_snapshots_vnext')")" = "7"
+
+          # Firewalls and integrity constraints must fail closed.
+          if $PSQL -c "insert into learning_candidates_vnext(candidate_id,engine,status,proposal,content_hash,automatic_adoption,production_change_allowed) values ('bad-prod','5DR','CANDIDATE','{}','x',false,true)"; then
+            echo "production_change_allowed constraint failed open"
+            exit 1
+          fi
+          if $PSQL -c "insert into edge_learning_observations_vnext(observation_id,recommendation_id,ticker,target_trading_date,run_role,official_efficacy_eligible,dimension,observation_type,source_ref,observed_at,content_hash) values ('bad-edge','g3-rehearsal-rec','LTF','2026-09-23','DIAGNOSTIC',false,'TEST','ERROR','g3',now(),'x')"; then
+            echo "non-canonical exclusion constraint failed open"
+            exit 1
+          fi
+          if $PSQL -c "insert into learning_daily_snapshots_vnext(snapshot_id,engine,cycle_id,as_of,snapshot_status,runs_analyzed,canonical_runs,diagnostic_runs,manual_runs,shadow_runs,matured_outcomes,scorable_outcomes,data_gap_outcomes,new_observations,active_hypotheses,active_challengers,approval_required,data_quality_state,content_hash) values ('bad-counts','5DR','bad-counts',now(),'COMPLETE',1,1,1,0,0,0,0,0,0,0,0,0,'PASS','x')"; then
+            echo "snapshot population constraint failed open"
+            exit 1
+          fi
+          echo "g3_migration_rehearsal_passed"
 
       - name: Verify producer snapshot contracts
         run: |
