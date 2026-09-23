@@ -37,7 +37,15 @@ test('G4 Console UI makes the production firewall explicit',()=>{
   assert.match(ui,/Approve for build/);
   assert.match(ui,/APPROVED_FOR_BUILD/);
   assert.match(ui,/does not promote it to production/i);
-  assert.match(ui,/production_change_allowed:false/);
+  assert.match(ui,/Production remains unchanged/i);
+  assert.match(ui,/cannot alter production logic/i);
   assert.match(ui,/\/api\/learning-lab\/governance-view/);
   assert.match(ui,/\/api\/learning-lab\/candidate-decision/);
+});
+
+test('G4 server contract hard-blocks automatic production promotion',()=>{
+  const governance=fs.readFileSync('src/learning-governance.ts','utf8');
+  assert.match(governance,/production_change_allowed:\s*false/);
+  assert.match(governance,/production_promotion_authorized:\s*false/);
+  assert.match(governance,/approval_scope:\s*'BUILD_VALIDATION_ONLY'/);
 });
