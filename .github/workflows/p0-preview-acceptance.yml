@@ -1,0 +1,37 @@
+name: P0 Preview Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase2-p0-operational-recovery-20260923
+
+permissions:
+  contents: read
+
+jobs:
+  preview-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      P0_BASE_URL: https://phase2-p0-operational-recovery-20260923-edge-console.k-anirudhsaxena.workers.dev
+      P0_TICKER: LTF
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Wait for branch preview to serve this head
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 24); do
+            code=$(curl -sS -o /tmp/p0-health.json -w '%{http_code}' "$P0_BASE_URL/api/5dr/current" || true)
+            echo "preview attempt=$attempt http=$code"
+            if [ "$code" != "000" ]; then
+              break
+            fi
+            sleep 15
+          done
+      - name: Run P0 4-of-4 persisted-data acceptance
+        run: node scripts/p0-live-acceptance.mjs
