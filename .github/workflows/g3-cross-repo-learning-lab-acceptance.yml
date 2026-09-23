@@ -43,12 +43,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-          cache: npm
 
       - name: Install test runtimes
         run: |
           python -m pip install --upgrade pip pytest
-          npm ci
+          npm install --no-audit --no-fund
 
       - name: Verify producer snapshot contracts
         run: |
@@ -199,5 +198,5 @@ jobs:
 
       - name: Verify Console contract tests
         run: |
-          npm test -- --test-name-pattern='Learning Lab|learning'
+          npm test
           npm run typecheck
