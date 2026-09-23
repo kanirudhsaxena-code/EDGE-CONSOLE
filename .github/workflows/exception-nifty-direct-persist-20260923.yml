@@ -1,0 +1,106 @@
+name: Direct 23 Sep NIFTY Exception Persist
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-nifty-direct-persist-20260923.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      REQUEST_ID: 5drreq_d2f611c4-24c2-4f22-8a43-e6a3612dff65
+      FIVEDR_REF: ad2afc81e3fcaee86e9f647abcce1ec8d138ceeb
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Checkout exact frozen 5DR engine
+        run: |
+          set -euo pipefail
+          git init fivedr
+          git -C fivedr remote add origin https://github.com/kanirudhsaxena-code/5DR-V2.git
+          git -C fivedr fetch --depth 1 origin "$FIVEDR_REF"
+          git -C fivedr checkout --detach FETCH_HEAD
+          test "$(git -C fivedr rev-parse HEAD)" = "$FIVEDR_REF"
+
+      - name: Fetch exact governed execution packet
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Accept: application/json' \
+            "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID/execution-packet" \
+            -o request.json
+          python - <<'PY'
+          import json, os
+          p=json.load(open('request.json'))
+          assert p.get('request_id')==os.environ['REQUEST_ID'], p.get('request_id')
+          assert isinstance(p.get('evidence'),list) and p['evidence']
+          print(f"execution_packet_ok request_id={p['request_id']} evidence_items={len(p['evidence'])}")
+          PY
+
+      - name: Execute frozen engine and persist through authenticated route
+        run: |
+          set -euo pipefail
+          (cd fivedr && python -m src.runner --input ../request.json --publish > ../envelope.json)
+          python - <<'PY'
+          import json, os
+          p=json.load(open('envelope.json'))
+          assert p.get('request_id')==os.environ['REQUEST_ID']
+          assert p.get('status')=='SUCCESS'
+          assert p.get('published') is True
+          print(f"NIFTY_ENGINE_SUCCESS run_id={p['run_id']} generated_at={p['generated_at']}")
+          PY
+          code=$(curl --location --silent --show-error \
+            -o persist-response.json -w '%{http_code}' \
+            -X POST \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Content-Type: application/json' \
+            --data-binary @envelope.json \
+            "$CONSOLE_URL/api/5dr/runs")
+          cat persist-response.json
+          echo
+          echo "persist_http_code=$code"
+          test "$code" = "201"
+          python - <<'PY'
+          import json, os
+          env=json.load(open('envelope.json'))
+          r=json.load(open('persist-response.json'))
+          assert r.get('ok') is True, r
+          assert r.get('run_id')==env.get('run_id'), (r,env)
+          assert r.get('request_id')==os.environ['REQUEST_ID'], r
+          assert r.get('published') is True, r
+          out={
+            'status':'NIFTY_EXCEPTION_PERSISTED',
+            'target_trading_date':'2026-09-23',
+            'exception_canonical':True,
+            'run_id':env['run_id'],
+            'request_id':os.environ['REQUEST_ID'],
+            'generated_at':env['generated_at'],
+            'result':env.get('result'),
+          }
+          open('nifty-exception-persisted.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print(json.dumps(out,sort_keys=True))
+          PY
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-exception-persisted-20260923
+          path: |
+            envelope.json
+            persist-response.json
+            nifty-exception-persisted.json
+          if-no-files-found: ignore
+          retention-days: 30
