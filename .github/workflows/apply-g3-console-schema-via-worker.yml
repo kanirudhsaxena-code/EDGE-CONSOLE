@@ -1,0 +1,68 @@
+name: Apply G3 Console Schema Via Worker
+
+on:
+  push:
+    branches:
+      - ops/g3-console-schema-20260923
+    paths:
+      - '.github/workflows/apply-g3-console-schema-via-worker.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  migrate-and-restore:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+      CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+    steps:
+      - name: Checkout migration branch
+        uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Validate temporary migration build
+        run: |
+          npm install --no-audit --no-fund
+          npm run typecheck
+          npm test
+      - name: Deploy temporary migration worker
+        run: npx wrangler deploy
+      - name: Apply and verify approved G3 Console schema
+        id: migrate
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          body="$(mktemp)"
+          code="$(
+            curl --location --silent --show-error               -o "$body" -w '%{http_code}'               -X POST               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"               -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"               -H "X-MDOS-G3-Migration: approved-20260923"               "$CONSOLE_URL/api/internal/g3-schema-migrate-20260923"
+          )"
+          cat "$body"
+          test "$code" = "200"
+          python - "$body" <<'PY'
+          import json,sys
+          p=json.load(open(sys.argv[1],encoding='utf-8'))
+          assert p.get('ok') is True
+          assert p.get('applied') is True
+          assert p.get('verified') is True
+          assert p.get('production_methodology_changed') is False
+          assert len(p.get('tables') or []) == 5
+          print('console_g3_schema_verified_via_worker')
+          PY
+      - name: Restore current production main source
+        if: always()
+        uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Reinstall main dependencies
+        if: always()
+        run: npm install --no-audit --no-fund
+      - name: Redeploy production main
+        if: always()
+        run: npx wrangler deploy
