@@ -1,0 +1,48 @@
+name: Verify Corrected LTF Canonical 24 Sep
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/verify-ltf-corrected-canonical-20260924.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Verify LTF console report selection
+        run: |
+          set -euo pipefail
+          curl --location --silent --show-error --fail \
+            -H "Accept: application/json" \
+            -H "CF-Access-Client-Id: ${CF_ACCESS_CLIENT_ID}" \
+            -H "CF-Access-Client-Secret: ${CF_ACCESS_CLIENT_SECRET}" \
+            "${CONSOLE_URL}/api/edge-stocks/report?ticker=LTF" > report.json
+          python - <<'PY'
+          import json
+          p=json.load(open('report.json'))
+          r=p.get('report') or p
+          expected='EDGE-LTF-20260924-043427-AUTO'
+          print(json.dumps(r,indent=2,sort_keys=True,default=str))
+          gov=r.get('canonical_governance') or {}
+          current=r.get('current_stock_outcome') or {}
+          run_id=r.get('run_id') or current.get('run_id')
+          selected=gov.get('selected_recommendation_id')
+          current_selected=gov.get('current_run_is_selected')
+          if run_id != expected:
+              raise SystemExit(f'LATEST_RUN_MISMATCH got={run_id} expected={expected}')
+          if selected != expected:
+              raise SystemExit(f'CANONICAL_SELECTION_MISMATCH got={selected} expected={expected}')
+          if current_selected is not True:
+              raise SystemExit(f'CURRENT_RUN_NOT_SELECTED value={current_selected}')
+          print('LTF_CONSOLE_CANONICAL_VERIFIED')
+          PY
