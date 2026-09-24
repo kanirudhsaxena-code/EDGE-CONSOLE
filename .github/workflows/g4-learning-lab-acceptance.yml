@@ -1,0 +1,101 @@
+name: G4 Learning Lab Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase2-g4-closure-20260924
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate-g4-learning-lab:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Verify production Learning Lab UI contract
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' \
+            "$BASE/learning-lab.html?g4=${{ github.sha }}" -o /tmp/learning-lab.html
+
+          grep -Fq 'Learning Lab Governance' /tmp/learning-lab.html
+          grep -Fq 'EDGE NIFTY / 5DR' /tmp/learning-lab.html
+          grep -Fq 'EDGE STOCKS' /tmp/learning-lab.html
+          grep -Fq 'Snapshot drill-down' /tmp/learning-lab.html
+          grep -Fq 'Approval queue' /tmp/learning-lab.html
+          grep -Fq 'Proposal' /tmp/learning-lab.html
+          grep -Fq 'Validation state' /tmp/learning-lab.html
+          grep -Fq 'Baseline' /tmp/learning-lab.html
+          grep -Fq 'Challenger' /tmp/learning-lab.html
+          grep -Fq 'Approve for build' /tmp/learning-lab.html
+          grep -Fq 'Reject' /tmp/learning-lab.html
+          grep -Fq 'Defer' /tmp/learning-lab.html
+          grep -Fq 'APPROVED_FOR_BUILD' /tmp/learning-lab.html
+          grep -Fq "LIVE:'Current learning snapshot'" /tmp/learning-lab.html
+          grep -Fq "PARTIAL:'Partial learning snapshot'" /tmp/learning-lab.html
+          grep -Fq "STALE:'Learning snapshot is stale'" /tmp/learning-lab.html
+          grep -Fq "FAILED:'Learning state unavailable'" /tmp/learning-lab.html
+          grep -Fq 'cannot alter production logic' /tmp/learning-lab.html
+
+      - name: Verify 5DR and EDGE Stocks governed read surfaces
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+
+          for ENGINE in 5DR EDGE_STOCKS; do
+            SAFE_NAME="$(printf '%s' "$ENGINE" | tr '[:upper:]' '[:lower:]' | tr '_' '-')"
+            curl --location --fail --silent --show-error -D "/tmp/${SAFE_NAME}.headers" "${AUTH[@]}" \
+              -H 'Cache-Control: no-cache' \
+              "$BASE/api/learning-lab/governance-view?engine=$ENGINE" \
+              -o "/tmp/${SAFE_NAME}.json"
+            grep -qi '^cache-control:.*no-store' "/tmp/${SAFE_NAME}.headers"
+          done
+
+          python - <<'PY'
+          import json
+
+          allowed_states={'LIVE','PARTIAL','STALE','FAILED'}
+          for engine, path in (
+              ('5DR','/tmp/5dr.json'),
+              ('EDGE_STOCKS','/tmp/edge-stocks.json'),
+          ):
+              data=json.load(open(path,encoding='utf-8'))
+              assert data.get('engine') == engine, data
+              presentation=data.get('presentation_state') or {}
+              assert presentation.get('state') in allowed_states, data
+              assert isinstance(data.get('candidates'), list), data
+              assert isinstance(data.get('recent_decisions'), list), data
+              governance=data.get('governance') or {}
+              assert governance.get('approval_scope') == 'BUILD_VALIDATION_ONLY', data
+              assert governance.get('automatic_adoption') is False, data
+              assert governance.get('production_change_allowed') is False, data
+              assert governance.get('production_promotion_requires_separate_explicit_approval') is True, data
+              if data.get('snapshot') is not None:
+                  snapshot=data['snapshot']
+                  assert snapshot.get('snapshot_id'), data
+                  assert snapshot.get('as_of'), data
+                  assert snapshot.get('engine') == engine, data
+          PY
+
+      - name: Verify engine validation fails closed
+        run: |
+          set -euo pipefail
+          code="$(curl --location --silent --show-error -o /tmp/invalid-engine.json -w '%{http_code}' \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$BASE/api/learning-lab/governance-view?engine=INVALID_ENGINE")"
+          test "$code" = "422"
+          python - <<'PY'
+          import json
+          data=json.load(open('/tmp/invalid-engine.json',encoding='utf-8'))
+          assert data.get('error') == 'engine must be 5DR or EDGE_STOCKS', data
+          PY
