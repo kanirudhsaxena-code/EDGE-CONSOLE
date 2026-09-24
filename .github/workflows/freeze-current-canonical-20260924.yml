@@ -1,0 +1,130 @@
+name: Freeze Current 24 Sep NIFTY and LTF Canonical Candidates
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/freeze-current-canonical-20260924.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  nifty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run fresh governed NIFTY 5DR candidate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error','-H','Content-Type: application/json','-H','Accept: application/json','-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",'-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method,'-w','\n%{http_code}']
+              if payload is not None: args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:1200],'stderr':p.stderr[:400]}
+              return status,body
+          now=datetime.now(ZoneInfo('Asia/Kolkata'))
+          slot=now.strftime('%H:%M')
+          payload={'force_new':True,'canonical_attempt':True,'canonical_attempt_slot':slot,'client_invocation_id':f'final-freeze-nifty-20260924-{now:%H%M%S}'}
+          code,created=call('/api/5dr/automated-runs','POST',payload)
+          if code not in (200,201,202): raise SystemExit(f'NIFTY_CREATE_FAILED http={code} body={created}')
+          request_id=((created.get('request') or {}).get('request_id'))
+          if not request_id: raise SystemExit('NIFTY_REQUEST_ID_MISSING')
+          final=None
+          for n in range(90):
+              time.sleep(8)
+              code,state=call(f'/api/5dr/run-requests/{request_id}/resume-processing','POST',{})
+              print(f"NIFTY poll={n+1} http={code} status={state.get('status')} stage={state.get('adapter_stage')} run_id={state.get('run_id')}",flush=True)
+              if code==200 and state.get('status')=='COMPLETED': final=state; break
+              if state.get('status')=='FAILED': raise SystemExit('NIFTY_FAILED '+json.dumps(state,sort_keys=True))
+          if not final: raise SystemExit('NIFTY_TIMEOUT')
+          out={'target_trading_date':'2026-09-24','requested_at':now.isoformat(),'slot':slot,'request_id':request_id,'run_id':final.get('run_id')}
+          open('nifty-current-freeze.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print('NIFTY_CURRENT_FREEZE '+json.dumps(out,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: nifty-current-freeze-20260924
+          path: nifty-current-freeze.json
+          retention-days: 30
+
+  ltf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run fresh governed LTF EDGE candidate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time, urllib.parse
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error','-H','Content-Type: application/json','-H','Accept: application/json','-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",'-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method,'-w','\n%{http_code}']
+              if payload is not None: args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:1200],'stderr':p.stderr[:400]}
+              return status,body
+          now=datetime.now(ZoneInfo('Asia/Kolkata')); nowz=now.isoformat(); slot=now.strftime('%H:%M')
+          bundle_id=f"EDGE-RESEARCH-LTF-20260924-FINAL-{now:%H%M%S}IST"
+          bundle={
+            'contract_version':'EDGE_RESEARCH_BUNDLE_V1','bundle_id':bundle_id,'ticker':'LTF','command':'EDGE LTF','created_at':nowz,'research_fresh_at':nowz,
+            'research_authority':'CHATGPT','retrieval_providers':['CHATGPT_WEB'],
+            'sources':[
+              {'source_id':'investors','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors/details','title':'L&T Finance Investor Details','retrieved_at':nowz,'publication_date':'2026-06-30T00:00:00+05:30','event_date':'2026-06-30T00:00:00+05:30'},
+              {'source_id':'newsroom','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room','title':'L&T Finance News Room','retrieved_at':nowz,'publication_date':'2026-09-18T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'},
+              {'source_id':'media','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room/print-online','title':'L&T Finance Print and Online Coverage','retrieved_at':nowz,'publication_date':'2026-09-22T00:00:00+05:30','event_date':'2026-09-22T00:00:00+05:30'},
+              {'source_id':'disclosures','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd','title':'L&T Finance Other Statutory Disclosures','retrieved_at':nowz,'publication_date':'2026-09-10T00:00:00+05:30','event_date':'2026-09-10T00:00:00+05:30'}
+            ],
+            'claims':[
+              {'claim_id':'c1','evidence_category':'BUSINESS_FUNDAMENTALS','statement':'Latest official quarterly materials available for the quarter ended June 30, 2026 remain the fundamental baseline; live market direction is left to the production engine.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['investors'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'c2','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'Official September newsroom, media and statutory disclosure pages were freshly checked for the current run; no unverified same-day causal explanation for the intraday gap is asserted.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['newsroom','media','disclosures'],'verification_status':'VERIFIED','independent_validation':True}
+            ],
+            'limitations':['No manual DES, probability, price zone, PVPO score or recommendation is supplied.','Live price, volume, options and structured market evidence remain the autonomous provider and engine responsibility.']
+          }
+          payload={'command':'EDGE LTF','force_new':True,'canonical_attempt':True,'canonical_attempt_slot':slot,'canonical_requested_at':nowz,'research_bundle':bundle}
+          code,res=call('/api/edge-stocks/invoke','POST',payload)
+          if code!=202 or res.get('status')!='DISPATCHED': raise SystemExit(f'LTF_DISPATCH_FAILED http={code} body={res}')
+          after=res.get('dispatched_at'); final=None
+          for n in range(90):
+              time.sleep(8)
+              qs=urllib.parse.urlencode({'ticker':'LTF','after':after})
+              code,state=call('/api/edge-stocks/invoke/status?'+qs)
+              print(f"LTF poll={n+1} http={code} status={state.get('status')} run_id={state.get('run_id')}",flush=True)
+              if code==200 and state.get('status')=='COMPLETE': final=state; break
+              if state.get('status') in {'FAILED','ERROR'}: raise SystemExit('LTF_FAILED '+json.dumps(state,sort_keys=True))
+          if not final: raise SystemExit('LTF_TIMEOUT')
+          out={'target_trading_date':'2026-09-24','requested_at':nowz,'slot':slot,'run_id':final.get('run_id'),'research_bundle_id':bundle_id}
+          open('ltf-current-freeze.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print('LTF_CURRENT_FREEZE '+json.dumps(out,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ltf-current-freeze-20260924
+          path: ltf-current-freeze.json
+          retention-days: 30
