@@ -1,4 +1,5 @@
 import { isNonEmptyString, isObject, type JsonRecord } from './normalization';
+import { validateEdgeStockForecastPath } from './edge-stock-forecast-path';
 
 const percentOrNull = (value: unknown): boolean =>
   value === null || (typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= 100);
@@ -24,6 +25,11 @@ export function validateEdgeStocksResult(body: unknown): string[] {
   if (!isNonEmptyString(body.generated_at) || Number.isNaN(Date.parse(String(body.generated_at)))) {
     errors.push('generated_at must be a valid ISO timestamp');
   }
+
+  // G5: forecast persistence is an additive output invariant, independent of execution action.
+  // This deliberately validates only the new path and does not alter scoring, Market Trust,
+  // recommendation logic, canonical selection, efficacy population, or live trading behavior.
+  errors.push(...validateEdgeStockForecastPath(body.forecast_path));
 
   const presentation = body.presentation;
   if (!isObject(presentation)) errors.push('presentation is mandatory');
