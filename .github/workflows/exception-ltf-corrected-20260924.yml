@@ -54,7 +54,7 @@ jobs:
             'created_at':nowz,
             'research_fresh_at':nowz,
             'research_authority':'CHATGPT',
-            'retrieval_providers':['CHATGPT_WEB','EXA_DEEP_RESEARCH'],
+            'retrieval_providers':['CHATGPT_WEB','EXA'],
             'sources':[
               {
                 'source_id':'ltf24_q1_official',
@@ -86,14 +86,14 @@ jobs:
               },
               {
                 'source_id':'ltf24_et_announcements',
-                'provider':'EXA_DEEP_RESEARCH','authority':'REPUTABLE_MEDIA',
+                'provider':'EXA','authority':'REPUTABLE_SECONDARY',
                 'url':'https://economictimes.indiatimes.com/lt-finance-ltd/stocksupdate/companyid-30050.cms',
                 'title':'Economic Times L&T Finance corporate announcements',
                 'retrieved_at':nowz,'publication_date':'2026-09-19T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'
               },
               {
                 'source_id':'ltf24_ubs_fe',
-                'provider':'EXA_DEEP_RESEARCH','authority':'REPUTABLE_MEDIA',
+                'provider':'EXA','authority':'REPUTABLE_SECONDARY',
                 'url':'https://www.financialexpress.com/market/shriram-finance-to-lampt-finance-ubs-retains-buy-on-4-top-nbfc-stocks-4345436/',
                 'title':'Financial Express report on UBS NBFC research',
                 'retrieved_at':nowz,'publication_date':'2026-09-23T14:53:00+05:30','event_date':'2026-09-23T00:00:00+05:30'
