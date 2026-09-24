@@ -1,0 +1,44 @@
+name: P0 Preview Acceptance
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - phase2-p0-operational-recovery-20260923
+
+permissions:
+  contents: read
+
+jobs:
+  preview-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      P0_BASE_URL: https://phase2-p0-operational-recovery-20260923-edge-console.k-anirudhsaxena.workers.dev
+      P0_TICKER: LTF
+      P0_AUTHORIZATION: ${{ secrets.P0_AUTHORIZATION }}
+      P0_CF_ACCESS_CLIENT_ID: ${{ secrets.P0_CF_ACCESS_CLIENT_ID }}
+      P0_CF_ACCESS_CLIENT_SECRET: ${{ secrets.P0_CF_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Diagnose branch-preview access
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(-sS -D /tmp/p0-headers.txt -o /tmp/p0-body.txt -w '%{http_code}')
+          if [ -n "${P0_CF_ACCESS_CLIENT_ID:-}" ]; then args+=(-H "CF-Access-Client-Id: $P0_CF_ACCESS_CLIENT_ID"); fi
+          if [ -n "${P0_CF_ACCESS_CLIENT_SECRET:-}" ]; then args+=(-H "CF-Access-Client-Secret: $P0_CF_ACCESS_CLIENT_SECRET"); fi
+          if [ -n "${P0_AUTHORIZATION:-}" ]; then args+=(-H "Authorization: $P0_AUTHORIZATION"); fi
+          code=$(curl "${args[@]}" "$P0_BASE_URL/api/5dr/current" || true)
+          location=$(grep -i '^location:' /tmp/p0-headers.txt | tail -1 | tr -d '\r' || true)
+          content_type=$(grep -i '^content-type:' /tmp/p0-headers.txt | tail -1 | tr -d '\r' || true)
+          echo "preview http=$code ${content_type:-content-type=unknown}"
+          if [ "$code" = "302" ] && echo "$location" | grep -qi 'cloudflareaccess'; then
+            echo 'Cloudflare Access protects the branch preview. Configure P0_CF_ACCESS_CLIENT_ID/P0_CF_ACCESS_CLIENT_SECRET repository secrets (or P0_AUTHORIZATION) for persisted-data acceptance.'
+            exit 2
+          fi
+      - name: Run P0 4-of-4 persisted-data acceptance
+        run: node scripts/p0-live-acceptance.mjs
