@@ -1,8 +1,2472 @@
 {
   "schema_version": "5DR_CONSOLE_HANDOFF_V1",
-  "generated_at": "2026-09-24T04:13:35.609Z",
+  "generated_at": "2026-09-24T04:15:42.080Z",
   "source": "EDGE_CONSOLE_PUBLISHED_RUNS",
   "runs": [
+    {
+      "run": {
+        "run_id": "5drrun_90727c6d-fa5e-4915-bd60-e6011c6e82df",
+        "generated_at": "2026-09-24T04:14:21.987Z",
+        "freshness_at": "2026-09-24T04:14:14.123Z",
+        "framework_version": "5DR_V2_1",
+        "contract_version": "1.0",
+        "status": "SUCCESS",
+        "provenance_mode": "AUTOMATED",
+        "published": true,
+        "result": {
+          "des5": -37.875,
+          "regime": "TRANSITION",
+          "tradeable": false,
+          "event_shock": {
+            "level": "MODERATE",
+            "kill_switch": false,
+            "transmission": "BEARISH",
+            "convexity_warranted": true
+          },
+          "expected_rr": 2.4,
+          "market_trust": 46.5,
+          "expected_zone": {
+            "low": 23200,
+            "high": 23500
+          },
+          "horizon_slots": {
+            "D+1": {
+              "basis": "Dowtrend structure on 1D/1H with significant gap down on 1H and 5m; heavy selling in Fin Service and Auto sectors.",
+              "zone_low": 23116,
+              "direction": "BEARISH",
+              "zone_high": 23285,
+              "probabilities": {
+                "BEAR": 60,
+                "BULL": 15,
+                "RANGE": 25
+              }
+            },
+            "D+2": {
+              "basis": "Continued pressure from high WTI/Brent levels and negative global risk sentiment (S&P500/DAX down).",
+              "zone_low": 23000,
+              "direction": "BEARISH",
+              "zone_high": 23250,
+              "probabilities": {
+                "BEAR": 60,
+                "BULL": 10,
+                "RANGE": 30
+              }
+            },
+            "D+3": {
+              "basis": "Potential stabilization near major Put OI concentration at 23000 strike.",
+              "zone_low": 23000,
+              "direction": "RANGE",
+              "zone_high": 23350,
+              "probabilities": {
+                "BEAR": 20,
+                "BULL": 20,
+                "RANGE": 60
+              }
+            },
+            "D+4": {
+              "basis": "Consolidation within the 20-day range as market digests recent volatility.",
+              "zone_low": 23100,
+              "direction": "RANGE",
+              "zone_high": 23400,
+              "probabilities": {
+                "BEAR": 20,
+                "BULL": 25,
+                "RANGE": 55
+              }
+            },
+            "D+5": {
+              "basis": "Mean reversion attempt towards Max Pain (23400) as selling exhaustion sets in.",
+              "zone_low": 23200,
+              "direction": "BULLISH",
+              "zone_high": 23500,
+              "probabilities": {
+                "BEAR": 20,
+                "BULL": 40,
+                "RANGE": 40
+              }
+            }
+          },
+          "model_version": "5DR_V2_1",
+          "probabilities": {
+            "BEAR": 54.731,
+            "BULL": 7.833,
+            "RANGE": 37.437
+          },
+          "execution_edge": 61.75,
+          "recommendation": "NO_TRADE",
+          "forecast_horizon": "D+5",
+          "directional_label": "BEAR",
+          "market_trust_band": "LOW",
+          "tradeability_gate": {
+            "rr_pass": true,
+            "des5_pass": true,
+            "event_shock": "MODERATE",
+            "expected_rr": 2.4,
+            "data_adequate": true,
+            "market_trust_pass": false,
+            "execution_edge_pass": false,
+            "event_kill_switch_inactive": true
+          },
+          "engine_diagnostics": {
+            "regime": "TRANSITION",
+            "component_scores": {
+              "PVPO": -25,
+              "PARTICIPATION": -67.5,
+              "MACRO_CATALYSTS": -30,
+              "PRICE_STRUCTURE": -40
+            },
+            "execution_inputs": {
+              "rr_score": 40,
+              "liquidity_spread_score": 80,
+              "premium_iv_theta_score": 70,
+              "strike_expiry_fit_score": 85,
+              "entry_invalidation_score": 50
+            },
+            "market_trust_inputs": {
+              "pvpo_confirmation": 30,
+              "price_confirmation": 40,
+              "closing_confirmation": 50,
+              "cross_engine_consistency": 80,
+              "participation_confirmation": 20,
+              "evidence_freshness_completeness": 90
+            }
+          },
+          "assessment_snapshot": {
+            "metrics": {
+              "day_metrics": {
+                "D": {
+                  "hits": 3,
+                  "status": "PARTIAL_SCORABLE",
+                  "scorable": 5,
+                  "zone_hits": 4,
+                  "coverage_pct": 83.33,
+                  "hit_rate_pct": 60,
+                  "zone_scorable": 5,
+                  "eligible_matured": 6,
+                  "zone_hit_rate_pct": 80,
+                  "missing_unscorable": 1,
+                  "avg_zone_error_points": 4.2,
+                  "avg_directional_margin_points": 56.28
+                },
+                "D+1": {
+                  "hits": 2,
+                  "status": "PARTIAL_SCORABLE",
+                  "scorable": 3,
+                  "zone_hits": 3,
+                  "coverage_pct": 60,
+                  "hit_rate_pct": 66.67,
+                  "zone_scorable": 3,
+                  "eligible_matured": 5,
+                  "zone_hit_rate_pct": 100,
+                  "missing_unscorable": 2,
+                  "avg_zone_error_points": 0,
+                  "avg_directional_margin_points": 177.82
+                },
+                "D+2": {
+                  "hits": 2,
+                  "status": "PARTIAL_SCORABLE",
+                  "scorable": 2,
+                  "zone_hits": 2,
+                  "coverage_pct": 50,
+                  "hit_rate_pct": 100,
+                  "zone_scorable": 2,
+                  "eligible_matured": 4,
+                  "zone_hit_rate_pct": 100,
+                  "missing_unscorable": 2,
+                  "avg_zone_error_points": 0,
+                  "avg_directional_margin_points": 193.85
+                },
+                "D+3": {
+                  "hits": 2,
+                  "status": "PARTIAL_SCORABLE",
+                  "scorable": 2,
+                  "zone_hits": 2,
+                  "coverage_pct": 50,
+                  "hit_rate_pct": 100,
+                  "zone_scorable": 2,
+                  "eligible_matured": 4,
+                  "zone_hit_rate_pct": 100,
+                  "missing_unscorable": 2,
+                  "avg_zone_error_points": 0,
+                  "avg_directional_margin_points": 129.45
+                },
+                "D+4": {
+                  "hits": 1,
+                  "status": "PARTIAL_SCORABLE",
+                  "scorable": 2,
+                  "zone_hits": 2,
+                  "coverage_pct": 50,
+                  "hit_rate_pct": 50,
+                  "zone_scorable": 2,
+                  "eligible_matured": 4,
+                  "zone_hit_rate_pct": 100,
+                  "missing_unscorable": 2,
+                  "avg_zone_error_points": 0,
+                  "avg_directional_margin_points": 57.6
+                }
+              },
+              "return_metrics": {
+                "method": "sum of resolved standardized model P&L percentages across selected DAILY_CANONICAL actionable recommendations only",
+                "hit_pnl_pct": 64.3385,
+                "miss_pnl_pct": -18.9346,
+                "population_rule": "SELECTED_DAILY_CANONICAL_ONLY",
+                "cumulative_resolved_pnl_pct": 45.4039
+              },
+              "canonical_selection": {
+                "selected_at": "2026-09-23T04:41:03.690844+00:00",
+                "canonical_type": "EXCEPTION_CANONICAL",
+                "governance_era": "POST_GOVERNANCE",
+                "selection_rule": "EXCEPTION_CANONICAL",
+                "selection_reason": "EXCEPTION_CANONICAL: user explicitly authorized the fresh 23-Sep-2026 rescue run as today's canonical after the scheduled 08:40 production canonical was missed because of infrastructure/build regressions. Exact persisted Console run 5drrun_4f69d989-59c6-4fc4-ba68-6595bd74f2bc is selected. Actual request/completion timestamps are preserved; this run is not relabeled as an 08:40 pre-open observation.",
+                "selection_status": "SELECTED",
+                "target_trading_date": "2026-09-23",
+                "selected_forecast_id": "5DR-CNS-20260923-1002-4f69d98959"
+              },
+              "recommendation_ledger": [
+                {
+                  "execution": {
+                    "stop": 150,
+                    "expiry": "2026-09-22",
+                    "strike": 23500,
+                    "target1": 250,
+                    "target2": 295,
+                    "entry_low": 175,
+                    "entry_high": 190,
+                    "instrument": "PE",
+                    "expected_rr": 2.07
+                  },
+                  "lifecycle": {
+                    "pnl_pct": 61.5996,
+                    "premium": 295,
+                    "r_multiple": 3.4547,
+                    "latest_event": "T2_HIT",
+                    "event_timestamp": "2026-09-11T04:24:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260910-1547-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-10T10:17:00+00:00",
+                  "recommendation": "BUY_PE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": 150,
+                    "expiry": "2026-09-22",
+                    "strike": 23500,
+                    "target1": 250,
+                    "target2": 295,
+                    "entry_low": 175,
+                    "entry_high": 183,
+                    "instrument": "PE",
+                    "expected_rr": 2.03
+                  },
+                  "lifecycle": {
+                    "pnl_pct": 61.5996,
+                    "premium": 295,
+                    "r_multiple": 3.4547,
+                    "latest_event": "T2_HIT",
+                    "event_timestamp": "2026-09-11T04:24:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260910-1826-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-10T12:56:00+00:00",
+                  "recommendation": "BUY_PE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": 150,
+                    "expiry": "2026-09-22",
+                    "strike": 23500,
+                    "target1": 255,
+                    "target2": 300,
+                    "entry_low": 175,
+                    "entry_high": 185,
+                    "instrument": "PE",
+                    "expected_rr": 2
+                  },
+                  "lifecycle": {
+                    "pnl_pct": 64.3385,
+                    "premium": 300,
+                    "r_multiple": 3.6083,
+                    "latest_event": "T2_HIT",
+                    "event_timestamp": "2026-09-11T04:24:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260910-2052-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-10T15:22:00+00:00",
+                  "recommendation": "BUY_PE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": "2026-09-11"
+                },
+                {
+                  "execution": {
+                    "stop": 140,
+                    "expiry": "2026-09-22",
+                    "strike": 23250,
+                    "target1": 250,
+                    "target2": 310,
+                    "entry_low": 170,
+                    "entry_high": 176,
+                    "instrument": "PE",
+                    "expected_rr": 2.06
+                  },
+                  "lifecycle": {
+                    "pnl_pct": -19.6095,
+                    "premium": 140,
+                    "r_multiple": -1,
+                    "latest_event": "SL_HIT",
+                    "event_timestamp": "2026-09-17T04:40:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260911-0954-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-11T04:24:00+00:00",
+                  "recommendation": "BUY_PE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "ISSUED",
+                    "event_timestamp": "2026-09-11T11:23:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260911-1653-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-11T11:23:00+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": "2026-09-15"
+                },
+                {
+                  "execution": {
+                    "stop": 140,
+                    "expiry": "2026-09-22",
+                    "strike": 23200,
+                    "target1": 250,
+                    "target2": 315,
+                    "entry_low": 168,
+                    "entry_high": 176,
+                    "instrument": "PE",
+                    "expected_rr": 2.06
+                  },
+                  "lifecycle": {
+                    "pnl_pct": -18.9346,
+                    "premium": 140,
+                    "r_multiple": -1,
+                    "latest_event": "SL_HIT",
+                    "event_timestamp": "2026-09-16T08:05:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260915-1644-01",
+                  "probabilities": {
+                    "BEAR": 62,
+                    "BULL": 8,
+                    "RANGE": 30
+                  },
+                  "run_timestamp": "2026-09-15T11:14:00+00:00",
+                  "recommendation": "BUY_PE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": "2026-09-16"
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "ISSUED",
+                    "event_timestamp": "2026-09-16T04:27:39+00:00"
+                  },
+                  "forecast_id": "5DR-20260916-0958-01",
+                  "probabilities": {
+                    "BEAR": 60,
+                    "BULL": 8,
+                    "RANGE": 32
+                  },
+                  "run_timestamp": "2026-09-16T04:27:39+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "ISSUED",
+                    "event_timestamp": "2026-09-16T08:08:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260916-1338-01",
+                  "probabilities": {
+                    "BEAR": 57,
+                    "BULL": 8,
+                    "RANGE": 35
+                  },
+                  "run_timestamp": "2026-09-16T08:08:00+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "ISSUED",
+                    "event_timestamp": "2026-09-16T11:11:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260916-1641-01",
+                  "probabilities": {
+                    "BEAR": 55,
+                    "BULL": 8,
+                    "RANGE": 37
+                  },
+                  "run_timestamp": "2026-09-16T11:11:00+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": "2026-09-17"
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "NO_TRADE",
+                    "event_timestamp": null
+                  },
+                  "forecast_id": "5DR-20260917-1010-01",
+                  "probabilities": {
+                    "BEAR": 50,
+                    "BULL": 8,
+                    "RANGE": 42
+                  },
+                  "run_timestamp": "2026-09-17T04:40:00+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": null
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "ISSUED",
+                    "event_timestamp": "2026-09-17T09:18:00+00:00"
+                  },
+                  "forecast_id": "5DR-20260917-1448-01",
+                  "probabilities": {
+                    "BEAR": 50,
+                    "BULL": 8,
+                    "RANGE": 42
+                  },
+                  "run_timestamp": "2026-09-17T09:18:00+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": 0
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "NO_TRADE",
+                    "event_timestamp": null
+                  },
+                  "forecast_id": "5DR-CNS-20260921-1623-08ba388c5f",
+                  "probabilities": {
+                    "BEAR": 24.381,
+                    "BULL": 24.381,
+                    "RANGE": 51.238
+                  },
+                  "run_timestamp": "2026-09-21T10:53:00.384000+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "RANGE",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": 0
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "NO_TRADE",
+                    "event_timestamp": null
+                  },
+                  "forecast_id": "5DR-CNS-20260921-2109-52ff78f15a",
+                  "probabilities": {
+                    "BEAR": 26.069,
+                    "BULL": 26.069,
+                    "RANGE": 47.863
+                  },
+                  "run_timestamp": "2026-09-21T15:39:27.188000+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "RANGE",
+                  "canonical_target_trading_date": null
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": 0
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "NO_TRADE",
+                    "event_timestamp": null
+                  },
+                  "forecast_id": "5DR-CNS-20260922-0934-503e99fdc4",
+                  "probabilities": {
+                    "BEAR": 25.741,
+                    "BULL": 25.741,
+                    "RANGE": 48.517
+                  },
+                  "run_timestamp": "2026-09-22T04:04:27.779000+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "RANGE",
+                  "canonical_target_trading_date": "2026-09-22"
+                },
+                {
+                  "execution": {
+                    "stop": null,
+                    "expiry": null,
+                    "strike": null,
+                    "target1": null,
+                    "target2": null,
+                    "entry_low": null,
+                    "entry_high": null,
+                    "instrument": "NONE",
+                    "expected_rr": 0
+                  },
+                  "lifecycle": {
+                    "pnl_pct": null,
+                    "premium": null,
+                    "r_multiple": null,
+                    "latest_event": "NO_TRADE",
+                    "event_timestamp": null
+                  },
+                  "forecast_id": "5DR-CNS-20260923-1002-4f69d98959",
+                  "probabilities": {
+                    "BEAR": 47.499,
+                    "BULL": 7.884,
+                    "RANGE": 44.618
+                  },
+                  "run_timestamp": "2026-09-23T04:32:34.613000+00:00",
+                  "recommendation": "NO_TRADE",
+                  "definitive_forecast": "BEARISH",
+                  "canonical_target_trading_date": "2026-09-23"
+                }
+              ],
+              "recommendation_metrics": {
+                "open": 0,
+                "wins": 1,
+                "losses": 1,
+                "resolved": 2,
+                "hit_rate_pct": 50,
+                "no_trade_calls": 4,
+                "population_rule": "SELECTED_DAILY_CANONICAL_ONLY",
+                "actionable_calls": 2,
+                "hit_rate_fraction": "1/2",
+                "average_resolved_r": 1.3042,
+                "average_resolved_standardized_pnl_pct": 22.702
+              },
+              "overall_forecast_metrics": {
+                "headline": "10/14 scorable canonical checkpoints directionally correct; 13/14 zone hits; 14/23 matured eligible checkpoints scorable; 2 overdue checkpoints still pending reconciliation; 2 canonical forecast(s) have incomplete frozen persistence",
+                "zone_hits": 13,
+                "population_rule": "SELECTED_DAILY_CANONICAL_ONLY",
+                "directional_hits": 10,
+                "zone_hit_rate_pct": 92.86,
+                "canonical_scorable": 14,
+                "scorable_coverage_pct": 60.87,
+                "pending_due_checkpoints": 2,
+                "directional_accuracy_pct": 71.43,
+                "canonical_scorable_checkpoints": 14,
+                "missing_unscorable_checkpoints": 9,
+                "canonical_matured_eligible_checkpoints": 23,
+                "persistence_integrity_incomplete_forecasts": 2
+              },
+              "all_recommendations_count": 15,
+              "day_recommendation_metrics": {
+                "D": {
+                  "hits": 1,
+                  "misses": 1,
+                  "resolved": 2,
+                  "hit_pnl_pct": 64.3385,
+                  "hit_rate_pct": 50,
+                  "miss_pnl_pct": -18.9346,
+                  "overall_pnl_pct": 45.4039
+                },
+                "D+1": {
+                  "hits": 0,
+                  "misses": 0,
+                  "resolved": 0,
+                  "hit_pnl_pct": null,
+                  "hit_rate_pct": null,
+                  "miss_pnl_pct": null,
+                  "overall_pnl_pct": null
+                },
+                "D+2": {
+                  "hits": 0,
+                  "misses": 0,
+                  "resolved": 0,
+                  "hit_pnl_pct": null,
+                  "hit_rate_pct": null,
+                  "miss_pnl_pct": null,
+                  "overall_pnl_pct": null
+                },
+                "D+3": {
+                  "hits": 0,
+                  "misses": 0,
+                  "resolved": 0,
+                  "hit_pnl_pct": null,
+                  "hit_rate_pct": null,
+                  "miss_pnl_pct": null,
+                  "overall_pnl_pct": null
+                },
+                "D+4": {
+                  "hits": 0,
+                  "misses": 0,
+                  "resolved": 0,
+                  "hit_pnl_pct": null,
+                  "hit_rate_pct": null,
+                  "miss_pnl_pct": null,
+                  "overall_pnl_pct": null
+                }
+              },
+              "assessment_snapshot_complete": true,
+              "recommendation_ledger_complete": true
+            },
+            "headline": "10/14 scorable canonical checkpoints directionally correct; 13/14 zone hits; 14/23 matured eligible checkpoints scorable; 2 overdue checkpoints still pending reconciliation; 2 canonical forecast(s) have incomplete frozen persistence; 1/2 resolved recommendations won",
+            "source_id": "5DR-CNS-20260923-1002-4f69d98959",
+            "assessed_at": "Thu Sep 24 2026 03:28:26 GMT+0000 (Coordinated Universal Time)"
+          },
+          "definitive_forecast": "BEARISH",
+          "expected_nifty_zone": {
+            "low": 23200,
+            "high": 23500
+          },
+          "forecast_assessment": "UNCHANGED — BEAR. DES5 -37.9; Market Trust 46.5/100 (LOW); leading scenario BEAR 54.7%. Governed component evidence: PARTICIPATION -67.5, PRICE_STRUCTURE -40.0, MACRO_CATALYSTS -30.0, PVPO -25.0. Leading scenario remains BEAR. Principal risk/invalidation: Market Trust is below the frozen 50 trade threshold (46.5).",
+          "tradeability_blockers": [
+            "MARKET_TRUST_LT_50",
+            "EXECUTION_EDGE_LT_65"
+          ],
+          "output_contract_version": "5DR_V2_1_2",
+          "recommendation_assessment": "REJECTED — NO_TRADE. Single Tradeability Gate: data adequate YES; Market Trust >=50 NO (46.5); |DES5| >=30 YES (37.9); Execution Edge >=65 NO (61.8); Kill Switch inactive YES; R:R >=2.0 YES (2.40). Event Shock MODERATE. Trade-specific risk: exact contract, premium, liquidity and invalidation controls must remain verified; no missing execution detail may be inferred.",
+          "assessment_snapshot_complete": true,
+          "recommendation_ledger_complete": true
+        }
+      },
+      "request": {
+        "request_id": "5drreq_e82c7c1b-f66c-4a40-a642-568a2738a473",
+        "provenance_mode": "AUTOMATED",
+        "metadata": {
+          "intelligence_handoff": {
+            "normalized": {
+              "regime": "TRANSITION",
+              "event_shock": "MODERATE",
+              "expected_rr": 2.4,
+              "data_adequate": true,
+              "horizon_slots": {
+                "D+1": {
+                  "basis": "Dowtrend structure on 1D/1H with significant gap down on 1H and 5m; heavy selling in Fin Service and Auto sectors.",
+                  "zone_low": 23116,
+                  "direction": "BEARISH",
+                  "zone_high": 23285,
+                  "probabilities": {
+                    "BEAR": 60,
+                    "BULL": 15,
+                    "RANGE": 25
+                  }
+                },
+                "D+2": {
+                  "basis": "Continued pressure from high WTI/Brent levels and negative global risk sentiment (S&P500/DAX down).",
+                  "zone_low": 23000,
+                  "direction": "BEARISH",
+                  "zone_high": 23250,
+                  "probabilities": {
+                    "BEAR": 60,
+                    "BULL": 10,
+                    "RANGE": 30
+                  }
+                },
+                "D+3": {
+                  "basis": "Potential stabilization near major Put OI concentration at 23000 strike.",
+                  "zone_low": 23000,
+                  "direction": "RANGE",
+                  "zone_high": 23350,
+                  "probabilities": {
+                    "BEAR": 20,
+                    "BULL": 20,
+                    "RANGE": 60
+                  }
+                },
+                "D+4": {
+                  "basis": "Consolidation within the 20-day range as market digests recent volatility.",
+                  "zone_low": 23100,
+                  "direction": "RANGE",
+                  "zone_high": 23400,
+                  "probabilities": {
+                    "BEAR": 20,
+                    "BULL": 25,
+                    "RANGE": 55
+                  }
+                },
+                "D+5": {
+                  "basis": "Mean reversion attempt towards Max Pain (23400) as selling exhaustion sets in.",
+                  "zone_low": 23200,
+                  "direction": "BULLISH",
+                  "zone_high": 23500,
+                  "probabilities": {
+                    "BEAR": 20,
+                    "BULL": 40,
+                    "RANGE": 40
+                  }
+                }
+              },
+              "component_scores": {
+                "PVPO": -25,
+                "PARTICIPATION": -67.5,
+                "MACRO_CATALYSTS": -30,
+                "PRICE_STRUCTURE": -40
+              },
+              "execution_inputs": {
+                "rr_score": 40,
+                "liquidity_spread_score": 80,
+                "premium_iv_theta_score": 70,
+                "strike_expiry_fit_score": 85,
+                "entry_invalidation_score": 50
+              },
+              "event_kill_switch": false,
+              "event_transmission": "BEARISH",
+              "convexity_warranted": true,
+              "market_trust_inputs": {
+                "pvpo_confirmation": 30,
+                "price_confirmation": 40,
+                "closing_confirmation": 50,
+                "cross_engine_consistency": 80,
+                "participation_confirmation": 20,
+                "evidence_freshness_completeness": 90
+              }
+            }
+          },
+          "automated_market_evidence": {
+            "schema": "5dr-console-market-evidence-v1",
+            "status": "AUTOMATED_MARKET_DATA_READY",
+            "blockers": [],
+            "provider": "UPSTOX",
+            "request_id": "5drreq_e82c7c1b-f66c-4a40-a642-568a2738a473",
+            "captured_at": "2026-09-24T04:13:30.310206+00:00",
+            "received_at": "2026-09-24T04:13:40.461Z",
+            "observations": [
+              {
+                "category": "PRICE_TECHNICALS",
+                "findings": [
+                  {
+                    "label": "Current Price",
+                    "value": 23232.6
+                  }
+                ],
+                "source_ref": "upstox-bundle://c31ed5b4128ce412e1741e1ae826f75c798c70b99207b2a494c5b2a42451a232#price-technicals",
+                "limitations": [],
+                "observed_at": "2026-09-24T04:13:30.310206+00:00",
+                "source_kind": "UPSTOX_STRUCTURED",
+                "retrieved_at": "2026-09-24T04:13:30.310206+00:00",
+                "verification": "VERIFIED",
+                "structured_data": {
+                  "chart": {
+                    "timeframes": {
+                      "1d": {
+                        "range_event": {
+                          "close_state": "CLOSE_INSIDE_PRIOR_RANGE",
+                          "lookback_bars": 20,
+                          "liquidity_sweep": "NONE",
+                          "prior_range_low": 23116.1,
+                          "prior_range_high": 24378.6
+                        },
+                        "recent_gaps": [
+                          {
+                            "gap_pct": 0.351671,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-08-02T18:30:00+00:00",
+                            "gap_points": 85.75
+                          },
+                          {
+                            "gap_pct": 0.048591,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-08-19T18:30:00+00:00",
+                            "gap_points": 11.7
+                          },
+                          {
+                            "gap_pct": 0.158382,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-01T18:30:00+00:00",
+                            "gap_points": 38.1
+                          },
+                          {
+                            "gap_pct": 0.024479,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-06T18:30:00+00:00",
+                            "gap_points": 5.85
+                          },
+                          {
+                            "gap_pct": 0.218108,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-08T18:30:00+00:00",
+                            "gap_points": 51.55
+                          }
+                        ],
+                        "latest_close": 23446.8,
+                        "failed_breakout": "NONE",
+                        "trend_structure": {
+                          "state": "DOWNTREND_STRUCTURE",
+                          "low_sequence": "LL",
+                          "high_sequence": "LH"
+                        },
+                        "volume_confirmation": {
+                          "status": "VOLUME_NOT_APPLICABLE_OR_UNAVAILABLE",
+                          "latest_volume": 0,
+                          "relative_to_median": null,
+                          "median_positive_volume": null
+                        }
+                      },
+                      "1h": {
+                        "range_event": {
+                          "close_state": "CLOSE_BELOW_PRIOR_RANGE",
+                          "lookback_bars": 20,
+                          "liquidity_sweep": "NONE",
+                          "prior_range_low": 23285.75,
+                          "prior_range_high": 23489
+                        },
+                        "recent_gaps": [
+                          {
+                            "gap_pct": 0.005677,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-08T03:45:00+00:00",
+                            "gap_points": 1.35
+                          },
+                          {
+                            "gap_pct": 0.417176,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-09T03:45:00+00:00",
+                            "gap_points": 98.6
+                          },
+                          {
+                            "gap_pct": 0.382702,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-11T03:45:00+00:00",
+                            "gap_points": 89.85
+                          },
+                          {
+                            "gap_pct": 0.000214,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-23T03:45:00+00:00",
+                            "gap_points": 0.05
+                          },
+                          {
+                            "gap_pct": 0.637187,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-24T03:45:00+00:00",
+                            "gap_points": 149.4
+                          }
+                        ],
+                        "latest_close": 23235.15,
+                        "failed_breakout": "NONE",
+                        "trend_structure": {
+                          "state": "DOWNTREND_STRUCTURE",
+                          "low_sequence": "LL",
+                          "high_sequence": "LH"
+                        },
+                        "volume_confirmation": {
+                          "status": "VOLUME_NOT_APPLICABLE_OR_UNAVAILABLE",
+                          "latest_volume": 0,
+                          "relative_to_median": null,
+                          "median_positive_volume": null
+                        }
+                      },
+                      "5m": {
+                        "range_event": {
+                          "close_state": "CLOSE_INSIDE_PRIOR_RANGE",
+                          "lookback_bars": 20,
+                          "liquidity_sweep": "NONE",
+                          "prior_range_low": 23205.45,
+                          "prior_range_high": 23459.95
+                        },
+                        "recent_gaps": [
+                          {
+                            "gap_pct": 0.021568,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-22T03:45:00+00:00",
+                            "gap_points": 5.05
+                          },
+                          {
+                            "gap_pct": 0.009645,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-23T03:45:00+00:00",
+                            "gap_points": 2.25
+                          },
+                          {
+                            "gap_pct": 0.637187,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-24T03:45:00+00:00",
+                            "gap_points": 149.4
+                          }
+                        ],
+                        "latest_close": 23235.15,
+                        "failed_breakout": "NONE",
+                        "trend_structure": {
+                          "state": "DOWNTREND_STRUCTURE",
+                          "low_sequence": "LL",
+                          "high_sequence": "LH"
+                        },
+                        "volume_confirmation": {
+                          "status": "VOLUME_NOT_APPLICABLE_OR_UNAVAILABLE",
+                          "latest_volume": 0,
+                          "relative_to_median": null,
+                          "median_positive_volume": null
+                        }
+                      },
+                      "15m": {
+                        "range_event": {
+                          "close_state": "CLOSE_INSIDE_PRIOR_RANGE",
+                          "lookback_bars": 20,
+                          "liquidity_sweep": "NONE",
+                          "prior_range_low": 23205.45,
+                          "prior_range_high": 23466.9
+                        },
+                        "recent_gaps": [
+                          {
+                            "gap_pct": 0.009645,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-23T03:45:00+00:00",
+                            "gap_points": 2.25
+                          },
+                          {
+                            "gap_pct": 0.637187,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-24T03:45:00+00:00",
+                            "gap_points": 149.4
+                          }
+                        ],
+                        "latest_close": 23235.15,
+                        "failed_breakout": "NONE",
+                        "trend_structure": {
+                          "state": "MIXED_OR_TRANSITION_STRUCTURE",
+                          "low_sequence": "HL",
+                          "high_sequence": "LH"
+                        },
+                        "volume_confirmation": {
+                          "status": "VOLUME_NOT_APPLICABLE_OR_UNAVAILABLE",
+                          "latest_volume": 0,
+                          "relative_to_median": null,
+                          "median_positive_volume": null
+                        }
+                      },
+                      "30m": {
+                        "range_event": {
+                          "close_state": "CLOSE_BELOW_PRIOR_RANGE",
+                          "lookback_bars": 20,
+                          "liquidity_sweep": "NONE",
+                          "prior_range_low": 23285.75,
+                          "prior_range_high": 23466.9
+                        },
+                        "recent_gaps": [
+                          {
+                            "gap_pct": 0.476833,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-11T03:45:00+00:00",
+                            "gap_points": 111.95
+                          },
+                          {
+                            "gap_pct": 0.016882,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-15T03:45:00+00:00",
+                            "gap_points": 3.95
+                          },
+                          {
+                            "gap_pct": 0.009645,
+                            "direction": "GAP_UP",
+                            "timestamp": "2026-09-23T03:45:00+00:00",
+                            "gap_points": 2.25
+                          },
+                          {
+                            "gap_pct": 0.637187,
+                            "direction": "GAP_DOWN",
+                            "timestamp": "2026-09-24T03:45:00+00:00",
+                            "gap_points": 149.4
+                          }
+                        ],
+                        "latest_close": 23235.15,
+                        "failed_breakout": "NONE",
+                        "trend_structure": {
+                          "state": "MIXED_OR_TRANSITION_STRUCTURE",
+                          "low_sequence": "HL",
+                          "high_sequence": "LH"
+                        },
+                        "volume_confirmation": {
+                          "status": "VOLUME_NOT_APPLICABLE_OR_UNAVAILABLE",
+                          "latest_volume": 0,
+                          "relative_to_median": null,
+                          "median_positive_volume": null
+                        }
+                      }
+                    },
+                    "directional_alignment_excluding_5m": "ALIGNED_DOWN"
+                  },
+                  "nifty": {
+                    "spot": {
+                      "volume": null,
+                      "timestamp": "2026-09-24T04:12:49.724000+00:00",
+                      "last_price": 23232.6,
+                      "net_change": -214.2,
+                      "average_price": null,
+                      "open_interest": null,
+                      "previous_close": 23446.8,
+                      "total_buy_quantity": null,
+                      "total_sell_quantity": null,
+                      "previous_open_interest": null,
+                      "change_pct_vs_previous_close": -0.913558
+                    },
+                    "series": {
+                      "1d": {
+                        "bar_count": 83,
+                        "series_sha256": "3e4e0c3ff860ae038c86025f3ec13eacbe67469151e4a92092be6517c2254061",
+                        "source_sha256": "8af009b884e8049e9268fdd2e9484e6cfb05604fc1fbbaca3e3920947cd3bfa0"
+                      },
+                      "1h": {
+                        "bar_count": 148,
+                        "series_sha256": "7e2720c55b273f77c0b87cfc3e93c85f37732b727d040fc56eecf75b09b8478c",
+                        "source_sha256": "7c5ac70bf482859090e2a64615a9347b14f11e49862e954234b48d777261c6ae"
+                      },
+                      "5m": {
+                        "bar_count": 231,
+                        "series_sha256": "8ec081b24e4ecbdfbd5f7f13a90d40288cebd03649496809189640f7b3c214c5",
+                        "source_sha256": "008e0104ed123719199a40394883e55bf325571c33b1f2f42a972b25d9d3e297"
+                      },
+                      "15m": {
+                        "bar_count": 152,
+                        "series_sha256": "abbc4567aead9d9c3c91f94d0469ab51edd0a42277818b69e3ec0180018ba867",
+                        "source_sha256": "3b4299707cbdc8a4156a4d4c3b2839ef7941cba6dafce5753305e419ed706a57"
+                      },
+                      "30m": {
+                        "bar_count": 131,
+                        "series_sha256": "1d782410e0cd4243423ee243d0a77d7e3ea6218ca39531daf862b756fb35112d",
+                        "source_sha256": "c58a5304540996bb90341c67fc00f9951e68cec77cf9265f6c0d12f111f7347f"
+                      }
+                    },
+                    "latest_by_timeframe": {
+                      "1d": {
+                        "close": 23446.8,
+                        "timestamp": "2026-09-22T18:30:00+00:00"
+                      },
+                      "1h": {
+                        "close": 23235.15,
+                        "timestamp": "2026-09-24T03:45:00+00:00"
+                      },
+                      "5m": {
+                        "close": 23235.15,
+                        "timestamp": "2026-09-24T04:10:00+00:00"
+                      },
+                      "15m": {
+                        "close": 23235.15,
+                        "timestamp": "2026-09-24T04:00:00+00:00"
+                      },
+                      "30m": {
+                        "close": 23235.15,
+                        "timestamp": "2026-09-24T03:45:00+00:00"
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "category": "DERIVATIVES_OI",
+                "findings": [
+                  {
+                    "label": "Underlying Value",
+                    "value": 23236.6
+                  }
+                ],
+                "source_ref": "upstox-bundle://c31ed5b4128ce412e1741e1ae826f75c798c70b99207b2a494c5b2a42451a232#derivatives-oi",
+                "limitations": [],
+                "observed_at": "2026-09-24T04:13:30.310206+00:00",
+                "source_kind": "UPSTOX_STRUCTURED",
+                "retrieved_at": "2026-09-24T04:13:30.310206+00:00",
+                "verification": "VERIFIED",
+                "structured_data": {
+                  "option_chain": {
+                    "sample_strikes": [
+                      {
+                        "CE": {
+                          "iv": 10.65,
+                          "pop": 39.39,
+                          "vega": 10.5752,
+                          "delta": 0.6233,
+                          "gamma": 0.0013,
+                          "theta": -10.7459,
+                          "volume": 2781870,
+                          "ask_qty": 325,
+                          "bid_qty": 390,
+                          "prev_oi": 237575,
+                          "ask_price": 168.8,
+                          "bid_price": 168.3,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 171.4,
+                          "net_change": -156.2,
+                          "close_price": 327.6,
+                          "average_price": 182.27,
+                          "open_interest": 954525,
+                          "bid_ask_spread": 0.5,
+                          "instrument_key": "NSE_FO|73908",
+                          "previous_close": 327.6,
+                          "trading_symbol": "NIFTY 23150 CE 29 SEP 26",
+                          "total_buy_quantity": 189930,
+                          "total_sell_quantity": 163865,
+                          "bid_ask_spread_pct_mid": 0.296648,
+                          "previous_open_interest": 237575,
+                          "change_pct_vs_previous_close": -47.680098
+                        },
+                        "PE": {
+                          "iv": 10.67,
+                          "pop": 28.58,
+                          "vega": 10.5766,
+                          "delta": -0.3769,
+                          "gamma": 0.0013,
+                          "theta": -10.7628,
+                          "volume": 10290280,
+                          "ask_qty": 715,
+                          "bid_qty": 455,
+                          "prev_oi": 2113280,
+                          "ask_price": 78.75,
+                          "bid_price": 78.55,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 77,
+                          "net_change": 51.2,
+                          "close_price": 25.8,
+                          "average_price": 67.36,
+                          "open_interest": 2711280,
+                          "bid_ask_spread": 0.2,
+                          "instrument_key": "NSE_FO|73909",
+                          "previous_close": 25.8,
+                          "trading_symbol": "NIFTY 23150 PE 29 SEP 26",
+                          "total_buy_quantity": 1939145,
+                          "total_sell_quantity": 180180,
+                          "bid_ask_spread_pct_mid": 0.254291,
+                          "previous_open_interest": 2113280,
+                          "change_pct_vs_previous_close": 198.449612
+                        },
+                        "strike": 23150
+                      },
+                      {
+                        "CE": {
+                          "iv": 10.53,
+                          "pop": 36.76,
+                          "vega": 10.9913,
+                          "delta": 0.5583,
+                          "gamma": 0.0013,
+                          "theta": -11.0407,
+                          "volume": 16997435,
+                          "ask_qty": 325,
+                          "bid_qty": 585,
+                          "prev_oi": 1471925,
+                          "ask_price": 137.95,
+                          "bid_price": 137.65,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 140.4,
+                          "net_change": -142.55,
+                          "close_price": 282.95,
+                          "average_price": 151.01,
+                          "open_interest": 6125665,
+                          "bid_ask_spread": 0.3,
+                          "instrument_key": "NSE_FO|73910",
+                          "previous_close": 282.95,
+                          "trading_symbol": "NIFTY 23200 CE 29 SEP 26",
+                          "total_buy_quantity": 2157675,
+                          "total_sell_quantity": 758290,
+                          "bid_ask_spread_pct_mid": 0.217707,
+                          "previous_open_interest": 1471925,
+                          "change_pct_vs_previous_close": -50.379926
+                        },
+                        "PE": {
+                          "iv": 10.53,
+                          "pop": 32,
+                          "vega": 10.9913,
+                          "delta": -0.4417,
+                          "gamma": 0.0013,
+                          "theta": -11.0407,
+                          "volume": 31619315,
+                          "ask_qty": 2080,
+                          "bid_qty": 260,
+                          "prev_oi": 6208930,
+                          "ask_price": 98.5,
+                          "bid_price": 98.25,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 95.8,
+                          "net_change": 63.25,
+                          "close_price": 32.55,
+                          "average_price": 84.77,
+                          "open_interest": 7851025,
+                          "bid_ask_spread": 0.25,
+                          "instrument_key": "NSE_FO|73911",
+                          "previous_close": 32.55,
+                          "trading_symbol": "NIFTY 23200 PE 29 SEP 26",
+                          "total_buy_quantity": 2473705,
+                          "total_sell_quantity": 534625,
+                          "bid_ask_spread_pct_mid": 0.25413,
+                          "previous_open_interest": 6208930,
+                          "change_pct_vs_previous_close": 194.316436
+                        },
+                        "strike": 23200
+                      },
+                      {
+                        "CE": {
+                          "iv": 10.39,
+                          "pop": 33.73,
+                          "vega": 11.1067,
+                          "delta": 0.4902,
+                          "gamma": 0.0014,
+                          "theta": -11.0111,
+                          "volume": 19327035,
+                          "ask_qty": 455,
+                          "bid_qty": 260,
+                          "prev_oi": 990925,
+                          "ask_price": 110.75,
+                          "bid_price": 110.6,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 112.45,
+                          "net_change": -129.8,
+                          "close_price": 242.25,
+                          "average_price": 120.58,
+                          "open_interest": 6005935,
+                          "bid_ask_spread": 0.15,
+                          "instrument_key": "NSE_FO|73921",
+                          "previous_close": 242.25,
+                          "trading_symbol": "NIFTY 23250 CE 29 SEP 26",
+                          "total_buy_quantity": 2232945,
+                          "total_sell_quantity": 826020,
+                          "bid_ask_spread_pct_mid": 0.135532,
+                          "previous_open_interest": 990925,
+                          "change_pct_vs_previous_close": -53.581011
+                        },
+                        "PE": {
+                          "iv": 10.38,
+                          "pop": 35.25,
+                          "vega": 11.1067,
+                          "delta": -0.5098,
+                          "gamma": 0.0014,
+                          "theta": -10.995,
+                          "volume": 26171210,
+                          "ask_qty": 1170,
+                          "bid_qty": 585,
+                          "prev_oi": 3762785,
+                          "ask_price": 120.8,
+                          "bid_price": 120.45,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 118.6,
+                          "net_change": 77.4,
+                          "close_price": 41.2,
+                          "average_price": 105.25,
+                          "open_interest": 5520125,
+                          "bid_ask_spread": 0.35,
+                          "instrument_key": "NSE_FO|73922",
+                          "previous_close": 41.2,
+                          "trading_symbol": "NIFTY 23250 PE 29 SEP 26",
+                          "total_buy_quantity": 2695030,
+                          "total_sell_quantity": 276770,
+                          "bid_ask_spread_pct_mid": 0.290155,
+                          "previous_open_interest": 3762785,
+                          "change_pct_vs_previous_close": 187.864078
+                        },
+                        "strike": 23250
+                      },
+                      {
+                        "CE": {
+                          "iv": 10.31,
+                          "pop": 30.33,
+                          "vega": 10.8931,
+                          "delta": 0.4213,
+                          "gamma": 0.0014,
+                          "theta": -10.7201,
+                          "volume": 24572665,
+                          "ask_qty": 195,
+                          "bid_qty": 325,
+                          "prev_oi": 4160390,
+                          "ask_price": 86.85,
+                          "bid_price": 86.7,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 88.55,
+                          "net_change": -114.7,
+                          "close_price": 203.25,
+                          "average_price": 95.59,
+                          "open_interest": 10237305,
+                          "bid_ask_spread": 0.15,
+                          "instrument_key": "NSE_FO|73923",
+                          "previous_close": 203.25,
+                          "trading_symbol": "NIFTY 23300 CE 29 SEP 26",
+                          "total_buy_quantity": 2347865,
+                          "total_sell_quantity": 1093170,
+                          "bid_ask_spread_pct_mid": 0.172861,
+                          "previous_open_interest": 4160390,
+                          "change_pct_vs_previous_close": -56.432964
+                        },
+                        "PE": {
+                          "iv": 10.25,
+                          "pop": 38.24,
+                          "vega": 10.8903,
+                          "delta": -0.5792,
+                          "gamma": 0.0014,
+                          "theta": -10.654,
+                          "volume": 26211445,
+                          "ask_qty": 715,
+                          "bid_qty": 715,
+                          "prev_oi": 9210500,
+                          "ask_price": 147.85,
+                          "bid_price": 147.45,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 144.55,
+                          "net_change": 91.95,
+                          "close_price": 52.6,
+                          "average_price": 127.87,
+                          "open_interest": 9111765,
+                          "bid_ask_spread": 0.4,
+                          "instrument_key": "NSE_FO|73924",
+                          "previous_close": 52.6,
+                          "trading_symbol": "NIFTY 23300 PE 29 SEP 26",
+                          "total_buy_quantity": 2854085,
+                          "total_sell_quantity": 345800,
+                          "bid_ask_spread_pct_mid": 0.270911,
+                          "previous_open_interest": 9210500,
+                          "change_pct_vs_previous_close": 174.809886
+                        },
+                        "strike": 23300
+                      },
+                      {
+                        "CE": {
+                          "iv": 10.22,
+                          "pop": 26.65,
+                          "vega": 10.3538,
+                          "delta": 0.3537,
+                          "gamma": 0.0013,
+                          "theta": -10.0989,
+                          "volume": 9462505,
+                          "ask_qty": 195,
+                          "bid_qty": 650,
+                          "prev_oi": 1590875,
+                          "ask_price": 66.65,
+                          "bid_price": 66.5,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 68.15,
+                          "net_change": -99.1,
+                          "close_price": 167.25,
+                          "average_price": 73.64,
+                          "open_interest": 3146585,
+                          "bid_ask_spread": 0.15,
+                          "instrument_key": "NSE_FO|73925",
+                          "previous_close": 167.25,
+                          "trading_symbol": "NIFTY 23350 CE 29 SEP 26",
+                          "total_buy_quantity": 2022865,
+                          "total_sell_quantity": 455780,
+                          "bid_ask_spread_pct_mid": 0.22531,
+                          "previous_open_interest": 1590875,
+                          "change_pct_vs_previous_close": -59.252616
+                        },
+                        "PE": {
+                          "iv": 10.13,
+                          "pop": 40.89,
+                          "vega": 10.3402,
+                          "delta": -0.6476,
+                          "gamma": 0.0013,
+                          "theta": -9.9953,
+                          "volume": 11780535,
+                          "ask_qty": 260,
+                          "bid_qty": 65,
+                          "prev_oi": 3979495,
+                          "ask_price": 177.9,
+                          "bid_price": 177.7,
+                          "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                          "last_price": 173.65,
+                          "net_change": 107.05,
+                          "close_price": 66.6,
+                          "average_price": 153.64,
+                          "open_interest": 2284620,
+                          "bid_ask_spread": 0.2,
+                          "instrument_key": "NSE_FO|73926",
+                          "previous_close": 66.6,
+                          "trading_symbol": "NIFTY 23350 PE 29 SEP 26",
+                          "total_buy_quantity": 1556035,
+                          "total_sell_quantity": 132860,
+                          "bid_ask_spread_pct_mid": 0.112486,
+                          "previous_open_interest": 3979495,
+                          "change_pct_vs_previous_close": 160.735736
+                        },
+                        "strike": 23350
+                      }
+                    ],
+                    "selected_expiry": "2026-09-29",
+                    "execution_evidence": {
+                      "iv_preserved": true,
+                      "theta_preserved": true,
+                      "greeks_preserved": true,
+                      "source_semantics": "UPSTOX_OPTION_CHAIN_DOCUMENTED_FIELDS",
+                      "best_bid_ask_preserved": true,
+                      "spread_calculated_from_best_bid_ask": true
+                    },
+                    "underlying_spot_price": 23236.6
+                  },
+                  "nifty_futures": {
+                    "expiry": "2026-09-29",
+                    "future": {
+                      "volume": 591240,
+                      "timestamp": "2026-09-24T04:12:49.724000+00:00",
+                      "last_price": 23236.6,
+                      "net_change": -213.2,
+                      "average_price": 23266.08,
+                      "open_interest": 15644525,
+                      "previous_close": 23449.8,
+                      "total_buy_quantity": 110825,
+                      "total_sell_quantity": 181610,
+                      "previous_open_interest": 15564510,
+                      "change_pct_vs_previous_close": -0.909176
+                    },
+                    "basis_points": 4,
+                    "spot_last_price": 23232.6,
+                    "basis_pct_of_spot": 0.017217
+                  },
+                  "derivative_analytics": {
+                    "oi": {
+                      "expiry": "29-09-2026",
+                      "fields": [
+                        "call_put_oi_data_list",
+                        "expiry",
+                        "spot_closing_price",
+                        "total_calls",
+                        "total_puts"
+                      ],
+                      "top_put_oi": {
+                        "put_oi": 11281450,
+                        "strike_price": 23000
+                      },
+                      "total_puts": 169862920,
+                      "top_call_oi": {
+                        "call_oi": 17380155,
+                        "strike_price": 24000
+                      },
+                      "total_calls": 203560780
+                    },
+                    "pcr": {
+                      "pcr": 0.8344579933325074,
+                      "fields": [
+                        "expiry_date",
+                        "insights",
+                        "instrument_key",
+                        "pcr",
+                        "spot_closing_price"
+                      ],
+                      "instrument_key": "NSE_INDEX|Nifty 50",
+                      "insights_preview": [
+                        {
+                          "pcr": 1.008645618494091,
+                          "time": "09:15",
+                          "spot_price": 23252.5
+                        }
+                      ]
+                    },
+                    "max_pain": {
+                      "fields": [
+                        "expiry_date",
+                        "insights",
+                        "instrument_key",
+                        "max_pain",
+                        "spot_closing_price"
+                      ],
+                      "max_pain": 23400,
+                      "instrument_key": "NSE_INDEX|Nifty 50",
+                      "insights_preview": [
+                        {
+                          "time": "09:15",
+                          "max_pain": 23500,
+                          "spot_price": 23252.5
+                        }
+                      ]
+                    },
+                    "change_oi": {
+                      "expiry": "29-09-2026",
+                      "fields": [
+                        "call_put_oi_data_list",
+                        "expiry",
+                        "spot_closing_price",
+                        "total_call_change_oi",
+                        "total_put_change_oi"
+                      ]
+                    }
+                  }
+                }
+              },
+              {
+                "category": "MARKET_TRUST",
+                "findings": [],
+                "source_ref": "upstox-bundle://c31ed5b4128ce412e1741e1ae826f75c798c70b99207b2a494c5b2a42451a232#market-trust",
+                "limitations": [],
+                "observed_at": "2026-09-24T04:13:30.310206+00:00",
+                "source_kind": "UPSTOX_STRUCTURED",
+                "retrieved_at": "2026-09-24T04:13:30.310206+00:00",
+                "verification": "VERIFIED",
+                "structured_data": {
+                  "sectors": {
+                    "instruments": {
+                      "NSE_INDEX|Nifty IT": {
+                        "volume": null,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 28293.5,
+                        "net_change": -40.55,
+                        "average_price": null,
+                        "open_interest": null,
+                        "previous_close": 28334.05,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "change_pct_vs_previous_close": -0.143114
+                      },
+                      "NSE_INDEX|Nifty Auto": {
+                        "volume": null,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 26972.25,
+                        "net_change": -185.3,
+                        "average_price": null,
+                        "open_interest": null,
+                        "previous_close": 27157.55,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "change_pct_vs_previous_close": -0.682315
+                      },
+                      "NSE_INDEX|NIFTY OIL AND GAS": {
+                        "volume": null,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 10928.15,
+                        "net_change": -77.05,
+                        "average_price": null,
+                        "open_interest": null,
+                        "previous_close": 11005.199999999999,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "change_pct_vs_previous_close": -0.700124
+                      },
+                      "NSE_INDEX|Nifty Fin Service": {
+                        "volume": null,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 25115.7,
+                        "net_change": -449.15,
+                        "average_price": null,
+                        "open_interest": null,
+                        "previous_close": 25564.850000000002,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "change_pct_vs_previous_close": -1.756904
+                      }
+                    },
+                    "approval_ref": "user-explicit-2026-09-16-participation-v1"
+                  },
+                  "india_vix": {
+                    "volume": null,
+                    "timestamp": "2026-09-24T04:12:49.724000+00:00",
+                    "last_price": 11.4,
+                    "net_change": 1.05,
+                    "average_price": null,
+                    "open_interest": null,
+                    "previous_close": 10.35,
+                    "total_buy_quantity": null,
+                    "total_sell_quantity": null,
+                    "previous_open_interest": null,
+                    "change_pct_vs_previous_close": 10.144928
+                  },
+                  "global_risk": {
+                    "instruments": {
+                      "dax": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:16.477000+00:00",
+                        "last_price": 25399,
+                        "net_change": -285.5,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^GDAXI",
+                        "previous_close": 25684.5,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 900,
+                        "provider_declared_latency": "900 Seconds",
+                        "change_pct_vs_previous_close": -1.111565
+                      },
+                      "sp500": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:24.002000+00:00",
+                        "last_price": 7726.85,
+                        "net_change": -58.79,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^GSPC",
+                        "previous_close": 7785.64,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": -0.755108
+                      },
+                      "ftse_100": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:19+00:00",
+                        "last_price": 10716.75,
+                        "net_change": 8.42,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^FTSE",
+                        "previous_close": 10708.33,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 900,
+                        "provider_declared_latency": "900 Seconds",
+                        "change_pct_vs_previous_close": 0.07863
+                      },
+                      "dow_jones": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:17.740000+00:00",
+                        "last_price": 51527.73,
+                        "net_change": -356.96,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^DJI",
+                        "previous_close": 51884.69,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": -0.687987
+                      },
+                      "hang_seng": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:21.499000+00:00",
+                        "last_price": 24647,
+                        "net_change": -187.13,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^HSI",
+                        "previous_close": 24834.13,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 900,
+                        "provider_declared_latency": "900 Seconds",
+                        "change_pct_vs_previous_close": -0.753519
+                      },
+                      "gift_nifty": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:20.240000+00:00",
+                        "last_price": 23235,
+                        "net_change": -80.5,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|SGX NIFTY",
+                        "previous_close": 23315.5,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 120,
+                        "provider_declared_latency": "120 Seconds",
+                        "change_pct_vs_previous_close": -0.345264
+                      },
+                      "nikkei_225": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:22.747000+00:00",
+                        "last_price": 65735.7,
+                        "net_change": 716.75,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|^N225",
+                        "previous_close": 65018.95,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 900,
+                        "provider_declared_latency": "900 Seconds",
+                        "change_pct_vs_previous_close": 1.102371
+                      },
+                      "us_tech_100": {
+                        "volume": null,
+                        "segment": "GLOBAL_INDEX",
+                        "timestamp": "2026-09-24T04:13:25.244000+00:00",
+                        "last_price": 26954.42,
+                        "net_change": -310.86,
+                        "average_price": null,
+                        "open_interest": null,
+                        "instrument_key": "GLOBAL_INDEX|IXIX",
+                        "previous_close": 27265.28,
+                        "total_buy_quantity": null,
+                        "total_sell_quantity": null,
+                        "previous_open_interest": null,
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": -1.140131
+                      }
+                    },
+                    "aggregate_timestamp_policy": "earliest constituent provider timestamp; individual timestamps preserved"
+                  },
+                  "crude_usdinr": {
+                    "instruments": {
+                      "wti": {
+                        "volume": 0,
+                        "segment": "GLOBAL_INDICATOR",
+                        "timestamp": "2026-09-24T04:11:00+00:00",
+                        "last_price": 91.35,
+                        "open_interest": 0,
+                        "instrument_key": "GLOBAL_INDICATOR|CLUSD",
+                        "previous_close": null,
+                        "snapshot_basis": "UPSTOX_INTRADAY_1M",
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": null
+                      },
+                      "brent": {
+                        "volume": 0,
+                        "segment": "GLOBAL_INDICATOR",
+                        "timestamp": "2026-09-24T04:10:00+00:00",
+                        "last_price": 102.13,
+                        "open_interest": 0,
+                        "instrument_key": "GLOBAL_INDICATOR|BZUSD",
+                        "previous_close": null,
+                        "snapshot_basis": "UPSTOX_INTRADAY_1M",
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": null
+                      },
+                      "usd_inr": {
+                        "volume": 0,
+                        "segment": "GLOBAL_INDICATOR",
+                        "timestamp": "2026-09-24T04:11:00+00:00",
+                        "last_price": 95.84,
+                        "open_interest": 0,
+                        "instrument_key": "GLOBAL_INDICATOR|USDINR",
+                        "previous_close": null,
+                        "snapshot_basis": "UPSTOX_INTRADAY_1M",
+                        "provider_latency_seconds": 20,
+                        "provider_declared_latency": "20 Seconds",
+                        "change_pct_vs_previous_close": null
+                      }
+                    },
+                    "aggregate_timestamp_policy": "earliest constituent provider timestamp; individual timestamps preserved"
+                  },
+                  "fii_dii_cash": {
+                    "dii": {
+                      "oi_amount": 0,
+                      "buy_amount": 14404.9,
+                      "time_stamp": 1790101800000,
+                      "sell_amount": 12063.44,
+                      "oi_contracts": 0,
+                      "buy_contracts": 0,
+                      "sell_contracts": 0,
+                      "total_long_contracts": 0,
+                      "total_short_contracts": 0,
+                      "total_put_long_contracts": 0,
+                      "total_call_long_contracts": 0,
+                      "total_put_short_contracts": 0,
+                      "total_call_short_contracts": 0
+                    },
+                    "fii": {
+                      "oi_amount": 0,
+                      "buy_amount": 13580.4,
+                      "time_stamp": 1790101800000,
+                      "sell_amount": 11962.95,
+                      "oi_contracts": 0,
+                      "buy_contracts": 0,
+                      "sell_contracts": 0,
+                      "total_long_contracts": 0,
+                      "total_short_contracts": 0,
+                      "total_put_long_contracts": 0,
+                      "total_call_long_contracts": 0,
+                      "total_put_short_contracts": 0,
+                      "total_call_short_contracts": 0
+                    }
+                  },
+                  "heavyweights": {
+                    "instruments": {
+                      "NSE_EQ|INE002A01018": {
+                        "volume": 1540223,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 1238.9,
+                        "net_change": -9.1,
+                        "average_price": 1239.06,
+                        "open_interest": 0,
+                        "previous_close": 1248,
+                        "total_buy_quantity": 504248,
+                        "total_sell_quantity": 519003,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -0.729167
+                      },
+                      "NSE_EQ|INE009A01021": {
+                        "volume": 1257311,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 1013.5,
+                        "net_change": -7,
+                        "average_price": 1017.58,
+                        "open_interest": 0,
+                        "previous_close": 1020.5,
+                        "total_buy_quantity": 384750,
+                        "total_sell_quantity": 410781,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -0.685938
+                      },
+                      "NSE_EQ|INE018A01030": {
+                        "volume": 110676,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 3886.9,
+                        "net_change": -43,
+                        "average_price": 3894.49,
+                        "open_interest": 0,
+                        "previous_close": 3929.9,
+                        "total_buy_quantity": 92886,
+                        "total_sell_quantity": 98083,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -1.094175
+                      },
+                      "NSE_EQ|INE040A01034": {
+                        "volume": 4714417,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 726.55,
+                        "net_change": -10.7,
+                        "average_price": 728.59,
+                        "open_interest": 0,
+                        "previous_close": 737.25,
+                        "total_buy_quantity": 935811,
+                        "total_sell_quantity": 1124717,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -1.451339
+                      },
+                      "NSE_EQ|INE062A01020": {
+                        "volume": 1099913,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 986.2,
+                        "net_change": -7.9,
+                        "average_price": 988.53,
+                        "open_interest": 0,
+                        "previous_close": 994.1,
+                        "total_buy_quantity": 395156,
+                        "total_sell_quantity": 605084,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -0.794689
+                      },
+                      "NSE_EQ|INE090A01021": {
+                        "volume": 1464252,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 1346.5,
+                        "net_change": 6.5,
+                        "average_price": 1338.48,
+                        "open_interest": 0,
+                        "previous_close": 1340,
+                        "total_buy_quantity": 319112,
+                        "total_sell_quantity": 281856,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": 0.485075
+                      },
+                      "NSE_EQ|INE238A01034": {
+                        "volume": 2296140,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 1199.2,
+                        "net_change": -44,
+                        "average_price": 1203.66,
+                        "open_interest": 0,
+                        "previous_close": 1243.2,
+                        "total_buy_quantity": 313111,
+                        "total_sell_quantity": 396049,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -3.539254
+                      },
+                      "NSE_EQ|INE397D01024": {
+                        "volume": 360295,
+                        "timestamp": "2026-09-24T04:13:13.453000+00:00",
+                        "last_price": 1819.7,
+                        "net_change": -13.5,
+                        "average_price": 1824.2,
+                        "open_interest": 0,
+                        "previous_close": 1833.2,
+                        "total_buy_quantity": 157603,
+                        "total_sell_quantity": 208388,
+                        "previous_open_interest": 0,
+                        "change_pct_vs_previous_close": -0.736417
+                      }
+                    },
+                    "approval_ref": "user-explicit-2026-09-16-participation-v1"
+                  },
+                  "fii_index_derivatives": {
+                    "index_futures": {
+                      "oi_amount": 59520.43,
+                      "buy_amount": 2594.38,
+                      "time_stamp": 1790101800000,
+                      "sell_amount": 1915.4,
+                      "oi_contracts": 379835,
+                      "buy_contracts": 16561,
+                      "sell_contracts": 12266,
+                      "total_long_contracts": 40611,
+                      "total_short_contracts": 339224,
+                      "total_put_long_contracts": 0,
+                      "total_call_long_contracts": 0,
+                      "total_put_short_contracts": 0,
+                      "total_call_short_contracts": 0
+                    },
+                    "index_options": {
+                      "oi_amount": 518491.27,
+                      "buy_amount": 528772.01,
+                      "time_stamp": 1790101800000,
+                      "sell_amount": 532678.16,
+                      "oi_contracts": 3312874,
+                      "buy_contracts": 3401141,
+                      "sell_contracts": 3423426,
+                      "total_long_contracts": 0,
+                      "total_short_contracts": 0,
+                      "total_put_long_contracts": 1132740,
+                      "total_call_long_contracts": 705480,
+                      "total_put_short_contracts": 580376,
+                      "total_call_short_contracts": 894277
+                    }
+                  }
+                }
+              },
+              {
+                "category": "EXECUTION_RISK",
+                "findings": [],
+                "source_ref": "upstox-bundle://c31ed5b4128ce412e1741e1ae826f75c798c70b99207b2a494c5b2a42451a232#execution-risk",
+                "limitations": [],
+                "observed_at": "2026-09-24T04:13:30.310206+00:00",
+                "source_kind": "UPSTOX_STRUCTURED",
+                "retrieved_at": "2026-09-24T04:13:30.310206+00:00",
+                "verification": "VERIFIED",
+                "structured_data": {
+                  "sample_strikes": [
+                    {
+                      "CE": {
+                        "iv": 10.65,
+                        "pop": 39.39,
+                        "vega": 10.5752,
+                        "delta": 0.6233,
+                        "gamma": 0.0013,
+                        "theta": -10.7459,
+                        "volume": 2781870,
+                        "ask_qty": 325,
+                        "bid_qty": 390,
+                        "prev_oi": 237575,
+                        "ask_price": 168.8,
+                        "bid_price": 168.3,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 171.4,
+                        "net_change": -156.2,
+                        "close_price": 327.6,
+                        "average_price": 182.27,
+                        "open_interest": 954525,
+                        "bid_ask_spread": 0.5,
+                        "instrument_key": "NSE_FO|73908",
+                        "previous_close": 327.6,
+                        "trading_symbol": "NIFTY 23150 CE 29 SEP 26",
+                        "total_buy_quantity": 189930,
+                        "total_sell_quantity": 163865,
+                        "bid_ask_spread_pct_mid": 0.296648,
+                        "previous_open_interest": 237575,
+                        "change_pct_vs_previous_close": -47.680098
+                      },
+                      "PE": {
+                        "iv": 10.67,
+                        "pop": 28.58,
+                        "vega": 10.5766,
+                        "delta": -0.3769,
+                        "gamma": 0.0013,
+                        "theta": -10.7628,
+                        "volume": 10290280,
+                        "ask_qty": 715,
+                        "bid_qty": 455,
+                        "prev_oi": 2113280,
+                        "ask_price": 78.75,
+                        "bid_price": 78.55,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 77,
+                        "net_change": 51.2,
+                        "close_price": 25.8,
+                        "average_price": 67.36,
+                        "open_interest": 2711280,
+                        "bid_ask_spread": 0.2,
+                        "instrument_key": "NSE_FO|73909",
+                        "previous_close": 25.8,
+                        "trading_symbol": "NIFTY 23150 PE 29 SEP 26",
+                        "total_buy_quantity": 1939145,
+                        "total_sell_quantity": 180180,
+                        "bid_ask_spread_pct_mid": 0.254291,
+                        "previous_open_interest": 2113280,
+                        "change_pct_vs_previous_close": 198.449612
+                      },
+                      "strike": 23150
+                    },
+                    {
+                      "CE": {
+                        "iv": 10.53,
+                        "pop": 36.76,
+                        "vega": 10.9913,
+                        "delta": 0.5583,
+                        "gamma": 0.0013,
+                        "theta": -11.0407,
+                        "volume": 16997435,
+                        "ask_qty": 325,
+                        "bid_qty": 585,
+                        "prev_oi": 1471925,
+                        "ask_price": 137.95,
+                        "bid_price": 137.65,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 140.4,
+                        "net_change": -142.55,
+                        "close_price": 282.95,
+                        "average_price": 151.01,
+                        "open_interest": 6125665,
+                        "bid_ask_spread": 0.3,
+                        "instrument_key": "NSE_FO|73910",
+                        "previous_close": 282.95,
+                        "trading_symbol": "NIFTY 23200 CE 29 SEP 26",
+                        "total_buy_quantity": 2157675,
+                        "total_sell_quantity": 758290,
+                        "bid_ask_spread_pct_mid": 0.217707,
+                        "previous_open_interest": 1471925,
+                        "change_pct_vs_previous_close": -50.379926
+                      },
+                      "PE": {
+                        "iv": 10.53,
+                        "pop": 32,
+                        "vega": 10.9913,
+                        "delta": -0.4417,
+                        "gamma": 0.0013,
+                        "theta": -11.0407,
+                        "volume": 31619315,
+                        "ask_qty": 2080,
+                        "bid_qty": 260,
+                        "prev_oi": 6208930,
+                        "ask_price": 98.5,
+                        "bid_price": 98.25,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 95.8,
+                        "net_change": 63.25,
+                        "close_price": 32.55,
+                        "average_price": 84.77,
+                        "open_interest": 7851025,
+                        "bid_ask_spread": 0.25,
+                        "instrument_key": "NSE_FO|73911",
+                        "previous_close": 32.55,
+                        "trading_symbol": "NIFTY 23200 PE 29 SEP 26",
+                        "total_buy_quantity": 2473705,
+                        "total_sell_quantity": 534625,
+                        "bid_ask_spread_pct_mid": 0.25413,
+                        "previous_open_interest": 6208930,
+                        "change_pct_vs_previous_close": 194.316436
+                      },
+                      "strike": 23200
+                    },
+                    {
+                      "CE": {
+                        "iv": 10.39,
+                        "pop": 33.73,
+                        "vega": 11.1067,
+                        "delta": 0.4902,
+                        "gamma": 0.0014,
+                        "theta": -11.0111,
+                        "volume": 19327035,
+                        "ask_qty": 455,
+                        "bid_qty": 260,
+                        "prev_oi": 990925,
+                        "ask_price": 110.75,
+                        "bid_price": 110.6,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 112.45,
+                        "net_change": -129.8,
+                        "close_price": 242.25,
+                        "average_price": 120.58,
+                        "open_interest": 6005935,
+                        "bid_ask_spread": 0.15,
+                        "instrument_key": "NSE_FO|73921",
+                        "previous_close": 242.25,
+                        "trading_symbol": "NIFTY 23250 CE 29 SEP 26",
+                        "total_buy_quantity": 2232945,
+                        "total_sell_quantity": 826020,
+                        "bid_ask_spread_pct_mid": 0.135532,
+                        "previous_open_interest": 990925,
+                        "change_pct_vs_previous_close": -53.581011
+                      },
+                      "PE": {
+                        "iv": 10.38,
+                        "pop": 35.25,
+                        "vega": 11.1067,
+                        "delta": -0.5098,
+                        "gamma": 0.0014,
+                        "theta": -10.995,
+                        "volume": 26171210,
+                        "ask_qty": 1170,
+                        "bid_qty": 585,
+                        "prev_oi": 3762785,
+                        "ask_price": 120.8,
+                        "bid_price": 120.45,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 118.6,
+                        "net_change": 77.4,
+                        "close_price": 41.2,
+                        "average_price": 105.25,
+                        "open_interest": 5520125,
+                        "bid_ask_spread": 0.35,
+                        "instrument_key": "NSE_FO|73922",
+                        "previous_close": 41.2,
+                        "trading_symbol": "NIFTY 23250 PE 29 SEP 26",
+                        "total_buy_quantity": 2695030,
+                        "total_sell_quantity": 276770,
+                        "bid_ask_spread_pct_mid": 0.290155,
+                        "previous_open_interest": 3762785,
+                        "change_pct_vs_previous_close": 187.864078
+                      },
+                      "strike": 23250
+                    },
+                    {
+                      "CE": {
+                        "iv": 10.31,
+                        "pop": 30.33,
+                        "vega": 10.8931,
+                        "delta": 0.4213,
+                        "gamma": 0.0014,
+                        "theta": -10.7201,
+                        "volume": 24572665,
+                        "ask_qty": 195,
+                        "bid_qty": 325,
+                        "prev_oi": 4160390,
+                        "ask_price": 86.85,
+                        "bid_price": 86.7,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 88.55,
+                        "net_change": -114.7,
+                        "close_price": 203.25,
+                        "average_price": 95.59,
+                        "open_interest": 10237305,
+                        "bid_ask_spread": 0.15,
+                        "instrument_key": "NSE_FO|73923",
+                        "previous_close": 203.25,
+                        "trading_symbol": "NIFTY 23300 CE 29 SEP 26",
+                        "total_buy_quantity": 2347865,
+                        "total_sell_quantity": 1093170,
+                        "bid_ask_spread_pct_mid": 0.172861,
+                        "previous_open_interest": 4160390,
+                        "change_pct_vs_previous_close": -56.432964
+                      },
+                      "PE": {
+                        "iv": 10.25,
+                        "pop": 38.24,
+                        "vega": 10.8903,
+                        "delta": -0.5792,
+                        "gamma": 0.0014,
+                        "theta": -10.654,
+                        "volume": 26211445,
+                        "ask_qty": 715,
+                        "bid_qty": 715,
+                        "prev_oi": 9210500,
+                        "ask_price": 147.85,
+                        "bid_price": 147.45,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 144.55,
+                        "net_change": 91.95,
+                        "close_price": 52.6,
+                        "average_price": 127.87,
+                        "open_interest": 9111765,
+                        "bid_ask_spread": 0.4,
+                        "instrument_key": "NSE_FO|73924",
+                        "previous_close": 52.6,
+                        "trading_symbol": "NIFTY 23300 PE 29 SEP 26",
+                        "total_buy_quantity": 2854085,
+                        "total_sell_quantity": 345800,
+                        "bid_ask_spread_pct_mid": 0.270911,
+                        "previous_open_interest": 9210500,
+                        "change_pct_vs_previous_close": 174.809886
+                      },
+                      "strike": 23300
+                    },
+                    {
+                      "CE": {
+                        "iv": 10.22,
+                        "pop": 26.65,
+                        "vega": 10.3538,
+                        "delta": 0.3537,
+                        "gamma": 0.0013,
+                        "theta": -10.0989,
+                        "volume": 9462505,
+                        "ask_qty": 195,
+                        "bid_qty": 650,
+                        "prev_oi": 1590875,
+                        "ask_price": 66.65,
+                        "bid_price": 66.5,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 68.15,
+                        "net_change": -99.1,
+                        "close_price": 167.25,
+                        "average_price": 73.64,
+                        "open_interest": 3146585,
+                        "bid_ask_spread": 0.15,
+                        "instrument_key": "NSE_FO|73925",
+                        "previous_close": 167.25,
+                        "trading_symbol": "NIFTY 23350 CE 29 SEP 26",
+                        "total_buy_quantity": 2022865,
+                        "total_sell_quantity": 455780,
+                        "bid_ask_spread_pct_mid": 0.22531,
+                        "previous_open_interest": 1590875,
+                        "change_pct_vs_previous_close": -59.252616
+                      },
+                      "PE": {
+                        "iv": 10.13,
+                        "pop": 40.89,
+                        "vega": 10.3402,
+                        "delta": -0.6476,
+                        "gamma": 0.0013,
+                        "theta": -9.9953,
+                        "volume": 11780535,
+                        "ask_qty": 260,
+                        "bid_qty": 65,
+                        "prev_oi": 3979495,
+                        "ask_price": 177.9,
+                        "bid_price": 177.7,
+                        "timestamp": "2026-09-24T04:13:04.452000+00:00",
+                        "last_price": 173.65,
+                        "net_change": 107.05,
+                        "close_price": 66.6,
+                        "average_price": 153.64,
+                        "open_interest": 2284620,
+                        "bid_ask_spread": 0.2,
+                        "instrument_key": "NSE_FO|73926",
+                        "previous_close": 66.6,
+                        "trading_symbol": "NIFTY 23350 PE 29 SEP 26",
+                        "total_buy_quantity": 1556035,
+                        "total_sell_quantity": 132860,
+                        "bid_ask_spread_pct_mid": 0.112486,
+                        "previous_open_interest": 3979495,
+                        "change_pct_vs_previous_close": 160.735736
+                      },
+                      "strike": 23350
+                    }
+                  ],
+                  "selected_expiry": "2026-09-29",
+                  "derivative_analytics": {
+                    "oi": {
+                      "expiry": "29-09-2026",
+                      "fields": [
+                        "call_put_oi_data_list",
+                        "expiry",
+                        "spot_closing_price",
+                        "total_calls",
+                        "total_puts"
+                      ],
+                      "top_put_oi": {
+                        "put_oi": 11281450,
+                        "strike_price": 23000
+                      },
+                      "total_puts": 169862920,
+                      "top_call_oi": {
+                        "call_oi": 17380155,
+                        "strike_price": 24000
+                      },
+                      "total_calls": 203560780
+                    },
+                    "pcr": {
+                      "pcr": 0.8344579933325074,
+                      "fields": [
+                        "expiry_date",
+                        "insights",
+                        "instrument_key",
+                        "pcr",
+                        "spot_closing_price"
+                      ],
+                      "instrument_key": "NSE_INDEX|Nifty 50",
+                      "insights_preview": [
+                        {
+                          "pcr": 1.008645618494091,
+                          "time": "09:15",
+                          "spot_price": 23252.5
+                        }
+                      ]
+                    },
+                    "max_pain": {
+                      "fields": [
+                        "expiry_date",
+                        "insights",
+                        "instrument_key",
+                        "max_pain",
+                        "spot_closing_price"
+                      ],
+                      "max_pain": 23400,
+                      "instrument_key": "NSE_INDEX|Nifty 50",
+                      "insights_preview": [
+                        {
+                          "time": "09:15",
+                          "max_pain": 23500,
+                          "spot_price": 23252.5
+                        }
+                      ]
+                    },
+                    "change_oi": {
+                      "expiry": "29-09-2026",
+                      "fields": [
+                        "call_put_oi_data_list",
+                        "expiry",
+                        "spot_closing_price",
+                        "total_call_change_oi",
+                        "total_put_change_oi"
+                      ]
+                    }
+                  }
+                }
+              }
+            ],
+            "bundle_sha256": "c31ed5b4128ce412e1741e1ae826f75c798c70b99207b2a494c5b2a42451a232",
+            "trading_enabled": false,
+            "methodology_changed": false,
+            "forecast_release_enabled": false
+          },
+          "invocation": {
+            "force_new": true,
+            "requested_at": "2026-09-24T04:12:36.194Z",
+            "canonical_attempt": true,
+            "client_invocation_id": "exception-20260924-094235",
+            "canonical_attempt_slot": "09:42"
+          },
+          "canonical_attempt": {
+            "slot": "09:42",
+            "type": "PREOPEN_CANONICAL_ATTEMPT",
+            "requested_at": "2026-09-24T04:12:36.194Z"
+          }
+        }
+      }
+    },
     {
       "run": {
         "run_id": "5drrun_4f69d989-59c6-4fc4-ba68-6595bd74f2bc",
