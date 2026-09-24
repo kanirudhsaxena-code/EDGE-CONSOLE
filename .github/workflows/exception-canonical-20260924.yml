@@ -1,0 +1,229 @@
+name: One-time 24 Sep NIFTY and LTF Canonical Exception Run
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-canonical-20260924.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  nifty:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      run_id: ${{ steps.out.outputs.run_id }}
+      request_id: ${{ steps.out.outputs.request_id }}
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run NIFTY 5DR exception canonical now
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error','--fail-with-body',
+                    '-H','Content-Type: application/json','-H','Accept: application/json',
+                    '-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    '-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method]
+              if payload is not None: args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              if p.returncode: raise RuntimeError((p.stderr or p.stdout).strip())
+              return json.loads(p.stdout)
+          now=datetime.now(ZoneInfo('Asia/Kolkata'))
+          slot='EXCEPTION_'+now.strftime('%H%M')
+          body={
+            'force_new':True,
+            'canonical_attempt':True,
+            'canonical_attempt_slot':slot,
+            'client_invocation_id':f'exception-canonical-20260924-nifty-{now:%H%M%S}',
+            'assessment':{
+              'objective':'Run the frozen production 5DR framework now as the user-authorized 24 Sep 2026 exception canonical because the scheduled pre-open canonical did not complete.',
+              'risk_tolerance':'CAPITAL_PROTECTION',
+              'capital_inr':5000000
+            }
+          }
+          created=call('/api/5dr/automated-runs','POST',body)
+          request_id=((created.get('request') or {}).get('request_id'))
+          if not request_id: raise SystemExit(f'CREATE_FAILED {created}')
+          print(f'NIFTY_EXCEPTION_REQUEST_ID={request_id} slot={slot}', flush=True)
+          final=None
+          for n in range(80):
+              time.sleep(8)
+              try:
+                  state=call(f'/api/5dr/run-requests/{request_id}/resume-processing','POST',{})
+              except Exception as exc:
+                  print(f'resume={n+1} transport={type(exc).__name__}:{str(exc)[:180]}', flush=True)
+                  continue
+              print(f"resume={n+1} status={state.get('status')} stage={state.get('adapter_stage')} run_id={state.get('run_id')}", flush=True)
+              if state.get('status')=='COMPLETED': final=state; break
+              if state.get('status')=='FAILED': raise SystemExit(f'NIFTY_EXCEPTION_FAILED {state}')
+          if not final: raise SystemExit('NIFTY_EXCEPTION_TIMEOUT')
+          out={'target_trading_date':'2026-09-24','exception_canonical':True,'actual_requested_at':now.isoformat(),'request_id':request_id,'run_id':final.get('run_id'),'slot':slot}
+          open('nifty-exception-canonical.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print('NIFTY_EXCEPTION_COMPLETE '+json.dumps(out,sort_keys=True), flush=True)
+          PY
+      - id: out
+        name: Export NIFTY identifiers
+        run: |
+          echo "run_id=$(python -c "import json;print(json.load(open('nifty-exception-canonical.json'))['run_id'])")" >> "$GITHUB_OUTPUT"
+          echo "request_id=$(python -c "import json;print(json.load(open('nifty-exception-canonical.json'))['request_id'])")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-exception-canonical-20260924
+          path: nifty-exception-canonical.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  ltf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      run_id: ${{ steps.out.outputs.run_id }}
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run LTF exception canonical now with freshly retrieved governed research
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time, urllib.parse
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error',
+                    '-H','Content-Type: application/json','-H','Accept: application/json',
+                    '-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    '-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method,'-w','\\n%{http_code}']
+              if payload is not None: args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:1000],'stderr':p.stderr[:500]}
+              return status,body
+          now=datetime.now(ZoneInfo('Asia/Kolkata'))
+          nowz=now.isoformat()
+          bundle_id=f"EDGE-RESEARCH-LTF-20260924T{now:%H%M%S}IST"
+          bundle={
+            'contract_version':'EDGE_RESEARCH_BUNDLE_V1','bundle_id':bundle_id,'ticker':'LTF','command':'EDGE LTF',
+            'created_at':nowz,'research_fresh_at':nowz,'research_authority':'CHATGPT','retrieval_providers':['CHATGPT_WEB'],
+            'sources':[
+              {'source_id':'ltf24_investors','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors/details','title':'L&T Finance Investor Details','retrieved_at':nowz,'publication_date':'2026-06-30T00:00:00+05:30','event_date':'2026-06-30T00:00:00+05:30'},
+              {'source_id':'ltf24_newsroom','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room','title':'L&T Finance News Room','retrieved_at':nowz,'publication_date':'2026-09-18T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'},
+              {'source_id':'ltf24_media','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room/print-online','title':'L&T Finance Print and Online Coverage','retrieved_at':nowz,'publication_date':'2026-09-22T00:00:00+05:30','event_date':'2026-09-22T00:00:00+05:30'},
+              {'source_id':'ltf24_disclosures','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd','title':'L&T Finance Other Statutory Disclosures','retrieved_at':nowz,'publication_date':'2026-09-10T00:00:00+05:30','event_date':'2026-09-10T00:00:00+05:30'}
+            ],
+            'claims':[
+              {'claim_id':'ltf24_c1','evidence_category':'BUSINESS_FUNDAMENTALS','statement':'L&T Finance official investor materials show Q1FY27 consolidated and standalone results, investor presentation, press release and earnings-call material for the quarter ended June 30, 2026. These are the latest quarterly financial-result materials visible on the official investor pages retrieved for this run; live market direction remains the production engine responsibility.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['ltf24_investors'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'ltf24_c2','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'The official newsroom lists a September 9, 2026 partnership with Pine Labs for agentic commerce and payments on the L&T Finance PLANET app and a September 18, 2026 community-development announcement. These are current company disclosures; no unquantified near-term earnings impact is assumed.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['ltf24_newsroom'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'ltf24_c3','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'The company media-coverage page retrieved for this run lists September 22, 2026 coverage on behavior, bias and BFSI risks, providing a fresh company-curated media datapoint without treating it as a directional stock signal.','materiality':'LOW','direction':'NEUTRAL','source_ids':['ltf24_media'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'ltf24_c4','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'The official statutory-disclosure page lists September 2026 commercial-paper offer letters, including September 10, 2026, confirming current funding-market and disclosure activity without treating that fact alone as a directional stock signal.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['ltf24_disclosures'],'verification_status':'VERIFIED','independent_validation':True}
+            ],
+            'limitations':['Research is limited to official L&T Finance investor, newsroom, company-curated media and statutory-disclosure pages freshly retrieved on 24 Sep 2026.','No manual EDGE score, DES, Market Trust, probability, price zone or recommendation is supplied by this bundle.','Live price, volume, options and structured market evidence remain the autonomous provider/engine responsibility.']
+          }
+          slot='EXCEPTION_'+now.strftime('%H%M')
+          payload={'command':'EDGE LTF','force_new':True,'canonical_attempt':True,'canonical_attempt_slot':slot,'canonical_requested_at':nowz,'research_bundle':bundle}
+          code,res=call('/api/edge-stocks/invoke','POST',payload)
+          if code!=202 or res.get('status')!='DISPATCHED': raise SystemExit(f'LTF_DISPATCH_FAILED http={code} body={res}')
+          after=res.get('dispatched_at')
+          print(f'LTF_EXCEPTION_DISPATCHED bundle={bundle_id} slot={slot} after={after}', flush=True)
+          final=None
+          for n in range(80):
+              time.sleep(8)
+              qs=urllib.parse.urlencode({'ticker':'LTF','after':after})
+              code,state=call('/api/edge-stocks/invoke/status?'+qs)
+              print(f"poll={n+1} http={code} status={state.get('status')} run_id={state.get('run_id')}", flush=True)
+              if code==200 and state.get('status')=='COMPLETE': final=state; break
+              if state.get('status') in {'FAILED','ERROR'}: raise SystemExit(f'LTF_EXCEPTION_FAILED {state}')
+          if not final: raise SystemExit('LTF_EXCEPTION_TIMEOUT')
+          out={'target_trading_date':'2026-09-24','exception_canonical':True,'actual_requested_at':nowz,'run_id':final.get('run_id'),'research_bundle_id':bundle_id,'slot':slot}
+          open('ltf-exception-canonical.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print('LTF_EXCEPTION_COMPLETE '+json.dumps(out,sort_keys=True), flush=True)
+          PY
+      - id: out
+        name: Export LTF identifier
+        run: |
+          echo "run_id=$(python -c "import json;print(json.load(open('ltf-exception-canonical.json'))['run_id'])")" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ltf-exception-canonical-20260924
+          path: ltf-exception-canonical.json
+          if-no-files-found: ignore
+          retention-days: 30
+
+  verify:
+    needs: [nifty, ltf]
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      NIFTY_RUN_ID: ${{ needs.nifty.outputs.run_id }}
+      LTF_RUN_ID: ${{ needs.ltf.outputs.run_id }}
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Verify 24 Sep canonical publication
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          curl --location --fail-with-body --silent --show-error "${AUTH[@]}" -H 'Accept: application/json' -H 'Cache-Control: no-cache' "$CONSOLE_URL/api/5dr/canonical-handoff" -o nifty-handoff.json
+          curl --location --fail-with-body --silent --show-error "${AUTH[@]}" -H 'Accept: application/json' -H 'Cache-Control: no-cache' "$CONSOLE_URL/api/edge-stocks/report?ticker=LTF" -o ltf-report.json
+          python - <<'PY'
+          import json, os
+          nh=json.load(open('nifty-handoff.json'))
+          lr=json.load(open('ltf-report.json'))['report']
+          nrun=os.environ.get('NIFTY_RUN_ID','').strip(); lrun=os.environ.get('LTF_RUN_ID','').strip()
+          print('expected_nifty_run_id='+nrun)
+          print('expected_ltf_run_id='+lrun)
+          if nrun:
+              rows=nh.get('runs') or []
+              hit=[]
+              for row in rows:
+                  run=row.get('run') or {}
+                  cs=(((run.get('result') or {}).get('assessment_snapshot') or {}).get('metrics') or {}).get('canonical_selection') or {}
+                  if run.get('run_id')==nrun:
+                      hit.append({'run_id':nrun,'selection':cs})
+              print('NIFTY_CANONICAL_VERIFY '+json.dumps(hit,sort_keys=True))
+              if not hit: raise SystemExit('NIFTY_RUN_NOT_IN_CANONICAL_HANDOFF')
+              cs=hit[0]['selection']
+              if cs.get('selection_status')!='SELECTED' or cs.get('target_trading_date')!='2026-09-24':
+                  raise SystemExit('NIFTY_NOT_SELECTED_FOR_2026_09_24 '+json.dumps(cs,sort_keys=True))
+          else:
+              raise SystemExit('NIFTY_RUN_ID_MISSING')
+          if not lrun: raise SystemExit('LTF_RUN_ID_MISSING')
+          print('LTF_REPORT_RUN_ID='+str(lr.get('run_id')))
+          print('LTF_CANONICAL_GOVERNANCE '+json.dumps(lr.get('canonical_governance') or {},sort_keys=True))
+          if lr.get('run_id')!=lrun: raise SystemExit('LTF_REPORT_NOT_NEW_RUN')
+          cg=lr.get('canonical_governance') or {}
+          if cg.get('selection_status')!='SELECTED' or cg.get('target_trading_date')!='2026-09-24':
+              raise SystemExit('LTF_NOT_SELECTED_FOR_2026_09_24 '+json.dumps(cg,sort_keys=True))
+          print('CANONICAL_20260924_VERIFIED')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: canonical-verification-20260924
+          path: |
+            nifty-handoff.json
+            ltf-report.json
+          if-no-files-found: ignore
+          retention-days: 30
