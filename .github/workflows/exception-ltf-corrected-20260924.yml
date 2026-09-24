@@ -1,0 +1,186 @@
+name: One-time 24 Sep LTF Corrected Canonical Rerun
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-ltf-corrected-20260924.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ltf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run corrected LTF with fresh governed deep research
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time, urllib.parse
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error',
+                    '-H','Content-Type: application/json','-H','Accept: application/json',
+                    '-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    '-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method,'-w','\\n%{http_code}']
+              if payload is not None:
+                  args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:1500],'stderr':p.stderr[:500]}
+              return status,body
+
+          now=datetime.now(ZoneInfo('Asia/Kolkata'))
+          nowz=now.isoformat()
+          bundle_id=f"EDGE-RESEARCH-LTF-20260924-DEEP-{now:%H%M%S}IST"
+          bundle={
+            'contract_version':'EDGE_RESEARCH_BUNDLE_V1',
+            'bundle_id':bundle_id,
+            'ticker':'LTF',
+            'command':'EDGE LTF',
+            'created_at':nowz,
+            'research_fresh_at':nowz,
+            'research_authority':'CHATGPT',
+            'retrieval_providers':['CHATGPT_WEB','EXA_DEEP_RESEARCH'],
+            'sources':[
+              {
+                'source_id':'ltf24_q1_official',
+                'provider':'CHATGPT_WEB','authority':'COMPANY',
+                'url':'https://www.ltfinance.com/docs/default-source/corporatedisclosure/press-release-june-30-2026.pdf',
+                'title':'L&T Finance Q1FY27 official press release',
+                'retrieved_at':nowz,'publication_date':'2026-07-10T00:00:00+05:30','event_date':'2026-07-10T00:00:00+05:30'
+              },
+              {
+                'source_id':'ltf24_investors',
+                'provider':'CHATGPT_WEB','authority':'COMPANY',
+                'url':'https://www.ltfinance.com/investors',
+                'title':'L&T Finance official Investor Relations',
+                'retrieved_at':nowz,'publication_date':'2026-07-10T00:00:00+05:30','event_date':'2026-06-30T00:00:00+05:30'
+              },
+              {
+                'source_id':'ltf24_newsroom',
+                'provider':'CHATGPT_WEB','authority':'COMPANY',
+                'url':'https://www.ltfinance.com/news-room',
+                'title':'L&T Finance official News Room',
+                'retrieved_at':nowz,'publication_date':'2026-09-18T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'
+              },
+              {
+                'source_id':'ltf24_disclosures',
+                'provider':'CHATGPT_WEB','authority':'COMPANY',
+                'url':'https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd',
+                'title':'L&T Finance official statutory disclosures',
+                'retrieved_at':nowz,'publication_date':'2026-09-18T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'
+              },
+              {
+                'source_id':'ltf24_et_announcements',
+                'provider':'EXA_DEEP_RESEARCH','authority':'REPUTABLE_MEDIA',
+                'url':'https://economictimes.indiatimes.com/lt-finance-ltd/stocksupdate/companyid-30050.cms',
+                'title':'Economic Times L&T Finance corporate announcements',
+                'retrieved_at':nowz,'publication_date':'2026-09-19T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'
+              },
+              {
+                'source_id':'ltf24_ubs_fe',
+                'provider':'EXA_DEEP_RESEARCH','authority':'REPUTABLE_MEDIA',
+                'url':'https://www.financialexpress.com/market/shriram-finance-to-lampt-finance-ubs-retains-buy-on-4-top-nbfc-stocks-4345436/',
+                'title':'Financial Express report on UBS NBFC research',
+                'retrieved_at':nowz,'publication_date':'2026-09-23T14:53:00+05:30','event_date':'2026-09-23T00:00:00+05:30'
+              }
+            ],
+            'claims':[
+              {
+                'claim_id':'ltf24_q1_growth','evidence_category':'BUSINESS_FUNDAMENTALS',
+                'statement':'L&T Finance reported Q1FY27 consolidated PAT of Rs 902 crore, up 29% YoY; consolidated loan book of Rs 1,29,634 crore, up 27% YoY; retail disbursements of Rs 23,852 crore, up 36% YoY.',
+                'materiality':'HIGH','direction':'POSITIVE','source_ids':['ltf24_q1_official','ltf24_investors'],'verification_status':'VERIFIED','independent_validation':True
+              },
+              {
+                'claim_id':'ltf24_q1_quality','evidence_category':'BUSINESS_FUNDAMENTALS',
+                'statement':'Q1FY27 official results reported NIM plus fees of 10.47%, Gross Stage 3 of 2.86%, Net Stage 3 of 0.90%, credit cost of 2.54%, RoA of 2.48% and RoE of 12.71%, with asset-quality metrics improved YoY and credit cost improved QoQ.',
+                'materiality':'HIGH','direction':'POSITIVE','source_ids':['ltf24_q1_official','ltf24_investors'],'verification_status':'VERIFIED','independent_validation':True
+              },
+              {
+                'claim_id':'ltf24_product_mix','evidence_category':'BUSINESS_FUNDAMENTALS',
+                'statement':'Official Q1FY27 materials show personal-loan disbursements up 126% YoY, two-wheeler disbursements up 41% YoY and gold-loan book at Rs 3,829 crore, up 182% YoY, indicating rapid retail and secured-product expansion while management continues risk-first underwriting.',
+                'materiality':'MODERATE','direction':'POSITIVE','source_ids':['ltf24_q1_official'],'verification_status':'VERIFIED','independent_validation':True
+              },
+              {
+                'claim_id':'ltf24_sep_corporate','evidence_category':'NEWS_EVENTS_CATALYSTS',
+                'statement':'September 2026 company disclosures include current funding/rating/investor-meeting activity, while the official newsroom also carries recent business and partnership updates. These are treated as current corporate-activity evidence, not as proof of immediate earnings impact.',
+                'materiality':'MODERATE','direction':'NEUTRAL','source_ids':['ltf24_newsroom','ltf24_disclosures','ltf24_et_announcements'],'verification_status':'VERIFIED','independent_validation':True
+              },
+              {
+                'claim_id':'ltf24_ubs_upgrade','evidence_category':'NEWS_EVENTS_CATALYSTS',
+                'statement':'Financial Express reported on September 23 that UBS upgraded L&T Finance from Neutral to Buy and raised its target price to Rs 380 from Rs 350, citing faster personal-loan growth and expected RoA improvement toward 3%. This is an attributed third-party analyst view, not an EDGE target or guaranteed outcome.',
+                'materiality':'MODERATE','direction':'POSITIVE','source_ids':['ltf24_ubs_fe'],'verification_status':'VERIFIED','independent_validation':True
+              }
+            ],
+            'limitations':[
+              'Live price, volume, candles and option-chain evidence are not supplied by this research bundle; they must come from the authenticated read-only market provider during the governed run.',
+              'The UBS target and rating are third-party analyst opinions and are retained only as attributed catalyst evidence.',
+              'No manual DES, Market Trust, probability, price zone, BOT score, decision ladder or trading recommendation is supplied by this bundle.'
+            ]
+          }
+          slot='CORRECTED_EXCEPTION_'+now.strftime('%H%M')
+          payload={
+              'command':'EDGE LTF','force_new':True,
+              'canonical_attempt':True,'canonical_attempt_slot':slot,
+              'canonical_requested_at':nowz,'research_bundle':bundle
+          }
+          code,res=call('/api/edge-stocks/invoke','POST',payload)
+          if code!=202 or res.get('status')!='DISPATCHED':
+              raise SystemExit(f'LTF_DISPATCH_FAILED http={code} body={res}')
+          after=res.get('dispatched_at')
+          print(f'LTF_CORRECTED_DISPATCHED bundle={bundle_id} slot={slot} after={after}',flush=True)
+          final=None
+          for n in range(100):
+              time.sleep(8)
+              qs=urllib.parse.urlencode({'ticker':'LTF','after':after})
+              code,state=call('/api/edge-stocks/invoke/status?'+qs)
+              print(f"poll={n+1} http={code} status={state.get('status')} run_id={state.get('run_id')}",flush=True)
+              if code==200 and state.get('status')=='COMPLETE':
+                  final=state; break
+              if state.get('status') in {'FAILED','ERROR'}:
+                  raise SystemExit(f'LTF_CORRECTED_FAILED {state}')
+          if not final:
+              raise SystemExit('LTF_CORRECTED_TIMEOUT')
+          run_id=final.get('run_id')
+          if not run_id:
+              raise SystemExit(f'LTF_CORRECTED_RUN_ID_MISSING {final}')
+
+          code,report=call('/api/edge-stocks/report?ticker=LTF','GET')
+          if code!=200:
+              raise SystemExit(f'LTF_REPORT_FETCH_FAILED http={code} body={report}')
+          report_body=report.get('report') or {}
+          if report_body.get('run_id')!=run_id:
+              raise SystemExit(f'LTF_REPORT_NOT_FRESH expected={run_id} got={report_body.get("run_id")}')
+          out={
+              'target_trading_date':'2026-09-24',
+              'corrected_exception_run':True,
+              'actual_requested_at':nowz,
+              'run_id':run_id,
+              'research_bundle_id':bundle_id,
+              'slot':slot,
+              'report':report_body,
+          }
+          open('ltf-corrected-rerun.json','w').write(json.dumps(out,indent=2,sort_keys=True,default=str))
+          print('LTF_CORRECTED_COMPLETE '+json.dumps(out,sort_keys=True,default=str),flush=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ltf-corrected-rerun-20260924
+          path: ltf-corrected-rerun.json
+          if-no-files-found: ignore
+          retention-days: 30
