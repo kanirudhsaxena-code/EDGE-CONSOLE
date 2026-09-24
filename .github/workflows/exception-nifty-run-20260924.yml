@@ -1,0 +1,110 @@
+name: Run 24 Sep NIFTY Exception Canonical Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-nifty-run-20260924.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Create and complete exact governed NIFTY rescue candidate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error',
+                    '-H','Content-Type: application/json','-H','Accept: application/json',
+                    '-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    '-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",
+                    '-X',method,'-w','\n%{http_code}']
+              if payload is not None:
+                  args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:2000],'stderr':p.stderr[:500]}
+              return status,body
+
+          now=datetime.now(ZoneInfo('Asia/Kolkata'))
+          slot=now.strftime('%H:%M')
+          body={
+            'force_new':True,
+            'canonical_attempt':True,
+            'canonical_attempt_slot':slot,
+            'client_invocation_id':f'exception-20260924-{now:%H%M%S}',
+          }
+          code,created=call('/api/5dr/automated-runs','POST',body)
+          print('CREATE_HTTP='+str(code)+' '+json.dumps(created,sort_keys=True),flush=True)
+          if code not in (200,201,202): raise SystemExit('NIFTY_CREATE_FAILED')
+          request_id=((created.get('request') or {}).get('request_id'))
+          if not request_id: raise SystemExit('NIFTY_REQUEST_ID_MISSING')
+          print(f'NIFTY_EXCEPTION_REQUEST_ID={request_id} slot={slot}',flush=True)
+
+          final=None
+          for n in range(90):
+              time.sleep(8)
+              code,state=call(f'/api/5dr/run-requests/{request_id}/resume-processing','POST',{})
+              print(f"resume={n+1} http={code} status={state.get('status')} stage={state.get('adapter_stage')} run_id={state.get('run_id')} body={json.dumps(state,sort_keys=True)[:900]}",flush=True)
+              if code==200 and state.get('status')=='COMPLETED': final=state; break
+              if state.get('status')=='FAILED': raise SystemExit('NIFTY_EXCEPTION_FAILED '+json.dumps(state,sort_keys=True))
+          if not final: raise SystemExit('NIFTY_EXCEPTION_TIMEOUT')
+          out={
+            'target_trading_date':'2026-09-24',
+            'exception_canonical_candidate':True,
+            'actual_requested_at':now.isoformat(),
+            'request_id':request_id,
+            'run_id':final.get('run_id'),
+            'slot':slot,
+          }
+          open('nifty-exception-candidate.json','w').write(json.dumps(out,indent=2,sort_keys=True))
+          print('NIFTY_EXCEPTION_CANDIDATE_COMPLETE '+json.dumps(out,sort_keys=True),flush=True)
+          PY
+      - name: Capture live handoff containing rescue candidate
+        if: success()
+        run: |
+          set -euo pipefail
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Accept: application/json' -H 'Cache-Control: no-cache' \
+            "$CONSOLE_URL/api/5dr/canonical-handoff" -o nifty-live-handoff-20260924.json
+          python - <<'PY'
+          import json
+          c=json.load(open('nifty-exception-candidate.json'))
+          h=json.load(open('nifty-live-handoff-20260924.json'))
+          rid=c['run_id']
+          matches=[row for row in h.get('runs',[]) if (row.get('run') or {}).get('run_id')==rid]
+          if len(matches)!=1: raise SystemExit(f'NIFTY_HANDOFF_MATCH_COUNT_{len(matches)}')
+          open('nifty-rescue-handoff-row-20260924.json','w').write(json.dumps({'schema_version':h.get('schema_version'),'generated_at':h.get('generated_at'),'runs':matches,'requests':h.get('requests',{})},indent=2,sort_keys=True))
+          print('NIFTY_HANDOFF_CAPTURED run_id='+rid)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-exception-candidate-20260924
+          path: |
+            nifty-exception-candidate.json
+            nifty-live-handoff-20260924.json
+            nifty-rescue-handoff-row-20260924.json
+          if-no-files-found: ignore
+          retention-days: 30
