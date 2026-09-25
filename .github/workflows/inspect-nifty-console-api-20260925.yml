@@ -1,0 +1,38 @@
+name: Inspect 25 Sep NIFTY via Console API
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-nifty-console-api-20260925.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Fetch latest governed request and latest published run
+        run: |
+          set -euo pipefail
+          hdr=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Accept: application/json')
+          curl --location --silent --show-error "${hdr[@]}" "$CONSOLE_URL/api/5dr/run-requests/latest" -o latest-request.json -w 'REQUEST_HTTP=%{http_code}\n'
+          curl --location --silent --show-error "${hdr[@]}" "$CONSOLE_URL/api/5dr/latest" -o latest-run.json -w 'RUN_HTTP=%{http_code}\n'
+          echo '---LATEST REQUEST---'; cat latest-request.json; echo
+          echo '---LATEST RUN---'; cat latest-run.json; echo
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-console-inspect-20260925
+          path: |
+            latest-request.json
+            latest-run.json
+          if-no-files-found: ignore
+          retention-days: 7
