@@ -13,27 +13,68 @@ permissions:
 jobs:
   inspect:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     env:
       CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
       REQUEST_ID: 5drreq_94017946-ad1f-4602-b54b-1a4c17245d4d
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Fetch exact governed request and latest published run
+      - name: Resume exact governed request through repaired state machine
         run: |
           set -euo pipefail
           hdr=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H 'Accept: application/json')
-          curl --location --silent --show-error "${hdr[@]}" "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID" -o exact-request.json -w 'REQUEST_HTTP=%{http_code}\n'
-          curl --location --silent --show-error "${hdr[@]}" "$CONSOLE_URL/api/5dr/latest" -o latest-run.json -w 'RUN_HTTP=%{http_code}\n'
+          post_hdr=("${hdr[@]}" -H 'Content-Type: application/json')
+
+          : > resume-trace.txt
+          for i in $(seq 1 12); do
+            echo "=== RESUME ATTEMPT $i ===" | tee -a resume-trace.txt
+            http=$(curl --location --silent --show-error "${post_hdr[@]}" -X POST --data '{}' \
+              "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID/resume-processing" \
+              -o "resume-$i.json" -w '%{http_code}')
+            echo "RESUME_HTTP=$http" | tee -a resume-trace.txt
+            cat "resume-$i.json" | tee -a resume-trace.txt
+            echo | tee -a resume-trace.txt
+
+            curl --location --silent --show-error "${hdr[@]}" \
+              "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID" -o exact-request.json
+            status=$(jq -r '.request.status // "UNKNOWN"' exact-request.json)
+            stage=$(jq -r '.request.metadata.adapter_stage // "UNKNOWN"' exact-request.json)
+            run_id=$(jq -r '.request.run_id // ""' exact-request.json)
+            echo "REQUEST_STATUS=$status ADAPTER_STAGE=$stage RUN_ID=$run_id" | tee -a resume-trace.txt
+
+            if [ "$status" = "COMPLETED" ] && [ -n "$run_id" ]; then
+              echo 'RECOVERY_COMPLETED' | tee -a resume-trace.txt
+              break
+            fi
+            if [ "$status" = "FAILED" ] || [ "$status" = "CANCELLED" ]; then
+              echo 'RECOVERY_TERMINAL_FAILURE' | tee -a resume-trace.txt
+              break
+            fi
+            sleep 3
+          done
+
+          curl --location --silent --show-error "${hdr[@]}" \
+            "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID" -o exact-request.json -w 'REQUEST_HTTP=%{http_code}\n'
+          curl --location --silent --show-error "${hdr[@]}" \
+            "$CONSOLE_URL/api/5dr/latest" -o latest-run.json -w 'RUN_HTTP=%{http_code}\n'
+
           echo '---EXACT REQUEST---'; cat exact-request.json; echo
           echo '---LATEST RUN---'; cat latest-run.json; echo
+
+          final_status=$(jq -r '.request.status // "UNKNOWN"' exact-request.json)
+          final_run_id=$(jq -r '.request.run_id // ""' exact-request.json)
+          test "$final_status" = 'COMPLETED'
+          test -n "$final_run_id"
+
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: nifty-console-inspect-20260925
+          name: nifty-console-recovery-20260925
           path: |
             exact-request.json
             latest-run.json
+            resume-trace.txt
+            resume-*.json
           if-no-files-found: ignore
           retention-days: 7
