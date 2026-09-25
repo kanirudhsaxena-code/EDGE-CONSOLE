@@ -1,0 +1,89 @@
+name: Run 25 Sep LTF Exception Canonical Candidate
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/exception-ltf-run-20260925.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  ltf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Run fresh governed LTF canonical candidate
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json, os, subprocess, time, urllib.parse
+          from datetime import datetime
+          from zoneinfo import ZoneInfo
+          base=os.environ['CONSOLE_URL'].rstrip('/')
+          def call(path, method='GET', payload=None):
+              args=['curl','--location','--silent','--show-error','-H','Content-Type: application/json','-H','Accept: application/json','-H',f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",'-H',f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",'-X',method,'-w','\n%{http_code}']
+              if payload is not None: args += ['--data-binary',json.dumps(payload,separators=(',',':'))]
+              args.append(base+path)
+              p=subprocess.run(args,text=True,capture_output=True)
+              raw=p.stdout or ''; text,_,code=raw.rpartition('\n')
+              try: status=int(code.strip())
+              except: status=0
+              try: body=json.loads(text) if text.strip() else {}
+              except: body={'raw':text[:1500],'stderr':p.stderr[:500]}
+              return status,body
+          now=datetime.now(ZoneInfo('Asia/Kolkata')); nowz=now.isoformat(); slot='USER_CANONICAL_'+now.strftime('%H%M')
+          bundle_id=f"EDGE-RESEARCH-LTF-20260925-{now:%H%M%S}IST"
+          bundle={
+            'contract_version':'EDGE_RESEARCH_BUNDLE_V1','bundle_id':bundle_id,'ticker':'LTF','command':'EDGE LTF','created_at':nowz,'research_fresh_at':nowz,
+            'research_authority':'CHATGPT','retrieval_providers':['CHATGPT_WEB'],
+            'sources':[
+              {'source_id':'ltf25_investors','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors','title':'L&T Finance official Investor Relations','retrieved_at':nowz,'publication_date':'2026-07-10T00:00:00+05:30','event_date':'2026-06-30T00:00:00+05:30'},
+              {'source_id':'ltf25_newsroom','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room','title':'L&T Finance official News Room','retrieved_at':nowz,'publication_date':'2026-09-18T00:00:00+05:30','event_date':'2026-09-18T00:00:00+05:30'},
+              {'source_id':'ltf25_media','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/news-room/print-online','title':'L&T Finance official print and online coverage','retrieved_at':nowz,'publication_date':'2026-09-22T00:00:00+05:30','event_date':'2026-09-22T00:00:00+05:30'},
+              {'source_id':'ltf25_disclosures','provider':'CHATGPT_WEB','authority':'COMPANY','url':'https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd','title':'L&T Finance official statutory disclosures','retrieved_at':nowz,'publication_date':'2026-09-10T00:00:00+05:30','event_date':'2026-09-10T00:00:00+05:30'},
+              {'source_id':'ltf25_ubs_fe','provider':'CHATGPT_WEB','authority':'REPUTABLE_SECONDARY','url':'https://www.financialexpress.com/market/shriram-finance-to-lampt-finance-ubs-retains-buy-on-4-top-nbfc-stocks-4345436/','title':'Financial Express report on UBS NBFC research','retrieved_at':nowz,'publication_date':'2026-09-23T14:53:00+05:30','event_date':'2026-09-23T00:00:00+05:30'}
+            ],
+            'claims':[
+              {'claim_id':'ltf25_fundamental','evidence_category':'BUSINESS_FUNDAMENTALS','statement':'The latest official quarterly baseline available is Q1FY27 for the quarter ended June 30, 2026; current price, volume, option-chain and market-state evidence are delegated to the authenticated production engine.','materiality':'HIGH','direction':'NEUTRAL','source_ids':['ltf25_investors'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'ltf25_recent_company','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'Official September 2026 newsroom, media and statutory-disclosure pages were freshly checked for this run; recent company activity is retained as context without asserting unverified same-day causality.','materiality':'MODERATE','direction':'NEUTRAL','source_ids':['ltf25_newsroom','ltf25_media','ltf25_disclosures'],'verification_status':'VERIFIED','independent_validation':True},
+              {'claim_id':'ltf25_ubs','evidence_category':'NEWS_EVENTS_CATALYSTS','statement':'Financial Express reported on September 23 that UBS upgraded L&T Finance from Neutral to Buy and raised its target price to Rs 380 from Rs 350. This is an attributed third-party analyst view, not an EDGE target or guaranteed outcome.','materiality':'MODERATE','direction':'POSITIVE','source_ids':['ltf25_ubs_fe'],'verification_status':'VERIFIED','independent_validation':True}
+            ],
+            'limitations':['No manual DES, probability, price zone, PVPO score or recommendation is supplied.','Live price, volume, options and structured market evidence remain the autonomous provider and engine responsibility.']
+          }
+          payload={'command':'EDGE LTF','force_new':True,'canonical_attempt':True,'canonical_attempt_slot':slot,'canonical_requested_at':nowz,'research_bundle':bundle}
+          code,res=call('/api/edge-stocks/invoke','POST',payload)
+          if code!=202 or res.get('status')!='DISPATCHED': raise SystemExit(f'LTF_DISPATCH_FAILED http={code} body={res}')
+          after=res.get('dispatched_at'); final=None
+          for n in range(100):
+              time.sleep(8)
+              qs=urllib.parse.urlencode({'ticker':'LTF','after':after})
+              code,state=call('/api/edge-stocks/invoke/status?'+qs)
+              print(f"poll={n+1} http={code} status={state.get('status')} run_id={state.get('run_id')}",flush=True)
+              if code==200 and state.get('status')=='COMPLETE': final=state; break
+              if state.get('status') in {'FAILED','ERROR'}: raise SystemExit('LTF_FAILED '+json.dumps(state,sort_keys=True))
+          if not final: raise SystemExit('LTF_TIMEOUT')
+          run_id=final.get('run_id')
+          code,report=call('/api/edge-stocks/report?ticker=LTF','GET')
+          if code!=200: raise SystemExit(f'LTF_REPORT_FETCH_FAILED http={code}')
+          r=report.get('report') or report
+          gov=r.get('canonical_governance') or {}
+          out={'target_trading_date':'2026-09-25','actual_requested_at':nowz,'run_id':run_id,'research_bundle_id':bundle_id,'slot':slot,'selected_recommendation_id':gov.get('selected_recommendation_id'),'current_run_is_selected':gov.get('current_run_is_selected')}
+          open('ltf-candidate-20260925.json','w').write(json.dumps(out,indent=2,sort_keys=True,default=str))
+          print('LTF_25SEP_CANDIDATE_COMPLETE '+json.dumps(out,sort_keys=True,default=str),flush=True)
+          if gov.get('selected_recommendation_id')!=run_id or gov.get('current_run_is_selected') is not True:
+              raise SystemExit('LTF_NOT_CANONICAL_AFTER_RUN '+json.dumps(out,sort_keys=True,default=str))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ltf-candidate-20260925
+          path: ltf-candidate-20260925.json
+          if-no-files-found: ignore
+          retention-days: 30
