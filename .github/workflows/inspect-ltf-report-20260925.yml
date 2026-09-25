@@ -1,0 +1,44 @@
+name: Inspect 25 Sep LTF Canonical Report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-ltf-report-20260925.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - name: Fetch exact current governed LTF report
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Accept: application/json' \
+            -H 'Cache-Control: no-cache' \
+            "$CONSOLE_URL/api/edge-stocks/report?ticker=LTF" \
+            -o ltf-report-20260925.json
+          python - <<'PY'
+          import json
+          p=json.load(open('ltf-report-20260925.json'))
+          r=p.get('report') or p
+          print(json.dumps(r,indent=2,sort_keys=True,default=str))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ltf-report-20260925
+          path: ltf-report-20260925.json
+          retention-days: 7
