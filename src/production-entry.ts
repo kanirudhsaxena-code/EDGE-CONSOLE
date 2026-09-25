@@ -51,7 +51,7 @@ export default {
       const recovery = await recoverBlocked5drAcquisition(env, requestId);
       if (!recovery.recovered) return first;
 
-      return mobile.fetch(request as any, env);
+      return mobile.fetch(request, env);
     }
 
     if (
@@ -66,6 +66,6 @@ export default {
     ) {
       return app.fetch(request, env);
     }
-    return mobile.fetch(request as any, env);
+    return mobile.fetch(request, env);
   },
 };
