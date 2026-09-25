@@ -1,0 +1,61 @@
+name: Diagnose 25 Sep NIFTY Canonical Execution
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/diagnose-nifty-20260925.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet 'psycopg[binary]>=3.2,<4'
+      - name: Inspect recent 5DR request/run state
+        run: |
+          python - <<'PY'
+          import json, os
+          import psycopg
+          out={}
+          with psycopg.connect(os.environ['DATABASE_URL']) as conn:
+            with conn.cursor() as cur:
+              cur.execute('''
+                SELECT request_id,status,error,created_at,updated_at,
+                       metadata->'invocation' AS invocation,
+                       metadata->'canonical_attempt' AS canonical_attempt,
+                       metadata->>'adapter_stage' AS adapter_stage,
+                       metadata->'normalization_assessment' AS normalization_assessment
+                  FROM analysis_requests
+                 WHERE engine='5DR' AND created_at > now()-interval '30 minutes'
+                 ORDER BY created_at DESC LIMIT 30
+              ''')
+              cols=[d.name for d in cur.description]
+              out['requests']=[dict(zip(cols,row)) for row in cur.fetchall()]
+              cur.execute('''
+                SELECT run_id,status,published,generated_at,request_id
+                  FROM analysis_runs
+                 WHERE engine='5DR' AND generated_at > now()-interval '30 minutes'
+                 ORDER BY generated_at DESC LIMIT 20
+              ''')
+              cols=[d.name for d in cur.description]
+              out['runs']=[dict(zip(cols,row)) for row in cur.fetchall()]
+          open('nifty-diagnostic-20260925.json','w').write(json.dumps(out,indent=2,sort_keys=True,default=str))
+          print(json.dumps(out,sort_keys=True,default=str))
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-diagnostic-20260925
+          path: nifty-diagnostic-20260925.json
+          if-no-files-found: ignore
+          retention-days: 7
