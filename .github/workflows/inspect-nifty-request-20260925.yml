@@ -1,0 +1,74 @@
+name: Inspect 25 Sep NIFTY Request Metadata
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/inspect-nifty-request-20260925.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REQUEST_ID: 5drreq_94017946-ad1f-4602-b54b-1a4c17245d4d
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --quiet 'psycopg[binary]>=3.2,<4'
+      - name: Inspect request metadata and recent assessment context
+        run: |
+          python - <<'PY'
+          import json, os
+          import psycopg
+          out={}
+          with psycopg.connect(os.environ['DATABASE_URL']) as conn:
+            with conn.cursor() as cur:
+              cur.execute('''
+                SELECT request_id,status,error,created_at,updated_at,provenance_mode,framework_version,output_contract_version,metadata
+                  FROM analysis_requests
+                 WHERE request_id=%s AND engine='5DR'
+                 LIMIT 1
+              ''',(os.environ['REQUEST_ID'],))
+              row=cur.fetchone(); cols=[d.name for d in cur.description]
+              if not row: raise SystemExit('REQUEST_NOT_FOUND')
+              rec=dict(zip(cols,row))
+              md=rec.pop('metadata') or {}
+              out['request']=rec
+              out['metadata_keys']=sorted(md.keys()) if isinstance(md,dict) else []
+              if isinstance(md,dict):
+                keep=['adapter_stage','automated_market_evidence','automated_market_data','system_research','research_snapshot','research','screenshot_intelligence','autonomous_evidence','intelligence','intelligence_reconciliation','normalized_evidence','normalization_assessment','invocation','canonical_attempt','acquisition_dispatch','market_evidence','assessment_context']
+                out['metadata']={k:md.get(k) for k in keep if k in md}
+              cur.execute('''
+                SELECT source_id,assessed_at,headline,created_at,metrics
+                  FROM assessment_rollups
+                 WHERE engine='5DR'
+                 ORDER BY created_at DESC,id DESC LIMIT 1
+              ''')
+              row=cur.fetchone(); cols=[d.name for d in cur.description]
+              out['latest_assessment']=dict(zip(cols,row)) if row else None
+              cur.execute('''
+                SELECT run_id,generated_at,status,published,request_id,result
+                  FROM analysis_runs
+                 WHERE engine='5DR'
+                 ORDER BY generated_at DESC LIMIT 3
+              ''')
+              cols=[d.name for d in cur.description]
+              out['latest_runs']=[dict(zip(cols,row)) for row in cur.fetchall()]
+          txt=json.dumps(out,indent=2,sort_keys=True,default=str)
+          open('nifty-request-inspect-20260925.json','w').write(txt)
+          print(txt)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: nifty-request-inspect-20260925
+          path: nifty-request-inspect-20260925.json
+          if-no-files-found: ignore
+          retention-days: 7
