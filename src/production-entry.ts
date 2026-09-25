@@ -36,7 +36,7 @@ export default {
     const url = new URL(request.url);
     const resume = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/resume-processing$/);
     if (resume && request.method === 'POST') {
-      const first = await mobile.fetch(request.clone(), env);
+      const first = await mobile.fetch(request.clone() as any, env);
       if (first.status !== 409) return first;
 
       let body: Record<string, unknown> = {};
@@ -51,7 +51,7 @@ export default {
       const recovery = await recoverBlocked5drAcquisition(env, requestId);
       if (!recovery.recovered) return first;
 
-      return mobile.fetch(request, env);
+      return mobile.fetch(request as any, env);
     }
 
     if (
@@ -66,6 +66,6 @@ export default {
     ) {
       return app.fetch(request, env);
     }
-    return mobile.fetch(request, env);
+    return mobile.fetch(request as any, env);
   },
 };
