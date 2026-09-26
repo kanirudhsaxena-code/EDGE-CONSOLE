@@ -8,6 +8,8 @@ type Env = AccessIdentityEnv & {
 
 type JsonRecord = Record<string, unknown>;
 
+const EDGE_FORECAST_LABELS = ['D','D+1','D+2','D+3','D+4'] as const;
+
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data, null, 2), {
   status,
   headers: {
@@ -70,6 +72,38 @@ async function fiveDrCurrent(request: Request, env: Env): Promise<Response> {
   });
 }
 
+function exactForecastPathReadModel(header: JsonRecord, rows: JsonRecord[]): JsonRecord {
+  if (rows.length !== 5) throw new Error('Persisted EDGE forecast path must contain exactly five rows');
+  rows.forEach((row,index)=>{
+    if (Number(row.horizon_index) !== index || String(row.horizon_label ?? '') !== EDGE_FORECAST_LABELS[index]) {
+      throw new Error('Persisted EDGE forecast path is incomplete or misordered');
+    }
+  });
+  return {
+    recommendation_id: header.recommendation_id,
+    version: header.path_version,
+    source_run_id: header.source_run_id,
+    issued_at: header.issued_at,
+    payload_hash: header.payload_hash,
+    rows: rows.map(row=>({
+      horizon_index: Number(row.horizon_index),
+      horizon_label: row.horizon_label,
+      target_trading_date: row.target_trading_date,
+      direction: row.direction,
+      bull_probability: Number(row.bull_probability),
+      base_probability: Number(row.base_probability),
+      bear_probability: Number(row.bear_probability),
+      expected_centre: row.expected_centre == null ? null : Number(row.expected_centre),
+      outer_expected_zone_low: Number(row.outer_expected_zone_low),
+      outer_expected_zone_high: Number(row.outer_expected_zone_high),
+      evidence_basis: row.evidence_basis,
+      regime_context: row.regime_context,
+      verification_state: row.verification_state,
+      lineage: row.lineage,
+    })),
+  };
+}
+
 async function edgeStocksCurrent(env: Env, tickerRaw: string): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ current_run: null, error: 'EDGE database is not configured' }, 503);
   const ticker = tickerRaw.trim().toUpperCase();
@@ -93,6 +127,7 @@ async function edgeStocksCurrent(env: Env, tickerRaw: string): Promise<Response>
   if (!rows.length) return json({ current_run: null, ticker, note: 'No EDGE Stocks run found for ticker' }, 404);
 
   const current = rows[0] as JsonRecord;
+  const recommendationId = String(current.recommendation_id ?? '');
   const canonicalRows = await sql`
     select canonical_key,target_trading_date,forecast_horizon,selection_status,canonical_type,
            selected_recommendation_id,selected_at,selection_reason
@@ -103,15 +138,47 @@ async function edgeStocksCurrent(env: Env, tickerRaw: string): Promise<Response>
   `;
   const canonical = canonicalRows.length ? canonicalRows[0] as JsonRecord : null;
 
+  const forecastHeaders = await sql`
+    select recommendation_id,path_version,source_run_id,issued_at,payload_hash
+      from edge_stock_forecast_paths
+     where recommendation_id=${recommendationId}
+     limit 1
+  `;
+  let forecastPath: JsonRecord | null = null;
+  if (forecastHeaders.length) {
+    const forecastRows = await sql`
+      select horizon_index,horizon_label,target_trading_date,direction,
+             bull_probability,base_probability,bear_probability,expected_centre,
+             outer_expected_zone_low,outer_expected_zone_high,evidence_basis,
+             regime_context,verification_state,lineage
+        from edge_stock_forecast_path_rows
+       where recommendation_id=${recommendationId}
+       order by horizon_index asc
+    `;
+    forecastPath = exactForecastPathReadModel(
+      forecastHeaders[0] as JsonRecord,
+      forecastRows.map(row=>row as JsonRecord),
+    );
+  }
+
   return json({
     ticker,
     current_run: current,
+    forecast_path: forecastPath,
+    forecast_path_retrieval: {
+      kind: 'IMMUTABLE_D_THROUGH_D_PLUS_4_BY_RECOMMENDATION_ID',
+      path_version: forecastPath?.version ?? null,
+      payload_hash: forecastPath?.payload_hash ?? null,
+      exact_row_count: forecastPath ? 5 : 0,
+      fail_closed_on_incomplete_or_misordered: true,
+      efficacy_population_changed: false,
+    },
     retrieval: {
       kind: 'CURRENT_LATEST_TICKER_RUN',
       selected_by: 'run_timestamp DESC, recommendation_id DESC',
       canonical_governance: canonical ? {
         ...canonical,
-        current_run_is_selected: String(canonical.selected_recommendation_id ?? '') === String(current.recommendation_id ?? ''),
+        current_run_is_selected: String(canonical.selected_recommendation_id ?? '') === recommendationId,
       } : {
         selection_status: 'NOT_AVAILABLE',
         canonical_type: 'NOT_AVAILABLE',
