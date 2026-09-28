@@ -1,5 +1,8 @@
 name: Import 5DR Canonical Assessment State
 
+# Operational recovery: this workflow is also safely push-triggerable so a fresh
+# lifecycle assessment can be imported immediately when an on-demand NIFTY run
+# is blocked by a stale Console assessment handoff.
 on:
   workflow_dispatch:
   push:
