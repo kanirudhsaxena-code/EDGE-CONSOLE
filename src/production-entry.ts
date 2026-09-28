@@ -3,6 +3,7 @@ import app from './index';
 import { handleLearningGovernanceRequest } from './learning-governance';
 import { handleP0CurrentRead } from './p0-current-read';
 import { handleP0PerformanceRead } from './p0-performance-read';
+import { handleP05drCanonicalHistoryRead } from './p0-5dr-canonical-history-read';
 import { handleP0IpoCanonicalHistoryRead } from './p0-ipo-canonical-history-read';
 import { handleP0CanonicalHistoryRead } from './p0-canonical-history-read';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
@@ -35,9 +36,12 @@ export default {
     const p0Performance = await handleP0PerformanceRead(request, env);
     if (p0Performance) return p0Performance;
 
-    // IPO shares the same public CANONICAL_READ_V1 route but has an isolated
-    // production store and canonical rule (T2_FINAL_DAY), so its adapter gets
-    // first refusal before the NIFTY/Stocks gateway handles the remaining engines.
+    // Each engine keeps an isolated production store but answers through the
+    // same owner-only CANONICAL_READ_V1 route. Engine-specific adapters get
+    // first refusal before the Stocks fallback reader.
+    const p05drCanonicalHistory = await handleP05drCanonicalHistoryRead(request, env);
+    if (p05drCanonicalHistory) return p05drCanonicalHistory;
+
     const p0IpoCanonicalHistory = await handleP0IpoCanonicalHistoryRead(request, env);
     if (p0IpoCanonicalHistory) return p0IpoCanonicalHistory;
 
