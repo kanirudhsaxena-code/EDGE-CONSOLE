@@ -3,6 +3,7 @@ import { isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } 
 
 type Env = AccessIdentityEnv & {
   DATABASE_URL?: string;
+  FIVEDR_DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
   IPO_DATABASE_URL?: string;
 };
@@ -31,6 +32,254 @@ function validTicker(value: string | null): value is string {
 
 function validIsoDate(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function baseRetrieval(extra: JsonRecord = {}): JsonRecord {
+  return {
+    contract: 'CANONICAL_READ_V1',
+    reconstructed_from_latest_run: false,
+    inferred_from_workflow_name: false,
+    efficacy_population_changed: false,
+    fail_closed: true,
+    ...extra,
+  };
+}
+
+async function fiveDrHistory(env: Env, url: URL): Promise<Response> {
+  if (!env.FIVEDR_DATABASE_URL) {
+    return json({
+      engine: '5DR',
+      error: '5DR canonical database is not configured on the Console read gateway',
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
+    }, 503);
+  }
+
+  const tradingDate = url.searchParams.get('date');
+  const forecastId = (url.searchParams.get('forecast_id') || '').trim() || null;
+  if (!forecastId && !validIsoDate(tradingDate)) {
+    return json({
+      engine: '5DR',
+      error: '5DR requires forecast_id or date (YYYY-MM-DD)',
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
+    }, 422);
+  }
+  if (tradingDate && !validIsoDate(tradingDate)) {
+    return json({
+      engine: '5DR',
+      error: 'Invalid date; expected YYYY-MM-DD',
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
+    }, 422);
+  }
+
+  const sql = neon(env.FIVEDR_DATABASE_URL);
+  const selections = forecastId
+    ? await sql`
+        select *
+          from canonical_selections
+         where selected_forecast_id=${forecastId}
+         order by selected_at desc
+      `
+    : await sql`
+        select *
+          from canonical_selections
+         where target_trading_date=${tradingDate}
+         order by selected_at desc
+      `;
+
+  if (!selections.length && forecastId) {
+    const candidateRows = await sql`
+      select to_jsonb(fg) as governance,to_jsonb(f) as forecast,to_jsonb(r) as run
+        from forecast_governance fg
+        join forecasts f on f.forecast_id=fg.forecast_id
+        join runs r on r.run_id=f.run_id
+       where fg.forecast_id=${forecastId}
+       limit 1
+    `;
+    if (candidateRows.length) {
+      return json({
+        engine: '5DR',
+        canonical: null,
+        audit_candidate: candidateRows[0],
+        status: 'NON_SELECTED_CANDIDATE',
+        analytical_record: null,
+        presentation: { status: 'NOT_APPLICABLE_NON_CANONICAL', snapshot: null },
+        retrieval: baseRetrieval({
+          exact_persisted_selection: false,
+          exact_candidate_identity: forecastId,
+          selected_for_headline_efficacy: false,
+          note: 'Candidate is preserved for audit but is not a selected canonical and cannot enter canonical efficacy.',
+        }),
+      });
+    }
+  }
+
+  if (!selections.length) {
+    return json({
+      engine: '5DR',
+      canonical: null,
+      error: 'No governed canonical selection matches the requested identity',
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
+    }, 404);
+  }
+
+  if (selections.length > 1) {
+    return json({
+      engine: '5DR',
+      error: 'Canonical selection identity is unexpectedly ambiguous',
+      candidates: selections,
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
+    }, 409);
+  }
+
+  const canonical = selections[0] as JsonRecord;
+  if (canonical.selection_status !== 'SELECTED' || !canonical.selected_forecast_id) {
+    return json({
+      engine: '5DR',
+      canonical,
+      analytical_record: null,
+      daily_forecasts: [],
+      component_scores: [],
+      execution_plan: null,
+      checkpoint_evaluations: [],
+      recommendation_events: [],
+      assessment_snapshot: null,
+      issuance_evidence: {
+        status: 'NOT_APPLICABLE_NO_VALID_CANDIDATE',
+        records: [],
+      },
+      core_shadow: {
+        status: 'NOT_APPLICABLE_NO_VALID_CANDIDATE',
+        record: null,
+      },
+      presentation: {
+        status: 'NOT_AVAILABLE_UNTIL_P0_11',
+        snapshot: null,
+      },
+      completeness: {
+        canonical_selection: true,
+        analytical_record: false,
+        daily_forecasts: false,
+        component_scores: false,
+        execution_plan: false,
+        checkpoint_evaluations: false,
+        recommendation_events: false,
+        assessment_snapshot: false,
+        evidence_lineage: false,
+        presentation_snapshot: false,
+      },
+      retrieval: baseRetrieval({
+        exact_persisted_selection: true,
+        selected_for_headline_efficacy: false,
+        note: 'NO_VALID_CANDIDATE is preserved as the immutable canonical state and is never backfilled.',
+      }),
+    });
+  }
+
+  const selectedId = String(canonical.selected_forecast_id);
+  const forecastRows = await sql`
+    select to_jsonb(f) as forecast,to_jsonb(r) as run,to_jsonb(fg) as governance,
+           to_jsonb(ld) as lineage_delta
+      from forecasts f
+      join runs r on r.run_id=f.run_id
+      left join forecast_governance fg on fg.forecast_id=f.forecast_id
+      left join lineage_deltas ld on ld.forecast_id=f.forecast_id
+     where f.forecast_id=${selectedId}
+     limit 1
+  `;
+
+  if (!forecastRows.length) {
+    return json({
+      engine: '5DR',
+      canonical,
+      error: 'Selected canonical points to a missing forecast record',
+      retrieval: baseRetrieval({
+        exact_persisted_selection: true,
+        exact_forecast_identity: selectedId,
+      }),
+    }, 409);
+  }
+
+  const dailyForecasts = await sql`
+    select *
+      from daily_forecasts
+     where forecast_id=${selectedId}
+     order by day_number
+  `;
+  const componentScores = await sql`
+    select *
+      from component_scores
+     where forecast_id=${selectedId}
+     order by component
+  `;
+  const executionRows = await sql`
+    select *
+      from execution_plans
+     where forecast_id=${selectedId}
+     limit 1
+  `;
+  const checkpointEvaluations = await sql`
+    select *
+      from forecast_checkpoint_evaluations
+     where forecast_id=${selectedId}
+     order by day_number,evaluated_at,evaluation_id
+  `;
+  const recommendationEvents = await sql`
+    select *
+      from recommendation_events
+     where forecast_id=${selectedId}
+     order by observed_at,event_id
+  `;
+  const assessmentRows = await sql`
+    select *
+      from assessment_snapshots
+     where forecast_id=${selectedId}
+     order by created_at desc,snapshot_id desc
+  `;
+
+  const completeness = {
+    canonical_selection: true,
+    analytical_record: true,
+    daily_forecasts: dailyForecasts.length > 0,
+    component_scores: componentScores.length > 0,
+    execution_plan: executionRows.length > 0,
+    checkpoint_evaluations: checkpointEvaluations.length > 0,
+    recommendation_events: recommendationEvents.length > 0,
+    assessment_snapshot: assessmentRows.length > 0,
+    evidence_lineage: false,
+    presentation_snapshot: false,
+  };
+
+  return json({
+    engine: '5DR',
+    canonical,
+    analytical_record: forecastRows[0],
+    daily_forecasts: dailyForecasts,
+    component_scores: componentScores,
+    execution_plan: executionRows[0] ?? null,
+    checkpoint_evaluations: checkpointEvaluations,
+    recommendation_events: recommendationEvents,
+    assessment_snapshot: assessmentRows[0] ?? null,
+    issuance_evidence: {
+      status: 'PENDING_SCHEMA_BOUND_ADAPTER',
+      records: [],
+      note: 'The canonical database contains evidence_items and forecast_evidence; P0-12 will expose them only after their exact deployed relation is schema-verified.',
+    },
+    core_shadow: {
+      status: 'NOT_YET_LINKED_IN_CANONICAL_READ_V1',
+      record: null,
+    },
+    presentation: {
+      status: 'NOT_AVAILABLE_UNTIL_P0_11',
+      snapshot: null,
+    },
+    completeness,
+    retrieval: baseRetrieval({
+      exact_persisted_selection: true,
+      exact_forecast_identity: selectedId,
+      selected_for_headline_efficacy: true,
+      canonical_store_binding: 'FIVEDR_DATABASE_URL',
+    }),
+  });
 }
 
 async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
@@ -85,12 +334,7 @@ async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
       engine: 'EDGE_STOCKS',
       canonical: null,
       error: 'No governed canonical selection matches the requested identity',
-      retrieval: {
-        contract: 'CANONICAL_READ_V1',
-        exact_persisted_selection: false,
-        reconstructed_from_latest_run: false,
-        fail_closed: true,
-      },
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
     }, 404);
   }
 
@@ -105,11 +349,7 @@ async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
         canonical_type: row.canonical_type,
         selected_recommendation_id: row.selected_recommendation_id,
       })),
-      retrieval: {
-        contract: 'CANONICAL_READ_V1',
-        fail_closed: true,
-        reconstructed_from_latest_run: false,
-      },
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
     }, 409);
   }
 
@@ -128,13 +368,10 @@ async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
         status: 'NOT_AVAILABLE_UNTIL_P0_11',
         snapshot: null,
       },
-      retrieval: {
-        contract: 'CANONICAL_READ_V1',
+      retrieval: baseRetrieval({
         exact_persisted_selection: true,
-        reconstructed_from_latest_run: false,
-        fail_closed: true,
         note: 'CANONICAL_MISSED is preserved as a governed historical state and is never backfilled.',
-      },
+      }),
     });
   }
 
@@ -171,12 +408,10 @@ async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
       engine: 'EDGE_STOCKS',
       canonical,
       error: 'Selected canonical points to a missing recommendation record',
-      retrieval: {
-        contract: 'CANONICAL_READ_V1',
+      retrieval: baseRetrieval({
         exact_persisted_selection: true,
-        reconstructed_from_latest_run: false,
-        fail_closed: true,
-      },
+        exact_recommendation_identity: selectedId,
+      }),
     }, 409);
   }
 
@@ -258,15 +493,10 @@ async function edgeStocksHistory(env: Env, url: URL): Promise<Response> {
       snapshot: null,
     },
     completeness,
-    retrieval: {
-      contract: 'CANONICAL_READ_V1',
+    retrieval: baseRetrieval({
       exact_persisted_selection: true,
       exact_recommendation_identity: selectedId,
-      reconstructed_from_latest_run: false,
-      inferred_from_workflow_name: false,
-      efficacy_population_changed: false,
-      fail_closed: true,
-    },
+    }),
   });
 }
 
@@ -287,19 +517,17 @@ export async function handleP0CanonicalHistoryRead(request: Request, env: Env): 
   if (denied) return denied;
 
   const engine = (url.searchParams.get('engine') || '').trim().toUpperCase();
+  if (engine === '5DR' || engine === 'NIFTY') {
+    return fiveDrHistory(env, url);
+  }
   if (engine === 'EDGE_STOCKS' || engine === 'STOCKS' || engine === 'EDGE') {
     return edgeStocksHistory(env, url);
   }
-
-  if (engine === '5DR' || engine === 'NIFTY' || engine === 'IPO_EDGE' || engine === 'IPO') {
+  if (engine === 'IPO_EDGE' || engine === 'IPO') {
     return json({
       engine,
       error: 'CANONICAL_READ_V1 route for this engine is not implemented yet',
-      retrieval: {
-        contract: 'CANONICAL_READ_V1',
-        fail_closed: true,
-        reconstructed_from_latest_run: false,
-      },
+      retrieval: baseRetrieval({ exact_persisted_selection: false }),
     }, 501);
   }
 
