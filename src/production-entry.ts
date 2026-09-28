@@ -3,6 +3,7 @@ import app from './index';
 import { handleLearningGovernanceRequest } from './learning-governance';
 import { handleP0CurrentRead } from './p0-current-read';
 import { handleP0PerformanceRead } from './p0-performance-read';
+import { handleP0CanonicalHistoryRead } from './p0-canonical-history-read';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 
 /**
@@ -15,9 +16,9 @@ import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
  * authorize production promotion or mutate canonical selection/scoring rules.
  *
  * P0 operational-recovery reads are handled before the legacy routing stack so
- * owner-facing current and canonical-performance retrieval is deterministic.
- * These shims are read-only and do not modify scoring, canonical selection,
- * efficacy populations, recommendations, Market Trust, or trading behavior.
+ * owner-facing current, canonical-performance and exact historical retrieval are
+ * deterministic. These shims are read-only and do not modify scoring, canonical
+ * selection, efficacy populations, recommendations, Market Trust, or trading behavior.
  *
  * A blocked 5DR automated-acquisition request gets one governed recovery check
  * after the normal ownership-gated mobile handler responds. This lets a later
@@ -32,6 +33,9 @@ export default {
 
     const p0Performance = await handleP0PerformanceRead(request, env);
     if (p0Performance) return p0Performance;
+
+    const p0CanonicalHistory = await handleP0CanonicalHistoryRead(request, env);
+    if (p0CanonicalHistory) return p0CanonicalHistory;
 
     const url = new URL(request.url);
     const resume = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/resume-processing$/);
