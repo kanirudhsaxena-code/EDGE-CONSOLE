@@ -12,19 +12,19 @@ for (const engine of ["5DR", "EDGE_STOCKS", "IPO_EDGE"] as PresentationEngine[])
   });
 }
 
-test("cross-language P0-11 semantic hash vector is locked", () => {
+test("cross-language P0-11 semantic hash vector is locked to current 5DR V2.1.2 semantics", () => {
   const basis = {
     presentation_contract_version:"P0_11_PRESENTATION_V1",
     engine:"5DR",
-    identity:{run_id:"run-42",result_id:"forecast-7",checkpoint_id:null},
+    identity:{run_id:"42",result_id:"forecast-7",checkpoint_id:null},
     governance_state:"SELECTED",
     sections:[
-      {name:"TABLE_1_5DR_OUTCOME",value:1.0,probability:42.5,verified:true},
-      {name:"TABLE_2_5DR_DRILL_DOWN",items:["PVPO",null,-0]},
+      {name:"TABLE_1_5DR_ASSESSMENT_EFFICACY",value:1.0,probability:42.5,verified:true},
+      {name:"TABLE_2_CURRENT_5DR_RUN",items:["PVPO",null,-0]},
     ],
     source_payload_hash:"source-abc",
   };
-  assert.equal(semanticPresentationHash(basis), "43cab49103f841c9a85d2213756ecb6db2ee54cbdbb5c0ec6545cc7dbb80b020");
+  assert.equal(semanticPresentationHash(basis), "c7ab9fc4e43a3d10460f99b1e8bada4147e85f4878880ddd12c08bf66c4b0127");
 });
 
 test("fails closed when persisted presentation semantics are changed", () => {
