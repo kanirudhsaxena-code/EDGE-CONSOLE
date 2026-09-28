@@ -6,6 +6,7 @@ import { handleP0PerformanceRead } from './p0-performance-read';
 import { handleP05drCanonicalHistoryRead } from './p0-5dr-canonical-history-read';
 import { handleP0IpoCanonicalHistoryRead } from './p0-ipo-canonical-history-read';
 import { handleP0CanonicalHistoryRead } from './p0-canonical-history-read';
+import { gateCanonicalHistoryResponse } from './canonical-history-release-gate';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 
 /**
@@ -22,6 +23,11 @@ import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
  * deterministic. These shims are read-only and do not modify scoring, canonical
  * selection, efficacy populations, recommendations, Market Trust, or trading behavior.
  *
+ * Exact historical readers may expose governed audit evidence, but selected
+ * canonicals pass a shared release firewall before HTTP success. Until the
+ * persisted P0-11 presentation snapshot is attached and shared P0-12 identity
+ * validation passes, selected reads fail closed as audit-only.
+ *
  * A blocked 5DR automated-acquisition request gets one governed recovery check
  * after the normal ownership-gated mobile handler responds. This lets a later
  * successful pinned acquisition retry advance from BLOCKED to READY without
@@ -37,16 +43,16 @@ export default {
     if (p0Performance) return p0Performance;
 
     // Each engine keeps an isolated production store but answers through the
-    // same owner-only CANONICAL_READ_V1 route. Engine-specific adapters get
-    // first refusal before the Stocks fallback reader.
+    // same owner-only P0-12 route. Engine-specific adapters get first refusal
+    // before the Stocks fallback reader; selected responses are contract-gated.
     const p05drCanonicalHistory = await handleP05drCanonicalHistoryRead(request, env);
-    if (p05drCanonicalHistory) return p05drCanonicalHistory;
+    if (p05drCanonicalHistory) return gateCanonicalHistoryResponse(p05drCanonicalHistory);
 
     const p0IpoCanonicalHistory = await handleP0IpoCanonicalHistoryRead(request, env);
-    if (p0IpoCanonicalHistory) return p0IpoCanonicalHistory;
+    if (p0IpoCanonicalHistory) return gateCanonicalHistoryResponse(p0IpoCanonicalHistory);
 
     const p0CanonicalHistory = await handleP0CanonicalHistoryRead(request, env);
-    if (p0CanonicalHistory) return p0CanonicalHistory;
+    if (p0CanonicalHistory) return gateCanonicalHistoryResponse(p0CanonicalHistory);
 
     const url = new URL(request.url);
     const resume = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/resume-processing$/);
