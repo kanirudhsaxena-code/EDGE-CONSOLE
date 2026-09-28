@@ -1,6 +1,6 @@
 name: 5DR Canonical Handoff State
 
-# Manual refresh marker: 2026-09-24 NIFTY exception canonical candidate persistence
+# Manual refresh marker: 2026-09-28 NIFTY user-authorized recovery candidate
 on:
   workflow_dispatch:
   push:
