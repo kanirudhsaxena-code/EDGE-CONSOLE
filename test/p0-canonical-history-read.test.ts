@@ -18,7 +18,7 @@ test('5DR exact history uses isolated canonical store and common CANONICAL_READ_
   assert.match(source, /CANONICAL_READ_V1/);
   assert.match(source, /env\.FIVEDR_DATABASE_URL/);
   assert.match(source, /neon\(env\.FIVEDR_DATABASE_URL\)/);
-  assert.doesNotMatch(source, /DATABASE_URL\?:/);
+  assert.doesNotMatch(source, /(?:^|\s)DATABASE_URL\?:/m);
   assert.match(source, /reconstructed_from_latest_run: false/);
   assert.match(source, /inferred_from_workflow_name: false/);
   assert.match(source, /fail_closed: true/);
@@ -69,7 +69,8 @@ test('5DR canonical type comes from persisted canonical selection rule, not timi
   assert.match(source, /timing_class/);
   assert.match(source, /source: runClass \? 'forecast_governance\.run_class'/);
   assert.match(source, /inferred_from_workflow_name: false/);
-  assert.doesNotMatch(source, /github|workflow_name/i);
+  assert.doesNotMatch(source, /\bgithub\b/i);
+  assert.doesNotMatch(source, /(?:^|[^A-Za-z0-9_])workflow_name\s*[:=]/i);
 });
 
 test('EDGE Stocks fallback reader contains no duplicate NIFTY or IPO database implementation', () => {
