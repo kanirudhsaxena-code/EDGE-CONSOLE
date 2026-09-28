@@ -1,5 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 import { isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { validate5drPersistedPresentation } from './p0-5dr-presentation-read';
 
 type Env = AccessIdentityEnv & {
   FIVEDR_DATABASE_URL?: string;
@@ -34,6 +35,10 @@ async function ownerOnly(request: Request, env: Env): Promise<Response | null> {
 
 function validIsoDate(value: string | null): value is string {
   return !!value && /^\d{4}-\d{2}-\d{2}$/.test(value);
+}
+
+function asRecord(value: unknown): JsonRecord | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as JsonRecord : null;
 }
 
 /**
@@ -153,7 +158,7 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
       recommendation_events: [],
       assessment_snapshot: null,
       core_shadow: { status: 'NOT_APPLICABLE_NO_VALID_CANDIDATE', record: null },
-      presentation: { status: 'NOT_AVAILABLE_UNTIL_P0_11', snapshot: null },
+      presentation: { status: 'NOT_APPLICABLE_NO_VALID_CANDIDATE', snapshot: null },
       completeness: {
         canonical_selection: true,
         analytical_record: false,
@@ -188,6 +193,20 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
       engine: '5DR',
       canonical,
       error: 'Selected canonical points to a missing forecast record',
+      retrieval: retrieval({ exact_persisted_selection: true, exact_forecast_identity: selectedId }),
+    }, 409);
+  }
+
+  const analyticalRecord = forecastRows[0] as JsonRecord;
+  const forecastRecord = asRecord(analyticalRecord.forecast);
+  const runRecord = asRecord(analyticalRecord.run);
+  const forecastRunId = forecastRecord?.run_id === undefined || forecastRecord?.run_id === null ? null : String(forecastRecord.run_id);
+  const runId = runRecord?.run_id === undefined || runRecord?.run_id === null ? null : String(runRecord.run_id);
+  if (!forecastRecord || !runRecord || !forecastRunId || !runId || forecastRunId !== runId) {
+    return json({
+      engine: '5DR',
+      canonical,
+      error: 'Selected canonical analytical run identity is missing or inconsistent',
       retrieval: retrieval({ exact_persisted_selection: true, exact_forecast_identity: selectedId }),
     }, 409);
   }
@@ -234,10 +253,56 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
      where forecast_id=${selectedId}
      order by created_at desc,assessment_snapshot_id desc
   `;
+  const presentationRows = await sql`
+    select * from presentation_snapshots
+     where result_id=${selectedId}
+     order by created_at,presentation_snapshot_id
+  `;
 
-  const analyticalRecord = forecastRows[0] as JsonRecord;
+  if (presentationRows.length > 1) {
+    return json({
+      engine: '5DR',
+      canonical,
+      error: 'P0-11 presentation identity is unexpectedly ambiguous',
+      retrieval: retrieval({
+        exact_persisted_selection: true,
+        exact_forecast_identity: selectedId,
+        exact_run_identity: runId,
+      }),
+    }, 409);
+  }
+
+  let presentationSnapshot: ReturnType<typeof validate5drPersistedPresentation> | null = null;
+  if (presentationRows.length === 1) {
+    try {
+      presentationSnapshot = validate5drPersistedPresentation(presentationRows[0], {
+        runId,
+        forecastId: selectedId,
+      });
+    } catch (error) {
+      return json({
+        engine: '5DR',
+        canonical,
+        error: 'Persisted P0-11 presentation failed closed validation',
+        presentation: {
+          status: 'INVALID_FAIL_CLOSED',
+          snapshot: null,
+          validation_error: error instanceof Error ? error.message : String(error),
+        },
+        retrieval: retrieval({
+          exact_persisted_selection: true,
+          exact_forecast_identity: selectedId,
+          exact_run_identity: runId,
+          canonical_contract_validation: 'FAILED',
+          selected_for_headline_efficacy: true,
+        }),
+      }, 409);
+    }
+  }
+
   const governance = (analyticalRecord.governance ?? null) as JsonRecord | null;
   const runClass = governance && typeof governance.run_class === 'string' ? governance.run_class : null;
+  const presentationAvailable = presentationSnapshot !== null;
 
   return json({
     engine: '5DR',
@@ -260,7 +325,9 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
     recommendation_events: recommendationEvents,
     assessment_snapshot: assessmentRows[0] ?? null,
     core_shadow: { status: 'NOT_YET_LINKED_IN_CANONICAL_READ_V1', record: null },
-    presentation: { status: 'NOT_AVAILABLE_UNTIL_P0_11', snapshot: null },
+    presentation: presentationAvailable
+      ? { status: 'AVAILABLE_VALIDATED', snapshot: presentationSnapshot }
+      : { status: 'NOT_AVAILABLE_NO_PERSISTED_SNAPSHOT', snapshot: null },
     completeness: {
       canonical_selection: true,
       analytical_record: true,
@@ -272,15 +339,22 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
       checkpoint_evaluations: checkpointEvaluations.length > 0,
       recommendation_events: recommendationEvents.length > 0,
       assessment_snapshot: assessmentRows.length > 0,
-      presentation_snapshot: false,
+      presentation_snapshot: presentationAvailable,
     },
     retrieval: retrieval({
       exact_persisted_selection: true,
       exact_forecast_identity: selectedId,
+      exact_run_identity: runId,
       selected_for_headline_efficacy: true,
       canonical_store_binding: 'FIVEDR_DATABASE_URL',
       canonical_type_source: 'canonical_selections.selection_rule',
+      presentation_contract: presentationAvailable ? 'P0_11_PRESENTATION_V1' : null,
+      canonical_contract_validation: presentationAvailable ? 'PASSED' : 'PENDING_P0_11_PRESENTATION',
+      release_eligible: presentationAvailable,
       production_schema_verified_at: '2026-09-28',
+      note: presentationAvailable
+        ? 'Exact selected canonical and immutable P0-11 presentation passed shared identity/hash validation.'
+        : 'Historical selected canonical has no P0-11 snapshot and remains audit-only; no retrospective backfill is permitted.',
     }),
   });
 }
