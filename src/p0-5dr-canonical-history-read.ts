@@ -143,6 +143,7 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
     return json({
       engine: '5DR',
       canonical,
+      canonical_type: canonical.selection_rule ?? null,
       analytical_record: null,
       daily_forecasts: [],
       component_scores: [],
@@ -241,14 +242,13 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
   return json({
     engine: '5DR',
     canonical,
-    canonical_type: runClass ? {
-      status: 'PERSISTED_RUN_CLASS',
+    canonical_type: {
+      value: canonical.selection_rule ?? null,
+      source: 'canonical_selections.selection_rule',
+    },
+    timing_class: {
       value: runClass,
-      source: 'forecast_governance.run_class',
-    } : {
-      status: 'NOT_PERSISTED_FOR_SELECTED_FORECAST',
-      value: null,
-      source: null,
+      source: runClass ? 'forecast_governance.run_class' : null,
     },
     analytical_record: analyticalRecord,
     lineage_deltas: lineageRows,
@@ -279,6 +279,7 @@ export async function handleP05drCanonicalHistoryRead(request: Request, env: Env
       exact_forecast_identity: selectedId,
       selected_for_headline_efficacy: true,
       canonical_store_binding: 'FIVEDR_DATABASE_URL',
+      canonical_type_source: 'canonical_selections.selection_rule',
       production_schema_verified_at: '2026-09-28',
     }),
   });
