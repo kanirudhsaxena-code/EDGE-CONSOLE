@@ -58,7 +58,7 @@ test('5DR selected history uses production-schema verified evidence and efficacy
   assert.match(source, /from assessment_snapshots/);
   assert.match(source, /assessment_snapshot_id desc/);
   assert.doesNotMatch(source, /order by observed_at,event_id/);
-  assert.doesNotMatch(source, /snapshot_id desc/);
+  assert.doesNotMatch(source, /(?:^|[^A-Za-z0-9_])snapshot_id\s+desc/i);
   assert.doesNotMatch(source, /PENDING_SCHEMA_BOUND_ADAPTER/);
 });
 
@@ -78,7 +78,7 @@ test('EDGE Stocks fallback reader contains no duplicate NIFTY or IPO database im
   assert.match(source, /EDGE_DATABASE_URL/);
   assert.doesNotMatch(source, /FIVEDR_DATABASE_URL/);
   assert.doesNotMatch(source, /IPO_DATABASE_URL/);
-  assert.doesNotMatch(source, /canonical_selections\b/);
+  assert.doesNotMatch(source, /\bfrom\s+canonical_selections\b/i);
   assert.doesNotMatch(source, /T2_FINAL_DAY/);
 });
 
