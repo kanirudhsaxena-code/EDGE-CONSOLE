@@ -62,12 +62,14 @@ test('5DR selected history uses production-schema verified evidence and efficacy
   assert.doesNotMatch(source, /PENDING_SCHEMA_BOUND_ADAPTER/);
 });
 
-test('5DR canonical type is read from persisted governance, never workflow names', () => {
+test('5DR canonical type comes from persisted canonical selection rule, not timing class or workflow names', () => {
   const source = readFileSync('src/p0-5dr-canonical-history-read.ts', 'utf8');
-  assert.match(source, /governance\.run_class/);
-  assert.match(source, /source: 'forecast_governance\.run_class'/);
+  assert.match(source, /canonical\.selection_rule/);
+  assert.match(source, /source: 'canonical_selections\.selection_rule'/);
+  assert.match(source, /timing_class/);
+  assert.match(source, /source: runClass \? 'forecast_governance\.run_class'/);
   assert.match(source, /inferred_from_workflow_name: false/);
-  assert.doesNotMatch(source, /github|workflow_name|exception-canonical/i);
+  assert.doesNotMatch(source, /github|workflow_name/i);
 });
 
 test('EDGE Stocks fallback reader contains no duplicate NIFTY or IPO database implementation', () => {
