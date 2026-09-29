@@ -1,0 +1,26 @@
+{
+  "record_type": "ORDINARY_PREOPEN_MISSING",
+  "engine": "NIFTY_5DR",
+  "target_trading_date": "2026-09-29",
+  "stage": "P0-07_LIVE_PREOPEN",
+  "recorded_at_ist": "2026-09-29T09:10:14+05:30",
+  "prep_bundle": {
+    "bundle_id": "PB-NIFTY-20260929-AB3AEFC276FB",
+    "payload_hash": "sha256:12c9cc07a8dd6017ad310c48262bda822cb0f943b03faba0a8c421991f5b286c",
+    "verification": "VERIFIED_FROM_PERSISTED_REPOSITORY"
+  },
+  "auction_snapshot": null,
+  "status": "MISSING",
+  "reason_code": "NO_VALID_ATTRIBUTABLE_AUCTION_EVIDENCE",
+  "reason": "No eligible pre-09:15 Upstox Market Data Feed V3 preOpenSessionStatus+IEP or equivalently attributable exchange-derived pre-open field was obtainable by this engine during the governed matching/opening-price window; intraday candles were not used.",
+  "retry_scope": "ENGINE_LOCAL_ONLY",
+  "ordinary_preopen_canonical_created": false,
+  "shadow_created": false,
+  "ipo_edge_touched": false,
+  "provenance": [
+    "Persisted 08:50 PREP_BUNDLE in EDGE-CONSOLE",
+    "NSE official pre-open-session documentation confirms matching/opening-price determination window and IEP dissemination",
+    "Live public search surfaces checked during governed window; no engine-eligible attributable auction payload obtained"
+  ],
+  "payload_hash": "sha256:574edce03d3c53e89b0d1de65b9901283983cc412ebe7d723f7941fc66b3276d"
+}
