@@ -26,7 +26,7 @@ jobs:
           CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
           CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
-          code="$(curl --location --silent --show-error             -X POST             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Content-Type: application/json"             --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}'             "$CONSOLE_URL/api/5dr/automated-runs"             -o /tmp/start.json -w '%{http_code}')"
+          code="$(curl --location --silent --show-error -X POST -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" --data '{"sandbox":true,"assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}}' "$CONSOLE_URL/api/5dr/automated-runs" -o /tmp/start.json -w '%{http_code}')"
           echo "start_http_code=$code"
           cat /tmp/start.json
           echo
@@ -50,7 +50,7 @@ jobs:
         run: |
           : > /tmp/final.json
           for attempt in $(seq 1 30); do
-            code="$(curl --location --silent --show-error               -o /tmp/status.json -w '%{http_code}'               -X POST               -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"               -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"               -H "Content-Type: application/json"               --data '{}'               "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID/resume-processing")"
+            code="$(curl --location --silent --show-error -o /tmp/status.json -w '%{http_code}' -X POST -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" --data '{}' "$CONSOLE_URL/api/5dr/run-requests/$REQUEST_ID/resume-processing")"
             cp /tmp/status.json /tmp/final.json
             python - <<'PY'
           import json
@@ -105,7 +105,7 @@ jobs:
             sleep 10
           done
 
-      - name: Assert sandbox persistence boundary
+      - name: Assert sandbox boundary without claiming base-product acceptance
         run: |
           python - <<'PY'
           import json
@@ -119,8 +119,11 @@ jobs:
                   raise SystemExit('tester acceptance result crossed canonical publish boundary')
               if d.get('learning_eligible') is not False:
                   raise SystemExit('tester acceptance result crossed Learning Lab boundary')
-              print('5DR_AUTOMATED_SANDBOX_ACCEPTANCE=PASS')
-              print('acceptance_mode=FULL_LIVE_E2E')
+              print('5DR_AUTOMATED_SANDBOX_EXECUTION=PASS')
+              print('acceptance_mode=SANDBOX_LIVE_EXECUTION_ONLY')
+              print('base_product_acceptance=false')
+              print('immutable_production_persistence_proven=false')
+              print('governed_presentation_retrieval_proven=false')
               print('request_id='+str(d.get('request_id')))
               print('run_id='+str(d.get('run_id')))
           elif (
@@ -132,6 +135,7 @@ jobs:
               print('acceptance_mode=WEEKEND_FAIL_CLOSED')
               print('request_id='+str(d.get('request_id')))
               print('live_engine_execution_proven=false')
+              print('base_product_acceptance=false')
           else:
               raise SystemExit('acceptance did not reach a governed accepted terminal state: '+json.dumps(d))
           PY
