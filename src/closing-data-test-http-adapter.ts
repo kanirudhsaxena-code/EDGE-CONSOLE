@@ -1,8 +1,19 @@
-import { closingDataTestPersistenceMetadata } from './closing-data-test-request';
+import { bindClosingDataTestToNiftyRequest, closingDataTestPersistenceMetadata } from './closing-data-test-request';
 import { isObject } from './normalization';
 
 export type ClosingDataHttpPersistence = {
   ok: true;
+  metadata: Record<string, unknown>;
+} | {
+  ok: false;
+  status: 422;
+  error: string;
+};
+
+export type PreparedClosingDataNiftyRequest = {
+  ok: true;
+  status: 200;
+  body: Record<string, unknown>;
   metadata: Record<string, unknown>;
 } | {
   ok: false;
@@ -46,5 +57,35 @@ export function persistClosingDataTestRequestMetadata(
         canonical_production_eligible: false,
       },
     },
+  };
+}
+
+/**
+ * Atomic preparation boundary for the NIFTY HTTP handler. Callers receive the
+ * governed methodology request body and the exact persistence metadata together,
+ * so a closing-data acceptance request cannot be dispatched while silently losing
+ * its immutable population/as-of/provenance quarantine at persistence time.
+ */
+export function prepareClosingDataTestNiftyRequest(
+  requestBody: unknown,
+  existingMetadata: unknown,
+): PreparedClosingDataNiftyRequest {
+  const bound = bindClosingDataTestToNiftyRequest(requestBody);
+  if (!bound.ok || !bound.body) {
+    return {
+      ok: false,
+      status: 422,
+      error: 'Invalid CLOSING_DATA_TEST NIFTY request envelope',
+    };
+  }
+
+  const persisted = persistClosingDataTestRequestMetadata(requestBody, existingMetadata);
+  if (!persisted.ok) return persisted;
+
+  return {
+    ok: true,
+    status: 200,
+    body: bound.body,
+    metadata: persisted.metadata,
   };
 }
