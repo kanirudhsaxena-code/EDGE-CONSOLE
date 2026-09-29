@@ -1,0 +1,9 @@
+{
+  "module": "EDGE_NIFTY",
+  "client_invocation_id": "mdos-p2-live-accept-20260929-1302",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  }
+}
