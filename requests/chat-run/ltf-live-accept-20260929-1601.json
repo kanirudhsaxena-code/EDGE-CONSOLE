@@ -1,0 +1,72 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "EDGE-RESEARCH-LTF-20260929-1601IST",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-09-29T16:01:53+05:30",
+    "research_fresh_at": "2026-09-29T16:01:53+05:30",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": ["CHATGPT_WEB"],
+    "sources": [
+      {
+        "source_id": "ltf29_investors",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors",
+        "title": "L&T Finance official Investor Relations",
+        "retrieved_at": "2026-09-29T16:01:53+05:30",
+        "publication_date": "2026-07-10T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf29_newsroom",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance official News Room",
+        "retrieved_at": "2026-09-29T16:01:53+05:30",
+        "publication_date": "2026-09-18T00:00:00+05:30",
+        "event_date": "2026-09-18T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf29_disclosures",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors/details?cdcat=Other+Disclosures&module=cd&sec=sd",
+        "title": "L&T Finance official statutory disclosures",
+        "retrieved_at": "2026-09-29T16:01:53+05:30",
+        "publication_date": "2026-09-10T00:00:00+05:30",
+        "event_date": "2026-09-10T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf29_fundamental",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "The latest official quarterly baseline retained for the governed live acceptance run is Q1FY27 for the quarter ended June 30, 2026; current price, volume, option-chain and market-state evidence are delegated to the authenticated production engine.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": ["ltf29_investors"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf29_company_context",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Official company newsroom and statutory-disclosure sources are supplied as attributable context; the production engine remains authoritative for current market evidence and no same-day causal claim is asserted here.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": ["ltf29_newsroom", "ltf29_disclosures"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "No manual DES, probability, price zone, PVPO score or recommendation is supplied.",
+      "Live price, volume, options and structured market evidence remain the autonomous provider and engine responsibility."
+    ]
+  }
+}
