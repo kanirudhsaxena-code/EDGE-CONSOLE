@@ -1,0 +1,17 @@
+{
+  "record_type": "PREP_BUNDLE",
+  "engine": "EDGE_STOCKS_LTF",
+  "bundle_id": "PB-STOCKS-LTF-20260929-C7B1EB9CDCE6",
+  "target_trading_date": "2026-09-29",
+  "created_at_ist": "2026-09-29T08:50:00+05:30",
+  "contract_version": "P0-07@ee4670e",
+  "readiness_state": "READY_FOR_STAGE2_AUCTION_SNAPSHOT",
+  "ordinary_preopen_canonical_created": false,
+  "shared_checks": {"indian_trading_calendar":"OPEN_TRADING_DAY","provider_health":"UPSTOX_PUBLIC_SURFACES_RESPONSIVE_STAGE1"},
+  "prior_close": {"instrument":"L&T Finance Ltd","symbol":"NSE:LTF","date":"2026-09-28","close":280.85,"change_pct":-1.11,"day_range":[277.80,283.45],"volume":5648582},
+  "overnight_global_context": {"nifty50_prior_close":22780.25,"nifty_change_pct":-1.56,"financials_context":"broad financial/bank weakness in prior session","gift_nifty":"muted indication","brent_usd_bbl":"~106-107, elevated","us_10y_yield_pct":"~5.24-5.27, elevated","asia":"mostly lower/mixed"},
+  "approved_current_research": ["Upstox LTF market page confirms Sep 28 close ₹280.85, -1.11%, prior close ₹284.00","Reuters Sep 29 pre-open: macro pressure from crude, yields and FII selling","No new LTF-specific exchange filing found in approved stage-1 research requiring a readiness block"],
+  "sources": [{"order":1,"name":"P0-07 contract","ref":"EDGE-CONSOLE commit ee4670efdab3bcf288b1852181c7561ec71ca685"},{"order":2,"name":"Trading-calendar evidence","ref":"Reuters 2026-09-29 Indian shares to open; NIFTY reshuffle effective COB 2026-09-29"},{"order":3,"name":"Provider health","ref":"Upstox public market pages responsive 2026-09-29 pre-open"},{"order":4,"name":"Upstox LTF quote","ref":"https://upstox.com/stocks/l-t-finance-limited-share-price/"},{"order":5,"name":"Reuters India pre-open","ref":"https://www.reuters.com/world/india/indian-shares-open-near-six-month-lows-oil-prices-rise-2026-09-29/"}],
+  "blockers": [],
+  "payload_hash": "sha256:4de0c5c697e4e73a32957b224ab60b04c0af507efa1921ae6de8284daafb4aee"
+}
