@@ -41,7 +41,7 @@ test('EDGE NIFTY runner advances then reads canonical persisted state',()=>{
   assert.match(workflow,/api\/5dr\/run-requests\/\$CAPTURE_REQUEST_ID/);
   assert.match(workflow,/req=d\.get\('request'\) or \{\}/);
   assert.match(workflow,/run=d\.get\('run'\) or \{\}/);
-  assert.match(workflow,/resume_http=/);
+  assert.match(workflow,/\/tmp\/status\.json/);
   assert.match(workflow,/RESUME_EXISTING/);
   assert.doesNotMatch(workflow,/d=json\.load\(open\('\/tmp\/resume\.json'\)\)/);
 });
