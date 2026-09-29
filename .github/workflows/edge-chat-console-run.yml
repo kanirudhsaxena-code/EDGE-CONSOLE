@@ -32,8 +32,7 @@ jobs:
           test -n "$FILE"
           python - "$FILE" <<'PY'
           import json,sys
-          p=sys.argv[1]
-          d=json.load(open(p,encoding='utf-8'))
+          d=json.load(open(sys.argv[1],encoding='utf-8'))
           module=str(d.get('module','')).upper()
           assert module in {'EDGE_NIFTY','EDGE_STOCKS'}, d
           print(module)
@@ -68,6 +67,30 @@ jobs:
           elif module=='EDGE_NIFTY':
               assessment=d.get('assessment') or {'objective':'BOTH','risk_posture':'CONSERVATIVE','capital_priority':'CAPITAL_PROTECTION'}
               payload={'sandbox':False,'force_new':True,'client_invocation_id':d.get('client_invocation_id') or 'chat-edge-nifty','assessment':assessment}
+              if d.get('acceptance_population') == 'CLOSING_DATA_TEST':
+                  # Governed closed-market acceptance: preserve exact as-of/provenance and
+                  # quarantine this population from production efficacy/Learning/canonical state.
+                  assert d.get('session_type') == 'CLOSING_DATA_TEST', d
+                  assert isinstance(d.get('evidence_as_of'),str) and d['evidence_as_of'].strip(), d
+                  provenance=d.get('evidence_provenance'); assert isinstance(provenance,list) and provenance,d
+                  assert d.get('official_efficacy_eligible') is False, d
+                  assert d.get('learning_eligible') is False, d
+                  assert d.get('canonical_production_eligible') is False, d
+                  from datetime import datetime
+                  asof=datetime.fromisoformat(d['evidence_as_of'].replace('Z','+00:00'))
+                  for item in provenance:
+                      assert isinstance(item,dict) and str(item.get('source') or '').strip(), item
+                      observed=datetime.fromisoformat(str(item.get('observed_at') or '').replace('Z','+00:00'))
+                      assert observed <= asof, {'future_evidence':item,'evidence_as_of':d['evidence_as_of']}
+                  payload.update({
+                      'acceptance_population':'CLOSING_DATA_TEST',
+                      'session_type':'CLOSING_DATA_TEST',
+                      'evidence_as_of':d['evidence_as_of'],
+                      'evidence_provenance':provenance,
+                      'official_efficacy_eligible':False,
+                      'learning_eligible':False,
+                      'canonical_production_eligible':False,
+                  })
               open('/tmp/invoke.json','w').write(json.dumps(payload))
           else:
               assert isinstance(d.get('command'),str) and d['command'].upper().startswith('EDGE '), d
@@ -108,17 +131,9 @@ jobs:
           print('EXPECTED_RESULT_ID='+str(run['run_id']))
           PY
           else
-            # Preserve the actual HTTP contract. Retry only transient transport/429/5xx failures;
-            # permanent 4xx responses fail closed and can never be mistaken for DISPATCHED.
             dispatched=false
             for attempt in 1 2 3; do
-              code="$(curl --location --silent --show-error --max-time 60 -X POST \
-                -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
-                -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-                -H "Content-Type: application/json" \
-                --data-binary @/tmp/invoke.json \
-                "$CONSOLE_URL/api/edge-stocks/invoke" \
-                -o /tmp/start.json -w '%{http_code}' || echo 000)"
+              code="$(curl --location --silent --show-error --max-time 60 -X POST -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Content-Type: application/json" --data-binary @/tmp/invoke.json "$CONSOLE_URL/api/edge-stocks/invoke" -o /tmp/start.json -w '%{http_code}' || echo 000)"
               echo "stocks_invoke_http=$code attempt=$attempt"
               cat /tmp/start.json 2>/dev/null || true
               if [ "$code" = "202" ]; then dispatched=true; break; fi
@@ -127,8 +142,7 @@ jobs:
             test "$dispatched" = "true"
             python - <<'PY' > /tmp/stocks.env
           import json
-          d=json.load(open('/tmp/start.json'))
-          assert d.get('ok') is True,d
+          d=json.load(open('/tmp/start.json')); assert d.get('ok') is True,d
           assert d.get('status')=='DISPATCHED',d
           assert d.get('ticker') and d.get('next'),d
           print('CAPTURE_TICKER='+str(d['ticker']))
