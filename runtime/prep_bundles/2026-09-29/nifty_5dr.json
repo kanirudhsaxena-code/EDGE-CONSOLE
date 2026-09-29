@@ -1,0 +1,17 @@
+{
+  "record_type": "PREP_BUNDLE",
+  "engine": "NIFTY_5DR",
+  "bundle_id": "PB-NIFTY-20260929-AB3AEFC276FB",
+  "target_trading_date": "2026-09-29",
+  "created_at_ist": "2026-09-29T08:50:00+05:30",
+  "contract_version": "P0-07@ee4670e",
+  "readiness_state": "READY_FOR_STAGE2_AUCTION_SNAPSHOT",
+  "ordinary_preopen_canonical_created": false,
+  "shared_checks": {"indian_trading_calendar":"OPEN_TRADING_DAY","provider_health":"UPSTOX_PUBLIC_SURFACES_RESPONSIVE_STAGE1"},
+  "prior_close": {"instrument":"NIFTY 50","date":"2026-09-28","close":22780.25,"change_pct":-1.56},
+  "overnight_global_context": {"gift_nifty":"~22820-22834, muted indication","brent_usd_bbl":"~106-107, elevated","us_10y_yield_pct":"~5.24-5.27, elevated","asia":"mostly lower/mixed","us_equities":"lower overnight","fii_cash_inr_crore":-5353.22,"dii_cash_inr_crore":5189.02},
+  "approved_current_research": ["Reuters Sep 29 pre-open: muted Indian open, oil/yields/FII outflows remain pressure","Upstox Sep 29: Asian markets lower; monthly-expiry OI shows 23,000 call resistance and 22,500 put support","NIFTY50 reshuffle: BSE replaces Wipro effective Sep 30 after Sep 29 close"],
+  "sources": [{"order":1,"name":"P0-07 contract","ref":"EDGE-CONSOLE commit ee4670efdab3bcf288b1852181c7561ec71ca685"},{"order":2,"name":"Trading-calendar evidence","ref":"Reuters 2026-09-29 Indian shares to open; NIFTY reshuffle effective COB 2026-09-29"},{"order":3,"name":"Provider health","ref":"Upstox public market pages responsive 2026-09-29 pre-open"},{"order":4,"name":"Reuters India pre-open","ref":"https://www.reuters.com/world/india/indian-shares-open-near-six-month-lows-oil-prices-rise-2026-09-29/"},{"order":5,"name":"Upstox Sep29 pre-open","ref":"https://upstox.com/news/market-news/stocks/nifty-50-sensex-today-wall-street-cues-fii-activity-key-things-to-know-before-markets-open-on-september-29/article-201013/"},{"order":6,"name":"Upstox expiry setup","ref":"https://upstox.com/news/market-news/trading/trade-setup-for-sept-29-can-nifty-50-bounce-back-from-current-levels/article-201017/"}],
+  "blockers": [],
+  "payload_hash": "sha256:12c9cc07a8dd6017ad310c48262bda822cb0f943b03faba0a8c421991f5b286c"
+}
