@@ -102,5 +102,31 @@ jobs:
           echo "Tagged deployment did not pass production health verification"
           cat /tmp/deploy-health.json || true
           exit 1
+      - name: Verify governed 5DR ingestion route is deployed
+        run: |
+          set -euo pipefail
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          # Deliberately invalid payload: the governed route may reject it, but it must exist.
+          # A 404 proves the deployed Worker cannot accept immutable 5DR run handoffs.
+          STATUS="$(curl --location --silent --show-error \
+            -o /tmp/5dr-route-probe.json -w '%{http_code}' \
+            -X POST \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            -H 'Cache-Control: no-cache' \
+            -H 'Content-Type: application/json' \
+            --data '{}' \
+            "$BASE/api/5dr/runs")"
+          echo "5dr_ingestion_probe_status=$STATUS"
+          if [ "$STATUS" = '404' ]; then
+            echo 'Governed POST /api/5dr/runs route is absent from the active production deployment.'
+            cat /tmp/5dr-route-probe.json || true
+            exit 1
+          fi
+          if [ "$STATUS" -ge 500 ]; then
+            echo 'Governed POST /api/5dr/runs route exists but failed its production route probe.'
+            cat /tmp/5dr-route-probe.json || true
+            exit 1
+          fi
       - name: Note preserved runtime secrets
         run: echo "Existing Cloudflare Worker secrets are preserved across deploys; no secret rewrite is required."
