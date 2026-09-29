@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest';
+import assert from 'node:assert/strict';
+import { describe, it } from 'node:test';
 import { assessClosingDataTestEnvelope } from '../src/closing-data-test';
 
 const base = {
@@ -13,7 +14,9 @@ const base = {
 
 describe('CLOSING_DATA_TEST governance boundary', () => {
   it('accepts a quarantined completed-session envelope', () => {
-    expect(assessClosingDataTestEnvelope(base)).toMatchObject({ valid: true, errors: [] });
+    const result = assessClosingDataTestEnvelope(base);
+    assert.equal(result.valid, true);
+    assert.deepEqual(result.errors, []);
   });
 
   it('fails closed on future evidence', () => {
@@ -21,8 +24,8 @@ describe('CLOSING_DATA_TEST governance boundary', () => {
       ...base,
       evidence_provenance: [{ source: 'NSE_COMPLETED_SESSION', observed_at: '2026-09-29T15:31:00+05:30' }],
     });
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain('evidence_provenance[0] is after evidence_as_of');
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.includes('evidence_provenance[0] is after evidence_as_of'));
   });
 
   it('rejects live/preopen relabelling and efficacy/Learning contamination', () => {
@@ -33,10 +36,10 @@ describe('CLOSING_DATA_TEST governance boundary', () => {
       learning_eligible: true,
       canonical_production_eligible: true,
     });
-    expect(result.valid).toBe(false);
-    expect(result.errors).toContain('CLOSING_DATA_TEST must not be labelled LIVE or ORDINARY_PREOPEN');
-    expect(result.errors).toContain('official_efficacy_eligible must be false');
-    expect(result.errors).toContain('learning_eligible must be false');
-    expect(result.errors).toContain('canonical_production_eligible must be false');
+    assert.equal(result.valid, false);
+    assert.ok(result.errors.includes('CLOSING_DATA_TEST must not be labelled LIVE or ORDINARY_PREOPEN'));
+    assert.ok(result.errors.includes('official_efficacy_eligible must be false'));
+    assert.ok(result.errors.includes('learning_eligible must be false'));
+    assert.ok(result.errors.includes('canonical_production_eligible must be false'));
   });
 });
