@@ -253,7 +253,7 @@ jobs:
           text=open('/tmp/chat-presentation.txt',encoding='utf-8').read()
           module=os.environ['CAPTURE_MODULE']
           if module=='EDGE_NIFTY':
-              required=['EDGE NIFTY','TABLE 1 · 5DR ASSESSMENT & EFFICACY','TABLE 2 · CURRENT 5DR RUN','Today’s Market View','5-day forecast','Why this view?','What could change the view?','Future performance scorecard','Advanced details']
+              required=['EDGE NIFTY','TABLE 1 · 5DR ASSESSMENT & EFFICACY','TABLE 2 · CURRENT 5DR RUN','Today’s Market View','5-day forecast','Detailed analysis · why this view?','What could change the view?','Future performance scorecard','Advanced details']
           else:
               required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN']
           missing=[x for x in required if x not in text]
