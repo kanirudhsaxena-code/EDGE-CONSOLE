@@ -31,6 +31,24 @@ test('P0 current read layer keeps latest runs separate from governed canonical e
   assert.doesNotMatch(source, /insert\s+into\s+edge_canonical_selections/i);
 });
 
+test('G5-D current read model exposes exact immutable D through D+4 persistence without efficacy mutation', () => {
+  const source = readFileSync('src/p0-current-read.ts', 'utf8');
+  assert.match(source, /from edge_stock_forecast_paths/);
+  assert.match(source, /from edge_stock_forecast_path_rows/);
+  assert.match(source, /order by horizon_index asc/);
+  assert.match(source, /rows\.length !== 5/);
+  assert.match(source, /EDGE_FORECAST_LABELS\[index\]/);
+  assert.match(source, /Persisted EDGE forecast path is incomplete or misordered/);
+  assert.match(source, /IMMUTABLE_D_THROUGH_D_PLUS_4_BY_RECOMMENDATION_ID/);
+  assert.match(source, /payload_hash/);
+  assert.match(source, /exact_row_count: forecastPath \? 5 : 0/);
+  assert.match(source, /fail_closed_on_incomplete_or_misordered: true/);
+  assert.doesNotMatch(source, /update\s+edge_stock_forecast_paths/i);
+  assert.doesNotMatch(source, /insert\s+into\s+edge_stock_forecast_paths/i);
+  assert.doesNotMatch(source, /update\s+edge_stock_forecast_path_rows/i);
+  assert.doesNotMatch(source, /insert\s+into\s+edge_stock_forecast_path_rows/i);
+});
+
 test('P0 current read layer preserves tester sandbox isolation', () => {
   const source = readFileSync('src/p0-current-read.ts', 'utf8');
   assert.match(source, /isAccessIdentityEnforced/);

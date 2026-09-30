@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { renderEdgeV13 } from '../public/edge-live.js';
 import { validateEdgeStocksResult } from '../src/edge-stocks';
+import { EDGE_STOCK_FORECAST_PATH_VERSION } from '../src/edge-stock-forecast-path';
 
 const report = {
   contract_version:'EDGE_STOCKS_V1_3',
@@ -12,6 +13,18 @@ const report = {
   ticker:'TCS',
   run_id:'EDGE-TCS-20260918-TEST',
   generated_at:'2026-09-18T18:00:00Z',
+  forecast_path:{
+    version:EDGE_STOCK_FORECAST_PATH_VERSION,
+    source_run_id:'EDGE-TCS-20260918-TEST',
+    generated_at:'2026-09-18T18:00:00Z',
+    sessions:['2026-09-18','2026-09-21','2026-09-22','2026-09-23','2026-09-24'].map((target_session,index)=>({
+      label:index===0?'D':`D+${index}`,
+      target_session,
+      probabilities:{bull:5,base:60,bear:35},
+      expected_price_zone:{low:3000,high:3200},
+      lineage_id:`EDGE-TCS-20260918-TEST:${index}`
+    }))
+  },
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',

@@ -3,360 +3,45 @@
   "$id": "edge-console.edge-stocks-output.v1.3",
   "title": "EDGE Stocks Output Contract V1.3 / Efficacy V2",
   "type": "object",
-  "required": [
-    "contract_version",
-    "presentation_contract",
-    "engine",
-    "framework_version",
-    "ticker",
-    "run_id",
-    "generated_at",
-    "presentation",
-    "master_assessment",
-    "active_calls",
-    "current_stock_outcome",
-    "drilldown"
-  ],
+  "required": ["contract_version","presentation_contract","engine","framework_version","ticker","run_id","generated_at","forecast_path","presentation","master_assessment","active_calls","current_stock_outcome","drilldown"],
   "properties": {
-    "contract_version": {
-      "const": "EDGE_STOCKS_V1_3"
-    },
-    "presentation_contract": {
-      "const": "EFFICACY_V2"
-    },
-    "engine": {
-      "const": "EDGE_STOCKS"
-    },
-    "framework_version": {
-      "const": "EDGE_V1"
-    },
-    "ticker": {
-      "type": "string",
-      "minLength": 1
-    },
-    "run_id": {
-      "type": "string",
-      "minLength": 1
-    },
-    "generated_at": {
-      "type": "string",
-      "format": "date-time"
-    },
-    "presentation": {
-      "type": "object",
-      "required": [
-        "standard_table_count",
-        "table_1",
-        "table_2",
-        "table_3",
-        "table_4"
-      ],
-      "properties": {
-        "standard_table_count": {
-          "const": 4
-        },
-        "table_1": {
-          "const": "EDGE_MASTER_ASSESSMENT"
-        },
-        "table_2": {
-          "const": "ACTIVE_CALLS"
-        },
-        "table_3": {
-          "const": "CURRENT_STOCK_OUTCOME"
-        },
-        "table_4": {
-          "const": "DRILLDOWN"
+    "contract_version": {"const":"EDGE_STOCKS_V1_3"},
+    "presentation_contract": {"const":"EFFICACY_V2"},
+    "engine": {"const":"EDGE_STOCKS"},
+    "framework_version": {"const":"EDGE_V1"},
+    "ticker": {"type":"string","minLength":1},
+    "run_id": {"type":"string","minLength":1},
+    "generated_at": {"type":"string","format":"date-time"},
+    "forecast_path": {
+      "type":"object",
+      "required":["version","source_run_id","generated_at","sessions"],
+      "properties":{
+        "version":{"const":"EDGE_STOCK_FORECAST_PATH_V1"},
+        "source_run_id":{"type":"string","minLength":1},
+        "generated_at":{"type":"string","format":"date-time"},
+        "sessions":{
+          "type":"array","minItems":5,"maxItems":5,
+          "prefixItems":[
+            {"$ref":"#/$defs/forecastD"},{"$ref":"#/$defs/forecastD1"},{"$ref":"#/$defs/forecastD2"},{"$ref":"#/$defs/forecastD3"},{"$ref":"#/$defs/forecastD4"}
+          ],"items":false
         }
-      },
-      "additionalProperties": false
+      },"additionalProperties":false
     },
-    "master_assessment": {
-      "type": "object"
-    },
-    "active_calls": {
-      "type": "array",
-      "items": {
-        "type": "object",
-        "required": [
-          "ticker",
-          "recommendation_id",
-          "definitive_forecast",
-          "definitive_recommendation",
-          "expected_price_zone",
-          "probabilities"
-        ],
-        "properties": {
-          "ticker": {
-            "type": "string",
-            "minLength": 1
-          },
-          "recommendation_id": {
-            "type": "string",
-            "minLength": 1
-          },
-          "definitive_forecast": {
-            "type": "string",
-            "minLength": 1
-          },
-          "definitive_recommendation": {
-            "type": "string",
-            "minLength": 1
-          },
-          "expected_price_zone": {
-            "type": "object",
-            "required": [
-              "low",
-              "high"
-            ]
-          },
-          "probabilities": {
-            "type": "object",
-            "required": [
-              "bull",
-              "base",
-              "bear"
-            ]
-          }
-        }
-      }
-    },
-    "current_stock_outcome": {
-      "type": "object",
-      "required": [
-        "des",
-        "market_trust",
-        "directional_agreement",
-        "effective_conviction",
-        "probabilities",
-        "definitive_forecast",
-        "expected_price_zone",
-        "forecast_horizon",
-        "risk_override",
-        "primary_action",
-        "decision_ladder",
-        "bot",
-        "execution"
-      ],
-      "properties": {
-        "des": {
-          "type": "number",
-          "minimum": -100,
-          "maximum": 100
-        },
-        "market_trust": {
-          "type": "object",
-          "required": [
-            "score",
-            "band",
-            "subscores",
-            "weights"
-          ],
-          "properties": {
-            "score": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100
-            },
-            "band": {
-              "type": "string",
-              "minLength": 1
-            },
-            "subscores": {
-              "type": "object",
-              "required": [
-                "evidence_quality",
-                "freshness",
-                "completeness",
-                "directional_agreement",
-                "market_confirmation"
-              ]
-            },
-            "weights": {
-              "type": "object",
-              "required": [
-                "evidence_quality",
-                "freshness",
-                "completeness",
-                "directional_agreement",
-                "market_confirmation"
-              ]
-            }
-          }
-        },
-        "directional_agreement": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 100
-        },
-        "effective_conviction": {
-          "type": "number",
-          "minimum": 0,
-          "maximum": 1
-        },
-        "probabilities": {
-          "type": "object",
-          "required": [
-            "bull",
-            "base",
-            "bear"
-          ]
-        },
-        "definitive_forecast": {
-          "type": "string",
-          "minLength": 1
-        },
-        "expected_price_zone": {
-          "type": "object",
-          "required": [
-            "low",
-            "high"
-          ]
-        },
-        "forecast_horizon": {
-          "type": "string",
-          "minLength": 1
-        },
-        "risk_override": {
-          "type": "object",
-          "required": [
-            "status"
-          ]
-        },
-        "primary_action": {
-          "type": "string",
-          "minLength": 1
-        },
-        "decision_ladder": {
-          "type": "string",
-          "minLength": 1
-        },
-        "bot": {
-          "type": "object",
-          "required": [
-            "score",
-            "grade",
-            "subscores",
-            "weights"
-          ],
-          "properties": {
-            "score": {
-              "type": "number",
-              "minimum": 0,
-              "maximum": 100
-            },
-            "grade": {
-              "type": "string",
-              "minLength": 1
-            },
-            "subscores": {
-              "type": "object",
-              "required": [
-                "forecast_edge",
-                "market_trust",
-                "structure_pattern_quality",
-                "pv_pvpo_confirmation",
-                "catalyst_asymmetry",
-                "execution_quality"
-              ]
-            },
-            "weights": {
-              "type": "object",
-              "required": [
-                "forecast_edge",
-                "market_trust",
-                "structure_pattern_quality",
-                "pv_pvpo_confirmation",
-                "catalyst_asymmetry",
-                "execution_quality"
-              ]
-            }
-          }
-        },
-        "execution": {
-          "type": "object",
-          "required": [
-            "instrument",
-            "execution_quality_score"
-          ]
-        }
-      }
-    },
-    "drilldown": {
-      "type": "array",
-      "minItems": 1,
-      "items": {
-        "type": "object",
-        "required": [
-          "component",
-          "score_or_level",
-          "verification_status",
-          "key_outcome",
-          "interpretation",
-          "original_weight",
-          "normalized_weight",
-          "weighted_contribution",
-          "evidence_quality",
-          "conflict_flag",
-          "finding"
-        ],
-        "properties": {
-          "component": {
-            "type": "string",
-            "minLength": 1
-          },
-          "score_or_level": {},
-          "verification_status": {
-            "enum": [
-              "VERIFIED",
-              "NOT_VERIFIED",
-              "NOT_AVAILABLE",
-              "NOT_SCORABLE",
-              "N/A"
-            ]
-          },
-          "key_outcome": {
-            "type": "string",
-            "minLength": 1
-          },
-          "interpretation": {
-            "type": "string",
-            "minLength": 1
-          },
-          "original_weight": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "normalized_direction": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "normalized_weight": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "weighted_contribution": {
-            "type": [
-              "number",
-              "null"
-            ]
-          },
-          "evidence_quality": {},
-          "conflict_flag": {
-            "type": "boolean"
-          },
-          "finding": {
-            "type": "string",
-            "minLength": 1
-          }
-        }
-      }
-    }
+    "presentation": {"type":"object","required":["standard_table_count","table_1","table_2","table_3","table_4"],"properties":{"standard_table_count":{"const":4},"table_1":{"const":"EDGE_MASTER_ASSESSMENT"},"table_2":{"const":"ACTIVE_CALLS"},"table_3":{"const":"CURRENT_STOCK_OUTCOME"},"table_4":{"const":"DRILLDOWN"}},"additionalProperties":false},
+    "master_assessment":{"type":"object"},
+    "active_calls":{"type":"array","items":{"type":"object","required":["ticker","recommendation_id","definitive_forecast","definitive_recommendation","expected_price_zone","probabilities"],"properties":{"ticker":{"type":"string","minLength":1},"recommendation_id":{"type":"string","minLength":1},"definitive_forecast":{"type":"string","minLength":1},"definitive_recommendation":{"type":"string","minLength":1},"expected_price_zone":{"type":"object","required":["low","high"]},"probabilities":{"type":"object","required":["bull","base","bear"]}}}},
+    "current_stock_outcome":{"type":"object","required":["des","market_trust","directional_agreement","effective_conviction","probabilities","definitive_forecast","expected_price_zone","forecast_horizon","risk_override","primary_action","decision_ladder","bot","execution"],"properties":{"des":{"type":"number","minimum":-100,"maximum":100},"market_trust":{"type":"object","required":["score","band","subscores","weights"],"properties":{"score":{"type":"number","minimum":0,"maximum":100},"band":{"type":"string","minLength":1},"subscores":{"type":"object","required":["evidence_quality","freshness","completeness","directional_agreement","market_confirmation"]},"weights":{"type":"object","required":["evidence_quality","freshness","completeness","directional_agreement","market_confirmation"]}}},"directional_agreement":{"type":"number","minimum":0,"maximum":100},"effective_conviction":{"type":"number","minimum":0,"maximum":1},"probabilities":{"type":"object","required":["bull","base","bear"]},"definitive_forecast":{"type":"string","minLength":1},"expected_price_zone":{"type":"object","required":["low","high"]},"forecast_horizon":{"type":"string","minLength":1},"risk_override":{"type":"object","required":["status"]},"primary_action":{"type":"string","minLength":1},"decision_ladder":{"type":"string","minLength":1},"bot":{"type":"object","required":["score","grade","subscores","weights"],"properties":{"score":{"type":"number","minimum":0,"maximum":100},"grade":{"type":"string","minLength":1},"subscores":{"type":"object","required":["forecast_edge","market_trust","structure_pattern_quality","pv_pvpo_confirmation","catalyst_asymmetry","execution_quality"]},"weights":{"type":"object","required":["forecast_edge","market_trust","structure_pattern_quality","pv_pvpo_confirmation","catalyst_asymmetry","execution_quality"]}}},"execution":{"type":"object","required":["instrument","execution_quality_score"]}}},
+    "drilldown":{"type":"array","minItems":1,"items":{"type":"object","required":["component","score_or_level","verification_status","key_outcome","interpretation","original_weight","normalized_weight","weighted_contribution","evidence_quality","conflict_flag","finding"],"properties":{"component":{"type":"string","minLength":1},"score_or_level":{},"verification_status":{"enum":["VERIFIED","NOT_VERIFIED","NOT_AVAILABLE","NOT_SCORABLE","N/A"]},"key_outcome":{"type":"string","minLength":1},"interpretation":{"type":"string","minLength":1},"original_weight":{"type":["number","null"]},"normalized_direction":{"type":["number","null"]},"normalized_weight":{"type":["number","null"]},"weighted_contribution":{"type":["number","null"]},"evidence_quality":{},"conflict_flag":{"type":"boolean"},"finding":{"type":"string","minLength":1}}}}
   },
-  "additionalProperties": true
+  "$defs":{
+    "probabilities":{"type":"object","required":["bull","base","bear"],"properties":{"bull":{"type":"number","minimum":0,"maximum":100},"base":{"type":"number","minimum":0,"maximum":100},"bear":{"type":"number","minimum":0,"maximum":100}},"additionalProperties":false},
+    "priceZone":{"type":"object","required":["low","high"],"properties":{"low":{"type":"number"},"high":{"type":"number"}},"additionalProperties":false},
+    "forecastBase":{"type":"object","required":["label","target_session","probabilities","expected_price_zone","lineage_id"],"properties":{"target_session":{"type":"string","format":"date"},"probabilities":{"$ref":"#/$defs/probabilities"},"expected_price_zone":{"$ref":"#/$defs/priceZone"},"lineage_id":{"type":"string","minLength":1}},"additionalProperties":false},
+    "forecastD":{"allOf":[{"$ref":"#/$defs/forecastBase"},{"properties":{"label":{"const":"D"}}}]},
+    "forecastD1":{"allOf":[{"$ref":"#/$defs/forecastBase"},{"properties":{"label":{"const":"D+1"}}}]},
+    "forecastD2":{"allOf":[{"$ref":"#/$defs/forecastBase"},{"properties":{"label":{"const":"D+2"}}}]},
+    "forecastD3":{"allOf":[{"$ref":"#/$defs/forecastBase"},{"properties":{"label":{"const":"D+3"}}}]},
+    "forecastD4":{"allOf":[{"$ref":"#/$defs/forecastBase"},{"properties":{"label":{"const":"D+4"}}}]}
+  },
+  "additionalProperties":true
 }

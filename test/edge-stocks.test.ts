@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { componentVerificationStatus, validateEdgeStocksResult } from '../src/edge-stocks';
+import { EDGE_STOCK_FORECAST_PATH_VERSION } from '../src/edge-stock-forecast-path';
 
 const valid = {
   contract_version:'EDGE_STOCKS_V1_3',
@@ -10,6 +11,18 @@ const valid = {
   ticker:'TCS',
   run_id:'EDGE-TCS-20260918-181704-AUTO',
   generated_at:'2026-09-18T18:20:00Z',
+  forecast_path:{
+    version:EDGE_STOCK_FORECAST_PATH_VERSION,
+    source_run_id:'EDGE-TCS-20260918-181704-AUTO',
+    generated_at:'2026-09-18T18:20:00Z',
+    sessions:['2026-09-18','2026-09-21','2026-09-22','2026-09-23','2026-09-24'].map((target_session,index)=>({
+      label:index===0?'D':`D+${index}`,
+      target_session,
+      probabilities:{bull:4.02,base:73.663,bear:22.317},
+      expected_price_zone:{low:2162.5,high:2240.86},
+      lineage_id:`EDGE-TCS-20260918-181704-AUTO:${index}`
+    }))
+  },
   presentation:{
     standard_table_count:4,
     table_1:'EDGE_MASTER_ASSESSMENT',
