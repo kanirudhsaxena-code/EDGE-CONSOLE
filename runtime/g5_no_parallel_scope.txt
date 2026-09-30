@@ -1,0 +1,1 @@
+Paused while G5 critical path is open: P0-07 preopen hardening; G6 Core Zone; G7 PVPO; IPO/P0-14; Learning Lab/P0-13 enhancements beyond strict acceptance needs; UI polish; multi-user/security hardening; new providers; broad refactors; unrelated NIFTY presentation work.
