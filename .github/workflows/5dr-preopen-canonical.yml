@@ -3,8 +3,8 @@ name: EDGE NIFTY Pre-open Canonical Attempts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '55 2 * * 1-5'
-    - cron: '20,25 3 * * 1-5'
+    # UTC: 03:20 = 08:50 IST prep; 03:40 = 09:10 IST auction attempt.
+    - cron: '20,40 3 * * 1-5'
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Launch and advance governed pre-open run
+      - name: Governed 08:50 prep or 09:10 auction attempt
         run: |
           set -euo pipefail
           test -n "$CF_ACCESS_CLIENT_ID"
@@ -34,14 +34,10 @@ jobs:
 
           base=os.environ["CONSOLE_URL"].rstrip("/")
           def request_json(url,method="GET",payload=None):
-              args=[
-                  "curl","--location","--silent","--show-error","--fail-with-body",
-                  "-H","Content-Type: application/json",
-                  "-H","Accept: application/json",
-                  "-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
-                  "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",
-                  "-X",method,
-              ]
+              args=["curl","--location","--silent","--show-error","--fail-with-body",
+                    "-H","Content-Type: application/json","-H","Accept: application/json",
+                    "-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}","-X",method]
               if payload is not None:
                   args += ["--data-binary",json.dumps(payload,separators=(",",":"))]
               args.append(url)
@@ -49,32 +45,35 @@ jobs:
               if proc.returncode!=0:
                   raise RuntimeError((proc.stderr or proc.stdout or "curl transport failed").strip())
               return json.loads(proc.stdout)
+
           IST=ZoneInfo("Asia/Kolkata")
           now=datetime.now(IST)
-          warmup=now.replace(hour=8,minute=40,second=0,microsecond=0)
-          cutoff=now.replace(hour=8,minute=55,second=59,microsecond=999999)
-          if now < warmup:
-              sleep_seconds=(warmup-now).total_seconds()
-              print(f"prewarm_wait_seconds={int(sleep_seconds)}")
-              time.sleep(sleep_seconds)
-              now=datetime.now(IST)
-          if now > cutoff:
-              print(f"PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW actual={now.isoformat()}")
+          prep_start=now.replace(hour=8,minute=50,second=0,microsecond=0)
+          prep_end=now.replace(hour=8,minute=59,second=59,microsecond=999999)
+          auction_start=now.replace(hour=9,minute=10,second=0,microsecond=0)
+          auction_cutoff=now.replace(hour=9,minute=14,second=59,microsecond=999999)
+
+          # 08:50 is preparation only. It MUST NOT create a canonical candidate.
+          if prep_start <= now <= prep_end:
+              print(json.dumps({"status":"PREP_BUNDLE_WINDOW_OK","actual":now.isoformat(),"canonical_created":False},sort_keys=True))
               raise SystemExit(0)
+
+          # GitHub cron is only a wake-up mechanism. Runtime wall-clock is authoritative.
+          # A late runner must fail closed instead of backdating a pre-open canonical.
+          if not (auction_start <= now <= auction_cutoff):
+              print(json.dumps({"status":"PREOPEN_MISSING_OUTSIDE_AUCTION_WINDOW","actual":now.isoformat(),"canonical_created":False},sort_keys=True))
+              raise SystemExit(0)
+
           slot=now.strftime("%H:%M")
-          body={
-              "force_new":True,
-              "canonical_attempt":True,
-              "canonical_attempt_slot":slot,
-              "client_invocation_id":f"preopen-{now:%Y%m%d-%H%M}",
-          }
+          body={"force_new":True,"canonical_attempt":True,"canonical_attempt_slot":slot,
+                "client_invocation_id":f"preopen-{now:%Y%m%d-%H%M}"}
           payload=request_json(base+"/api/5dr/automated-runs","POST",body)
           request_id=((payload.get("request") or {}).get("request_id"))
           if not request_id:
               raise SystemExit(f"PREOPEN_RUN_CREATE_FAILED {payload}")
           print(f"request_id={request_id} slot={slot}")
 
-          for attempt in range(48):
+          for attempt in range(36):
               time.sleep(8)
               try:
                   state=request_json(base+f"/api/5dr/run-requests/{request_id}/resume-processing","POST",{})
@@ -85,13 +84,9 @@ jobs:
               stage=str(state.get("adapter_stage") or "")
               print(f"resume_attempt={attempt+1} status={status} stage={stage}")
               if status=="COMPLETED":
-                  print(json.dumps({
-                      "status":"PREOPEN_RUN_COMPLETED",
-                      "request_id":request_id,
-                      "run_id":state.get("run_id"),
-                      "slot":slot,
-                      "completed_at":datetime.now(ZoneInfo("Asia/Kolkata")).isoformat(),
-                  },sort_keys=True))
+                  print(json.dumps({"status":"PREOPEN_RUN_COMPLETED","request_id":request_id,
+                      "run_id":state.get("run_id"),"slot":slot,
+                      "completed_at":datetime.now(IST).isoformat()},sort_keys=True))
                   raise SystemExit(0)
               if status=="FAILED":
                   raise SystemExit(f"PREOPEN_RUN_FAILED request_id={request_id} stage={stage}")
