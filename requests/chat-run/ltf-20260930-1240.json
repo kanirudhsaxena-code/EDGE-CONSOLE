@@ -1,0 +1,148 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "CHATGPT-LTF-20260930-1240-IST",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-09-30T12:40:00+05:30",
+    "research_fresh_at": "2026-09-30T12:40:00+05:30",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": ["CHATGPT_WEB"],
+    "sources": [
+      {
+        "source_id": "S_LTF_OFFICIAL_INVESTORS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors",
+        "title": "L&T Finance - Investors & Stock Information",
+        "retrieved_at": "2026-09-30T12:40:00+05:30"
+      },
+      {
+        "source_id": "S_UPSTOX_LTF",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://upstox.com/stocks/l-t-finance-limited-share-price/",
+        "title": "L&T Finance Share Price - Upstox",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "event_date": "2026-09-29T15:56:00+05:30"
+      },
+      {
+        "source_id": "S_LTF_HISTORY",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://in.investing.com/equities/lt-finance-holdings-ltd-historical-data",
+        "title": "L&T Finance historical prices",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "event_date": "2026-09-29T15:30:00+05:30"
+      },
+      {
+        "source_id": "S_LTF_ANNOUNCEMENTS",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.moneycontrol.com/company-notices/ltfinance/notices/LFH/",
+        "title": "L&T Finance announcements / BSE notices",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "publication_date": "2026-09-29T18:44:00+05:30",
+        "event_date": "2026-09-29T18:44:00+05:30"
+      },
+      {
+        "source_id": "S_REUTERS_IRDAI",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/commentary/breakingviews/indias-big-insurance-overhaul-will-test-demand-2026-09-29/",
+        "title": "India's big insurance overhaul will test demand - Reuters Breakingviews",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "publication_date": "2026-09-29T00:00:00+05:30",
+        "event_date": "2026-09-29T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_REUTERS_MARKET",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-likely-rise-oil-comes-off-bse-joins-nifty-2026-09-30/",
+        "title": "Indian shares inch higher after recent slide; IT stocks lead - Reuters",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "publication_date": "2026-09-30T00:00:00+05:30",
+        "event_date": "2026-09-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_UPSTOX_SHAREHOLDING",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://upstox.com/stocks/l-t-finance-limited-shareholding/",
+        "title": "L&T Finance Shareholding Pattern - Upstox",
+        "retrieved_at": "2026-09-30T12:40:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "C_Q1FY27_REPORTING",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance has published its Q1FY27 June 30, 2026 consolidated results, press release, investor presentation and earnings-call materials on its official investor site. Upstox's latest earnings summary reports revenue +9.26% QoQ, operating profit +15.12% QoQ and net profit +13.20% QoQ.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": ["S_LTF_OFFICIAL_INVESTORS", "S_UPSTOX_LTF"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_PRICE_STRUCTURE_TO_29SEP",
+        "evidence_category": "OTHER",
+        "statement": "Through the September 29 close, LTF had weakened sharply: it fell from a September 23 close of Rs 310.00 to Rs 282.00 on September 24 on about 36.08 million shares, then closed September 29 at Rs 271.05, down 3.49% for the day on about 13.97 million shares. This claim is historical through September 29 only and is not a substitute for September 30 live market evidence.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": ["S_UPSTOX_LTF", "S_LTF_HISTORY"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_IRDAI_COMMISSION_PROPOSAL",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "IRDAI has proposed an overhaul of insurance distribution commissions, including tighter caps; Reuters reported that distributors including L&T Finance saw share-price pressure after the proposal. Feedback is open until October 25, so the proposal is a live regulatory risk rather than a final rule.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": ["S_REUTERS_IRDAI"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_NCD_ALLOTMENT",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "L&T Finance disclosed on September 29, 2026 the allotment of non-convertible debentures on a private-placement basis. The existence of the funding action is verified; no directional price inference is imposed by this research bundle.",
+        "materiality": "LOW",
+        "direction": "NEUTRAL",
+        "source_ids": ["S_LTF_ANNOUNCEMENTS"],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "C_SHAREHOLDING_JUN26",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "For June 2026, Upstox reports promoter holding of 65.96%, mutual funds 11.56%, FII 7.71% and other DII 3.34%; FII holding increased from 7.63% in March 2026 while promoter and other DII holdings were slightly lower.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": ["S_UPSTOX_SHAREHOLDING"],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "C_MARKET_REGIME_30SEP",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "On September 30 the broader Indian market was modestly higher after a two-day slide, while sustained foreign outflows and elevated oil remained macro headwinds. This is context only; the governed engine must determine LTF-specific market trust and direction from canonical evidence.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": ["S_REUTERS_MARKET"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Public web price pages available to ChatGPT are stale at the September 29 close. They must not be used as the September 30 live reference price.",
+      "The production EDGE engine must use its authenticated Upstox / governed structured market evidence for September 30 current price, chart state, volume, derivatives evidence and execution levels.",
+      "No current intraday value has been inferred from stale public pages, and no missing field is silently substituted."
+    ]
+  }
+}
