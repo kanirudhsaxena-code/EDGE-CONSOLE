@@ -8,5 +8,7 @@
   "official_efficacy_eligible": false,
   "learning_eligible": false,
   "canonical_production_eligible": false,
+  "resume_existing": true,
+  "request_id": "5drreq_655fd8bb-8ab1-41b4-b5f5-3c976876f819",
   "assessment": {"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}
 }
