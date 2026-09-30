@@ -1,0 +1,14 @@
+{
+  "module": "EDGE_NIFTY",
+  "client_invocation_id": "mdos-p0-nifty-closing-data-test-20260929",
+  "acceptance_population": "CLOSING_DATA_TEST",
+  "session_type": "CLOSING_DATA_TEST",
+  "evidence_as_of": "2026-09-29T15:30:00+05:30",
+  "evidence_provenance": [{"source":"LATEST_VALID_COMPLETED_SESSION_2026-09-29","observed_at":"2026-09-29T15:30:00+05:30"}],
+  "official_efficacy_eligible": false,
+  "learning_eligible": false,
+  "canonical_production_eligible": false,
+  "resume_existing": true,
+  "request_id": "5drreq_655fd8bb-8ab1-41b4-b5f5-3c976876f819",
+  "assessment": {"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}
+}
