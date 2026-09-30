@@ -1,0 +1,145 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "CHATGPT-CUPID-20260930-1000-IST",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-09-30T10:00:00+05:30",
+    "research_fresh_at": "2026-09-30T10:00:00+05:30",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": ["CHATGPT_WEB"],
+    "sources": [
+      {
+        "source_id": "S_COMPANY_FINANCIALS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/financial-reports/",
+        "title": "Cupid Limited - Financial Reports",
+        "retrieved_at": "2026-09-30T10:00:00+05:30"
+      },
+      {
+        "source_id": "S_COMPANY_NOTICES",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited - ShareHolders Notice 2026-2027",
+        "retrieved_at": "2026-09-30T10:00:00+05:30"
+      },
+      {
+        "source_id": "S_ET_GUIDANCE",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://m.economictimes.com/markets/stocks/news/cupid-raises-fy27-profit-guidance-targets-rs-750-crore-revenue-stock-up-160-in-2026/articleshow/134439902.cms",
+        "title": "Cupid raises FY27 profit guidance, targets Rs 750 crore revenue; stock up 160% in 2026",
+        "retrieved_at": "2026-09-30T10:00:00+05:30",
+        "publication_date": "2026-09-23T19:13:00+05:30",
+        "event_date": "2026-09-22T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_ET_RETAIL_GUIDANCE",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://retail.economictimes.indiatimes.com/news/health-and-beauty/cupid-limited-raises-fy27-revenue-guidance-to-rs-725-750-crore/134433645",
+        "title": "Cupid Limited raises FY27 revenue guidance to Rs 725-750 crore",
+        "retrieved_at": "2026-09-30T10:00:00+05:30",
+        "publication_date": "2026-09-23T16:41:00+05:30",
+        "event_date": "2026-09-22T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_ET_INDEX",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/markets/stocks/news/cupid-shares-end-10-higher-ahead-of-nifty-smallcap-250-inclusion-tomorrow-how-much-inflows-can-it-see/articleshow/134564560.cms",
+        "title": "Cupid shares end 10% higher ahead of Nifty Smallcap 250 inclusion tomorrow",
+        "retrieved_at": "2026-09-30T10:00:00+05:30",
+        "publication_date": "2026-09-29T16:48:00+05:30",
+        "event_date": "2026-09-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_NSE_INDEX_MIRROR",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://noticeblue.com/circulars/e56dd516-fb39-4f99-8f84-4b8bd582f5c2",
+        "title": "NSE Indices press release mirror - Replacements in indices w.e.f. September 30, 2026",
+        "retrieved_at": "2026-09-30T10:00:00+05:30",
+        "publication_date": "2026-08-10T00:00:00+05:30",
+        "event_date": "2026-09-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_STOCKANALYSIS_VALUATION",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/CUPID/financials/ratios/",
+        "title": "Cupid (NSE:CUPID) Financial Ratios",
+        "retrieved_at": "2026-09-30T10:00:00+05:30"
+      },
+      {
+        "source_id": "S_STOCKANALYSIS_STATS",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/CUPID/statistics/",
+        "title": "Cupid (NSE:CUPID) Statistics & Valuation Metrics",
+        "retrieved_at": "2026-09-30T10:00:00+05:30",
+        "event_date": "2026-09-29T15:30:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "C_FY27_GROWTH",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Cupid reported strong June-quarter FY27 growth and raised FY27 guidance to revenue of Rs 725-750 crore and net profit of Rs 210-225 crore; reported Q1 total income was about Rs 157 crore, PAT about Rs 44 crore and EBITDA margin about 39%.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": ["S_COMPANY_FINANCIALS", "S_ET_GUIDANCE", "S_ET_RETAIL_GUIDANCE"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_INDEX_INCLUSION",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Cupid is included in the Nifty Smallcap 250 as part of the periodic index review effective September 30, 2026, creating a near-term index-rebalance/passive-flow catalyst.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": ["S_ET_INDEX", "S_NSE_INDEX_MIRROR"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_VALUATION",
+        "evidence_category": "VALUATION",
+        "statement": "Current valuation is highly elevated: StockAnalysis reports trailing P/E about 258.95x, price-to-sales about 78.59x and price-to-book about 78.91x for September 2026, versus FY26 P/E about 103.30x.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": ["S_STOCKANALYSIS_VALUATION", "S_STOCKANALYSIS_STATS"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_MOMENTUM",
+        "evidence_category": "OTHER",
+        "statement": "Cupid closed September 29, 2026 at about Rs 290.30, up about 9.75% for the session and close to the reported 52-week high of Rs 299, indicating strong momentum but proximity to a major recent high.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": ["S_STOCKANALYSIS_STATS", "S_ET_INDEX"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_RECENT_DISCLOSURES",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Cupid's official shareholder-notice page records multiple Regulation 29(2) SAST disclosures through September 28, 2026 and a September 28 trading-window closure; the existence and dates of these disclosures are verified, while directional ownership interpretation is left to the governed engine.",
+        "materiality": "LOW",
+        "direction": "NEUTRAL",
+        "source_ids": ["S_COMPANY_NOTICES"],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Public web price sources may be delayed intraday; the production EDGE engine must use its governed structured market evidence for current price, chart state and execution levels.",
+      "No directional inference is made from the recent SAST disclosure titles without the underlying governed ownership-detail read."
+    ]
+  }
+}
