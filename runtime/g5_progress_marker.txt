@@ -1,0 +1,1 @@
+FOUND -> CODED in progress. Schema guard committed; renderer/readback/chat parity next.
