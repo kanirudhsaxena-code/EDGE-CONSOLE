@@ -1,0 +1,14 @@
+{
+  "module": "EDGE_STOCKS",
+  "instrument": "LTF",
+  "command": "EDGE LTF",
+  "client_invocation_id": "mdos-p0-ltf-closing-data-test-20260929",
+  "acceptance_population": "CLOSING_DATA_TEST",
+  "session_type": "CLOSING_DATA_TEST",
+  "evidence_as_of": "2026-09-29T15:30:00+05:30",
+  "evidence_provenance": [{"source":"LATEST_VALID_COMPLETED_SESSION_2026-09-29","observed_at":"2026-09-29T15:30:00+05:30"}],
+  "official_efficacy_eligible": false,
+  "learning_eligible": false,
+  "canonical_production_eligible": false,
+  "assessment": {"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}
+}
