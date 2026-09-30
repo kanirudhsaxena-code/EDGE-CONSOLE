@@ -1,0 +1,1 @@
+Checkpoint: schema/test guard committed; implementation continues.
