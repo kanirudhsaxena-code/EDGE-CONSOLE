@@ -1,0 +1,1 @@
+Current step: machine schema committed; renderer/readback/chat parity wiring in progress.
