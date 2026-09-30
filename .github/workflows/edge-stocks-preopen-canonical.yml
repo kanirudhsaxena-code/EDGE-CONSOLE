@@ -3,8 +3,8 @@ name: EDGE Stocks Pre-open Canonical Attempts
 on:
   workflow_dispatch:
   schedule:
-    - cron: '55 2 * * 1-5'
-    - cron: '20,25 3 * * 1-5'
+    # UTC: 03:20 = 08:50 IST prep; 03:40 = 09:10 IST auction attempt.
+    - cron: '20,40 3 * * 1-5'
 
 permissions:
   contents: read
@@ -22,7 +22,7 @@ jobs:
       CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
       CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
     steps:
-      - name: Attempt governed pre-open runs for active stock lineages
+      - name: Governed 08:50 prep or 09:10 stock auction attempts
         run: |
           set -euo pipefail
           test -n "$CF_ACCESS_CLIENT_ID"
@@ -35,21 +35,13 @@ jobs:
           IST=ZoneInfo("Asia/Kolkata")
           base=os.environ["CONSOLE_URL"].rstrip("/")
           def request_json(url,method="GET",payload=None):
-              args=[
-                  "curl","--location","--silent","--show-error",
-                  "-H","Content-Type: application/json",
-                  "-H","Accept: application/json",
-                  "-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
-                  "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}",
-                  "-X",method,
-                  "-w","\\n%{http_code}",
-              ]
-              if payload is not None:
-                  args += ["--data-binary",json.dumps(payload,separators=(",",":"))]
+              args=["curl","--location","--silent","--show-error","-H","Content-Type: application/json",
+                    "-H","Accept: application/json","-H",f"CF-Access-Client-Id: {os.environ['CF_ACCESS_CLIENT_ID']}",
+                    "-H",f"CF-Access-Client-Secret: {os.environ['CF_ACCESS_CLIENT_SECRET']}","-X",method,"-w","\\n%{http_code}"]
+              if payload is not None: args += ["--data-binary",json.dumps(payload,separators=(",",":"))]
               args.append(url)
               proc=subprocess.run(args,text=True,capture_output=True)
-              raw=proc.stdout or ""
-              body_text,_,code_text=raw.rpartition("\n")
+              raw=proc.stdout or ""; body_text,_,code_text=raw.rpartition("\n")
               try: code=int(code_text.strip())
               except Exception: code=0
               try: body=json.loads(body_text) if body_text.strip() else {}
@@ -57,80 +49,64 @@ jobs:
               return code,body
 
           status,targets_payload=request_json(base+"/api/edge-stocks/canonical-targets")
-          if status!=200:
-              raise SystemExit(f"CANONICAL_TARGETS_FAILED http={status} body={targets_payload}")
+          if status!=200: raise SystemExit(f"CANONICAL_TARGETS_FAILED http={status} body={targets_payload}")
           targets=targets_payload.get("canonical_targets")
-          if not isinstance(targets,list):
-              raise SystemExit("CANONICAL_TARGETS_INVALID")
+          if not isinstance(targets,list): raise SystemExit("CANONICAL_TARGETS_INVALID")
 
           now=datetime.now(IST)
-          warmup=now.replace(hour=8,minute=40,second=0,microsecond=0)
-          cutoff=now.replace(hour=8,minute=55,second=59,microsecond=999999)
-          if now < warmup:
-              sleep_seconds=(warmup-now).total_seconds()
-              print(f"prewarm_wait_seconds={int(sleep_seconds)}")
-              time.sleep(sleep_seconds)
-              now=datetime.now(IST)
-          if now > cutoff:
-              print(f"PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW actual={now.isoformat()}")
+          prep_start=now.replace(hour=8,minute=50,second=0,microsecond=0)
+          prep_end=now.replace(hour=8,minute=59,second=59,microsecond=999999)
+          auction_start=now.replace(hour=9,minute=10,second=0,microsecond=0)
+          auction_cutoff=now.replace(hour=9,minute=14,second=59,microsecond=999999)
+
+          # Preparation is intentionally non-canonical. Resolve lineages and surface
+          # research freshness before auction time; never create a market-state candidate here.
+          if prep_start <= now <= prep_end:
+              print(json.dumps({"status":"PREP_BUNDLE_TARGETS_RESOLVED","actual":now.isoformat(),
+                  "targets":[str((t or {}).get("ticker") or "").upper() for t in targets if (t or {}).get("ticker")],
+                  "canonical_created":False},sort_keys=True))
               raise SystemExit(0)
-          requested_at=now.isoformat()
-          slot=now.strftime("%H:%M")
-          dispatched={}
-          skipped=[]
+
+          # GitHub cron is not timing proof. Late starts fail closed as MISSING.
+          if not (auction_start <= now <= auction_cutoff):
+              print(json.dumps({"status":"PREOPEN_MISSING_OUTSIDE_AUCTION_WINDOW","actual":now.isoformat(),
+                  "canonical_created":False},sort_keys=True))
+              raise SystemExit(0)
+
+          requested_at=now.isoformat(); slot=now.strftime("%H:%M")
+          dispatched={}; skipped=[]
           for target in targets:
               ticker=str((target or {}).get("ticker") or "").strip().upper()
-              if not ticker:
-                  continue
-              body={
-                  "command":f"EDGE {ticker}",
-                  "force_new":True,
-                  "canonical_attempt":True,
-                  "canonical_attempt_slot":slot,
-                  "canonical_requested_at":requested_at,
-              }
+              if not ticker: continue
+              body={"command":f"EDGE {ticker}","force_new":True,"canonical_attempt":True,
+                    "canonical_attempt_slot":slot,"canonical_requested_at":requested_at}
               code,result=request_json(base+"/api/edge-stocks/invoke","POST",body)
               if code==202 and result.get("status")=="DISPATCHED":
-                  dispatched[ticker]={
-                      "after":result.get("dispatched_at"),
-                      "research_bundle_id":result.get("research_bundle_id"),
-                  }
+                  dispatched[ticker]={"after":result.get("dispatched_at"),"research_bundle_id":result.get("research_bundle_id")}
                   print(f"canonical_dispatch ticker={ticker} slot={slot} status=DISPATCHED")
               elif code==409 and result.get("code")=="EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED":
-                  skipped.append({"ticker":ticker,"reason":"RESEARCH_REFRESH_REQUIRED"})
+                  # Fail this lineage locally; do not block LTF or any other ticker.
+                  skipped.append({"ticker":ticker,"reason":"RESEARCH_REFRESH_REQUIRED","state":"MISSING"})
                   print(f"canonical_dispatch ticker={ticker} slot={slot} status=RESEARCH_REFRESH_REQUIRED")
               else:
-                  skipped.append({"ticker":ticker,"reason":result.get("code") or result.get("error") or f"HTTP_{code}"})
+                  skipped.append({"ticker":ticker,"reason":result.get("code") or result.get("error") or f"HTTP_{code}","state":"MISSING"})
                   print(f"canonical_dispatch ticker={ticker} slot={slot} status=BLOCKED code={code}")
 
-          deadline=time.monotonic()+240
-          completed={}
+          deadline=time.monotonic()+240; completed={}
           while dispatched and time.monotonic()<deadline:
               for ticker,state in list(dispatched.items()):
                   after=state.get("after")
                   if not after:
-                      skipped.append({"ticker":ticker,"reason":"MISSING_DISPATCH_TIMESTAMP"})
-                      dispatched.pop(ticker,None)
-                      continue
+                      skipped.append({"ticker":ticker,"reason":"MISSING_DISPATCH_TIMESTAMP","state":"MISSING"}); dispatched.pop(ticker,None); continue
                   qs=urllib.parse.urlencode({"ticker":ticker,"after":after})
                   code,result=request_json(base+"/api/edge-stocks/invoke/status?"+qs)
                   if code==200 and result.get("status")=="COMPLETE":
-                      completed[ticker]=result.get("run_id")
-                      dispatched.pop(ticker,None)
+                      completed[ticker]=result.get("run_id"); dispatched.pop(ticker,None)
                       print(f"canonical_result ticker={ticker} status=COMPLETE run_id={result.get('run_id')}")
-              if dispatched:
-                  time.sleep(8)
+              if dispatched: time.sleep(8)
 
           for ticker in list(dispatched):
-              skipped.append({"ticker":ticker,"reason":"NOT_COMPLETED_WITHIN_ATTEMPT_WINDOW"})
-              print(f"canonical_result ticker={ticker} status=PENDING_OR_MISSED")
-          print(json.dumps({
-              "status":"EDGE_STOCKS_PREOPEN_ATTEMPT_COMPLETE",
-              "slot":slot,
-              "requested_at":requested_at,
-              "targets":len(targets),
-              "completed":completed,
-              "skipped":skipped,
-              "trading_enabled":False,
-          },sort_keys=True))
+              skipped.append({"ticker":ticker,"reason":"NOT_COMPLETED_WITHIN_ATTEMPT_WINDOW","state":"MISSING"})
+          print(json.dumps({"status":"EDGE_STOCKS_PREOPEN_ATTEMPT_COMPLETE","slot":slot,"requested_at":requested_at,
+              "targets":len(targets),"completed":completed,"skipped":skipped,"trading_enabled":False},sort_keys=True))
           PY
