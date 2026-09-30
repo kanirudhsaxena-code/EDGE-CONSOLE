@@ -45,15 +45,19 @@ test('G5 live rollback accepts only governed versions with prior green evidence'
   assert.match(recovery,/actions\/upload-artifact@v4/);
 });
 
-test('G5 does not weaken the protected 08:40 NIFTY/LTF canonical contract',()=>{
+test('G5 does not weaken the governed two-stage NIFTY/LTF pre-open contract',()=>{
   for(const workflow of [canonicalNifty,canonicalStocks]){
-    assert.match(workflow,/replace\(hour=8,minute=40,second=0,microsecond=0\)/);
-    assert.match(workflow,/replace\(hour=8,minute=55,second=59,microsecond=999999\)/);
+    assert.match(workflow,/replace\(hour=8,minute=50,second=0,microsecond=0\)/);
+    assert.match(workflow,/replace\(hour=9,minute=10,second=0,microsecond=0\)/);
+    assert.match(workflow,/replace\(hour=9,minute=14,second=59,microsecond=999999\)/);
     assert.match(workflow,/"canonical_attempt":True/);
     assert.match(workflow,/"canonical_attempt_slot":slot/);
-    assert.match(workflow,/PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW/);
+    assert.match(workflow,/PREOPEN_MISSING_OUTSIDE_AUCTION_WINDOW/);
+    assert.doesNotMatch(workflow,/replace\(hour=8,minute=40/);
   }
+  assert.match(canonicalNifty,/PREP_BUNDLE_WINDOW_OK/);
   assert.match(canonicalNifty,/\/api\/5dr\/automated-runs/);
+  assert.match(canonicalStocks,/PREP_BUNDLE_TARGETS_RESOLVED/);
   assert.match(canonicalStocks,/\/api\/edge-stocks\/canonical-targets/);
   assert.match(canonicalStocks,/"trading_enabled":False/);
 });
