@@ -1,4 +1,5 @@
 import { bindClosingDataTestToNiftyRequest, closingDataTestPersistenceMetadata } from './closing-data-test-request';
+import { enforceClosingDataTemporalIntegrity } from './closing-data-temporal-integrity';
 import { isObject } from './normalization';
 
 export type ClosingDataHttpPersistence = {
@@ -23,11 +24,6 @@ export type PreparedClosingDataNiftyRequest = {
 
 /**
  * HTTP/persistence boundary for governed NIFTY CLOSING_DATA_TEST requests.
- *
- * The adapter deliberately does not alter methodology/scoring inputs. It only
- * copies the already-validated immutable acceptance identity into persisted
- * request metadata. A malformed/partial envelope fails closed rather than
- * silently degrading to LIVE, PREOPEN or ordinary production population.
  */
 export function persistClosingDataTestRequestMetadata(
   requestBody: unknown,
@@ -35,11 +31,7 @@ export function persistClosingDataTestRequestMetadata(
 ): ClosingDataHttpPersistence {
   const governed = closingDataTestPersistenceMetadata(requestBody);
   if (!governed) {
-    return {
-      ok: false,
-      status: 422,
-      error: 'Invalid CLOSING_DATA_TEST persistence envelope',
-    };
+    return { ok: false, status: 422, error: 'Invalid CLOSING_DATA_TEST persistence envelope' };
   }
 
   const base = isObject(existingMetadata) ? existingMetadata : {};
@@ -61,21 +53,28 @@ export function persistClosingDataTestRequestMetadata(
 }
 
 /**
- * Atomic preparation boundary for the NIFTY HTTP handler. Callers receive the
- * governed methodology request body and the exact persistence metadata together,
- * so a closing-data acceptance request cannot be dispatched while silently losing
- * its immutable population/as-of/provenance quarantine at persistence time.
+ * Atomic NIFTY preparation boundary. For CLOSING_DATA_TEST the evidence itself
+ * must pass the as-of firewall before methodology dispatch or persistence.
  */
 export function prepareClosingDataTestNiftyRequest(
   requestBody: unknown,
   existingMetadata: unknown,
+  evidence?: unknown,
 ): PreparedClosingDataNiftyRequest {
   const bound = bindClosingDataTestToNiftyRequest(requestBody);
   if (!bound.ok || !bound.body) {
+    return { ok: false, status: 422, error: 'Invalid CLOSING_DATA_TEST NIFTY request envelope' };
+  }
+
+  if (evidence === undefined) {
+    return { ok: false, status: 422, error: 'CLOSING_DATA_TEST_EVIDENCE_REQUIRED' };
+  }
+  const temporal = enforceClosingDataTemporalIntegrity(requestBody, evidence);
+  if (!temporal.ok) {
     return {
       ok: false,
       status: 422,
-      error: 'Invalid CLOSING_DATA_TEST NIFTY request envelope',
+      error: `${temporal.error}:${temporal.offending_paths.join(',')}`,
     };
   }
 
@@ -86,6 +85,12 @@ export function prepareClosingDataTestNiftyRequest(
     ok: true,
     status: 200,
     body: bound.body,
-    metadata: persisted.metadata,
+    metadata: {
+      ...persisted.metadata,
+      temporal_integrity: {
+        status: 'PASSED',
+        evidence_as_of: temporal.evidence_as_of,
+      },
+    },
   };
 }
