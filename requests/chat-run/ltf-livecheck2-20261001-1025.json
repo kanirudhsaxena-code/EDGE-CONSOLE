@@ -1,0 +1,89 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "CHATGPT-LTF-20261001-1015-IST",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-01T10:15:00+05:30",
+    "research_fresh_at": "2026-10-01T10:15:00+05:30",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "S_LTF_OFFICIAL_NEWS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance News Room",
+        "retrieved_at": "2026-10-01T10:15:00+05:30"
+      },
+      {
+        "source_id": "S_REUTERS_IRDAI",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/commentary/breakingviews/indias-big-insurance-overhaul-will-test-demand-2026-09-29/",
+        "title": "India's big insurance overhaul will test demand",
+        "retrieved_at": "2026-10-01T10:15:00+05:30",
+        "publication_date": "2026-09-29T00:00:00+05:30",
+        "event_date": "2026-09-29T00:00:00+05:30"
+      },
+      {
+        "source_id": "S_REUTERS_MARKET_01OCT",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/india-shares-head-negative-open-foreign-outflows-offset-oil-relief-2026-10-01/",
+        "title": "Indian share benchmarks set for longest weekly losing run in 25 years",
+        "retrieved_at": "2026-10-01T10:15:00+05:30",
+        "publication_date": "2026-10-01T00:00:00+05:30",
+        "event_date": "2026-10-01T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "C_LTF_OFFICIAL_RECENT",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance's official news room shows current FY2026-27 disclosures and recent company updates, including September operational and partnership announcements. No unverified same-day company event is inferred from this source.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "S_LTF_OFFICIAL_NEWS"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "C_IRDAI_DISTRIBUTION_RISK",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "IRDAI's proposed insurance-distribution commission overhaul remains a live regulatory risk; Reuters reported share-price pressure on distributors including L&T Finance after the proposal. It remains a proposal subject to consultation, not a final rule.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "S_REUTERS_IRDAI"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "C_MARKET_REGIME_01OCT",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "On October 1, Indian benchmarks were weak amid persistent foreign outflows and cautious broader market conditions ahead of a market holiday. This is macro context only; the governed EDGE engine must determine LTF-specific direction and execution from authenticated current market evidence.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "S_REUTERS_MARKET_01OCT"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The research bundle does not supply or infer the October 1 live LTF price.",
+      "Current price, volume, chart state, derivatives evidence and execution levels must come from the production engine's authenticated Upstox/governed market-data path.",
+      "No missing market field is replaced with public-web estimates."
+    ]
+  }
+}
