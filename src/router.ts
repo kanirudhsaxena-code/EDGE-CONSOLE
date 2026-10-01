@@ -1004,7 +1004,11 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     drilldown
   };
 
-  const errors = validateEdgeStocksResult(payload);
+  // Lane-1 continuity firewall: until the genuine G5 D:D+4 producer is promoted,
+  // the live V1.3 report remains usable with the frozen aggregate forecast.
+  // G5 acceptance stays strict everywhere else and must explicitly prove the
+  // immutable five-row path before this compatibility flag is removed.
+  const errors = validateEdgeStocksResult(payload, { requireForecastPath: false });
   if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }

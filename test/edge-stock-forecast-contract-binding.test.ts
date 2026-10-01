@@ -32,3 +32,11 @@ test('G5 EDGE Stocks contract rejects an incomplete D through D+4 path',()=>{
   const errors=validateEdgeStocksResult({forecast_path:incomplete});
   assert.ok(errors.some(error=>error.includes('exactly D through D+4')));
 });
+
+
+test('Lane-1 compatibility may omit G5 path only when explicitly requested',()=>{
+  const strict=validateEdgeStocksResult({});
+  assert.ok(strict.includes('forecast_path must be an object'));
+  const compatible=validateEdgeStocksResult({}, {requireForecastPath:false});
+  assert.equal(compatible.includes('forecast_path must be an object'),false);
+});
