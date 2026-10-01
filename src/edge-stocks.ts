@@ -13,7 +13,7 @@ const requiredNumber = (obj: JsonRecord, key: string, min: number, max: number, 
   }
 };
 
-export function validateEdgeStocksResult(body: unknown): string[] {
+export function validateEdgeStocksResult(body: unknown, options: { requireForecastPath?: boolean } = {}): string[] {
   const errors: string[] = [];
   if (!isObject(body)) return ['request body must be a JSON object'];
   if (body.contract_version !== 'EDGE_STOCKS_V1_3') errors.push('contract_version must be EDGE_STOCKS_V1_3');
@@ -26,10 +26,12 @@ export function validateEdgeStocksResult(body: unknown): string[] {
     errors.push('generated_at must be a valid ISO timestamp');
   }
 
-  // G5: forecast persistence is an additive output invariant, independent of execution action.
-  // This deliberately validates only the new path and does not alter scoring, Market Trust,
-  // recommendation logic, canonical selection, efficacy population, or live trading behavior.
-  errors.push(...validateEdgeStockForecastPath(body.forecast_path));
+  // G5 remains a governed cutover gate. The target contract requires the five-row path,
+  // while Lane-1 production may explicitly use compatibility mode until the genuine
+  // upstream D:D+4 producer is promoted. Default stays strict for G5/schema tests.
+  if (options.requireForecastPath !== false) {
+    errors.push(...validateEdgeStockForecastPath(body.forecast_path));
+  }
 
   const presentation = body.presentation;
   if (!isObject(presentation)) errors.push('presentation is mandatory');
