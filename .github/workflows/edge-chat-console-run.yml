@@ -175,6 +175,17 @@ jobs:
           test -s /tmp/chat-presentation.txt
           echo "EDGE_CHAT_PRESENTATION_BEGIN"; cat /tmp/chat-presentation.txt; echo "EDGE_CHAT_PRESENTATION_END"
 
+      - name: Fetch governed EDGE Stocks parity source
+        if: env.CAPTURE_MODULE == 'EDGE_STOCKS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --location --fail-with-body --silent --show-error \
+            -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
+            -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
+            "$CONSOLE_URL/api/edge-stocks/report?ticker=$CAPTURE_TICKER" \
+            -o /tmp/chat-five-session-source.json
+
       - name: Enforce Console-only presentation
         shell: bash
         run: |
@@ -188,19 +199,34 @@ jobs:
               required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN','CANONICAL FORECAST PATH','Five governed sessions · D through D+4','EXACTLY 5']
           missing=[x for x in required if x not in text]; assert not missing, {'missing_console_sections':missing}
           if module=='EDGE_STOCKS':
-              p='/tmp/chat-five-session.json'
-              assert os.path.exists(p), {'missing_five_session_parity_artifact':p}
-              d=json.load(open(p,encoding='utf-8'))
+              rendered_path='/tmp/chat-five-session-rendered.json'
+              source_path='/tmp/chat-five-session-source.json'
+              assert os.path.exists(rendered_path), {'missing_rendered_rows':rendered_path}
+              assert os.path.exists(source_path), {'missing_governed_source':source_path}
+              rendered=json.load(open(rendered_path,encoding='utf-8'))
+              envelope=json.load(open(source_path,encoding='utf-8'))
+              report=envelope.get('report') or {}
+              outcome=report.get('current_stock_outcome') or {}
+              source=outcome.get('forecast_sessions')
               expected=['D','D+1','D+2','D+3','D+4']
-              assert d.get('parity') is True,d
-              assert d.get('forecast_horizon')=='D:D+4',d
-              source=d.get('source_rows'); rendered=d.get('rendered_rows')
-              assert isinstance(source,list) and len(source)==5,d
-              assert isinstance(rendered,list) and len(rendered)==5,d
-              assert [x.get('session_label') for x in source]==expected,d
-              assert [x.get('session_label') for x in rendered]==expected,d
-              assert all(x.get('trading_date') and x.get('direction') and isinstance(x.get('expected_zone'),dict) and x['expected_zone'].get('low') is not None and x['expected_zone'].get('high') is not None for x in source),d
-              assert all(x.get('session_label')!='D+5' for x in source+rendered),d
+              assert outcome.get('forecast_horizon')=='D:D+4',outcome
+              assert isinstance(source,list) and len(source)==5,source
+              assert isinstance(rendered,list) and len(rendered)==5,rendered
+              assert [x.get('session_label') for x in source]==expected,source
+              assert [x.get('session_label') for x in rendered]==expected,rendered
+              for i,label in enumerate(expected):
+                  s=source[i]; r=rendered[i]
+                  zone=s.get('expected_zone') or {}
+                  assert s.get('trading_date') and s.get('direction') and zone.get('low') is not None and zone.get('high') is not None,s
+                  assert r.get('trading_date')==str(s.get('trading_date')), {'label':label,'rendered':r,'source':s}
+                  assert r.get('direction')==str(s.get('direction')), {'label':label,'rendered':r,'source':s}
+                  assert float(r.get('zone_low'))==float(zone.get('low')), {'label':label,'rendered':r,'source':s}
+                  assert float(r.get('zone_high'))==float(zone.get('high')), {'label':label,'rendered':r,'source':s}
+                  assert r.get('session_label')!='D+5',r
+              expected_id=os.environ.get('EXPECTED_RESULT_ID','').strip()
+              if expected_id:
+                  identities={str(report.get('run_id') or ''),str(report.get('recommendation_id') or '')}
+                  assert expected_id in identities, {'expected_result_id':expected_id,'report_identities':sorted(identities)}
               print('CHAT_FIVE_SESSION_PARITY=TRUE')
           print('CHAT_PRESENTATION_SOURCE=LIVE_EDGE_CONSOLE'); print('CHAT_PRESENTATION_VALID=TRUE')
           PY
@@ -212,7 +238,8 @@ jobs:
           name: edge-chat-console-presentation
           path: |
             /tmp/chat-presentation.txt
-            /tmp/chat-five-session.json
+            /tmp/chat-five-session-rendered.json
+            /tmp/chat-five-session-source.json
             /tmp/start.json
             /tmp/status.json
             /tmp/final.json
