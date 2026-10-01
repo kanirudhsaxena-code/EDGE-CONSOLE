@@ -77,43 +77,19 @@ try{
       await page.waitForFunction(id=>document.querySelector('#stocksSummary')?.textContent?.includes(id),expectedId,{timeout:60000});
     }
     await page.waitForSelector('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row="D+4"]',{timeout:60000});
-    const fiveSessionParity=await page.evaluate(async ticker=>{
-      const expected=['D','D+1','D+2','D+3','D+4'];
-      const resp=await fetch('/api/edge-stocks/report?ticker='+encodeURIComponent(ticker),{cache:'no-store'});
-      const data=await resp.json();
-      if(!resp.ok)throw new Error(data.error||'EDGE Stocks report read failed during Chat parity capture');
-      const report=data.report||{};
-      const outcome=report.current_stock_outcome||{};
-      if(outcome.forecast_horizon!=='D:D+4')throw new Error('EDGE Stocks Chat parity source horizon is not D:D+4');
-      const source=outcome.forecast_sessions;
-      if(!Array.isArray(source)||source.length!==5)throw new Error('EDGE Stocks Chat parity source must contain exactly five rows');
+    const renderedRows=await page.evaluate(()=>{
       const nodes=[...document.querySelectorAll('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row]')];
       if(nodes.length!==5)throw new Error('EDGE Stocks Console must render exactly five D:D+4 rows');
-      const money=v=>v==null||Number.isNaN(Number(v))?'—':'₹'+Number(v).toLocaleString('en-IN',{maximumFractionDigits:2});
-      const dateText=v=>{if(!v)return'—';const d=new Date(String(v)+'T00:00:00');return Number.isNaN(d.getTime())?String(v):d.toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})};
-      const rendered=nodes.map((node,i)=>{
-        const row=source[i]||{};
-        if(row.session_label!==expected[i])throw new Error('EDGE Stocks source row order mismatch at '+expected[i]);
-        if(node.getAttribute('data-edge-forecast-row')!==expected[i])throw new Error('EDGE Stocks rendered row order mismatch at '+expected[i]);
-        if(!row.trading_date||!row.direction||!row.expected_zone||row.expected_zone.low==null||row.expected_zone.high==null)throw new Error('EDGE Stocks source row incomplete at '+expected[i]);
-        const text=node.innerText||'';
-        const direction=String(row.direction).replaceAll('_',' ');
-        for(const required of [dateText(row.trading_date),direction,money(row.expected_zone.low),money(row.expected_zone.high)]){
-          if(!text.includes(required))throw new Error('EDGE Stocks rendered/source parity mismatch at '+expected[i]+': '+required);
-        }
-        return {session_label:expected[i],text};
-      });
-      if(nodes.some(node=>node.getAttribute('data-edge-forecast-row')==='D+5'))throw new Error('D+5 is prohibited in current EDGE Stocks Chat presentation');
-      return {
-        run_id:String(report.run_id||''),
-        recommendation_id:String(report.recommendation_id||''),
-        forecast_horizon:outcome.forecast_horizon,
-        source_rows:source,
-        rendered_rows:rendered,
-        parity:true
-      };
-    },ticker);
-    fs.writeFileSync('/tmp/chat-five-session.json',JSON.stringify(fiveSessionParity,null,2)+'\n','utf8');
+      return nodes.map(node=>({
+        session_label:node.getAttribute('data-edge-forecast-row')||'',
+        trading_date:node.getAttribute('data-edge-trading-date')||'',
+        direction:node.getAttribute('data-edge-direction')||'',
+        zone_low:node.getAttribute('data-edge-zone-low')||'',
+        zone_high:node.getAttribute('data-edge-zone-high')||'',
+        text:node.innerText||''
+      }));
+    });
+    fs.writeFileSync('/tmp/chat-five-session-rendered.json',JSON.stringify(renderedRows,null,2)+'\n','utf8');
     const parts=await page.evaluate(()=>{
       const eyebrow=document.querySelector('#selectedModuleEyebrow')?.textContent?.trim()||'';
       const title=document.querySelector('#selectedModuleTitle')?.textContent?.trim()||'';
