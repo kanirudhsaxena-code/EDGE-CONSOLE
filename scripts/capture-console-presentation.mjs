@@ -76,6 +76,20 @@ try{
     if(expectedId){
       await page.waitForFunction(id=>document.querySelector('#stocksSummary')?.textContent?.includes(id),expectedId,{timeout:60000});
     }
+    await page.waitForSelector('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row="D+4"]',{timeout:60000});
+    const renderedRows=await page.evaluate(()=>{
+      const nodes=[...document.querySelectorAll('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row]')];
+      if(nodes.length!==5)throw new Error('EDGE Stocks Console must render exactly five D:D+4 rows');
+      return nodes.map(node=>({
+        session_label:node.getAttribute('data-edge-forecast-row')||'',
+        trading_date:node.getAttribute('data-edge-trading-date')||'',
+        direction:node.getAttribute('data-edge-direction')||'',
+        zone_low:node.getAttribute('data-edge-zone-low')||'',
+        zone_high:node.getAttribute('data-edge-zone-high')||'',
+        text:node.innerText||''
+      }));
+    });
+    fs.writeFileSync('/tmp/chat-five-session-rendered.json',JSON.stringify(renderedRows,null,2)+'\n','utf8');
     const parts=await page.evaluate(()=>{
       const eyebrow=document.querySelector('#selectedModuleEyebrow')?.textContent?.trim()||'';
       const title=document.querySelector('#selectedModuleTitle')?.textContent?.trim()||'';
