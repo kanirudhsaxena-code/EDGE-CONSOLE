@@ -141,12 +141,12 @@ jobs:
             done
             test "$dispatched" = "true"
             python - <<'PY' > /tmp/stocks.env
-          import json
+          import json,shlex
           d=json.load(open('/tmp/start.json')); assert d.get('ok') is True,d
           assert d.get('status')=='DISPATCHED',d
           assert d.get('ticker') and d.get('next'),d
-          print('CAPTURE_TICKER='+str(d['ticker']))
-          print('EDGE_STATUS_URL='+str(d['next']))
+          print('CAPTURE_TICKER='+shlex.quote(str(d['ticker'])))
+          print('EDGE_STATUS_URL='+shlex.quote(str(d['next'])))
           PY
             cat /tmp/stocks.env >> "$GITHUB_ENV"; source /tmp/stocks.env
             for attempt in $(seq 1 48); do
