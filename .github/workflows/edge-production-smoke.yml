@@ -131,6 +131,9 @@ jobs:
             200)
               echo 'CURRENT_DAY_REUSE' > /tmp/ltf-invoke-mode
               ;;
+            202)
+              echo 'GOVERNED_DISPATCH' > /tmp/ltf-invoke-mode
+              ;;
             409)
               echo 'PREPUBLISH_FAIL_CLOSED' > /tmp/ltf-invoke-mode
               ;;
@@ -174,6 +177,13 @@ jobs:
               run_dt=datetime.fromisoformat(str(invoke['run_timestamp']).replace('Z','+00:00')).astimezone(ZoneInfo('Asia/Kolkata'))
               now=datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
               assert run_dt.date()==now.date(), (run_dt, now)
+          elif mode=='GOVERNED_DISPATCH':
+              assert invoke.get('status')=='DISPATCHED', invoke
+              assert invoke.get('ticker')=='LTF', invoke
+              assert invoke.get('research_contract_version')=='EDGE_RESEARCH_BUNDLE_V1', invoke
+              assert invoke.get('research_bundle_id'), invoke
+              assert invoke.get('next'), invoke
+              assert invoke.get('trading_enabled') is False, invoke
           elif mode=='PREPUBLISH_FAIL_CLOSED':
               assert invoke.get('code')=='EDGE_RESEARCH_BUNDLE_REQUIRED', invoke
               assert invoke.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1', invoke
