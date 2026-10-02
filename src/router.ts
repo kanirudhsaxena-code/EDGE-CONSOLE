@@ -50,6 +50,17 @@ const sha256Hex = async (text: string): Promise<string> => {
   return [...new Uint8Array(hash)].map(v => v.toString(16).padStart(2, '0')).join('');
 };
 
+
+const stableJson = (value: unknown): string => {
+  if (Array.isArray(value)) return '[' + value.map(stableJson).join(',') + ']';
+  if (isObject(value)) {
+    return '{' + Object.keys(value).sort().map(
+      key => JSON.stringify(key) + ':' + stableJson((value as JsonRecord)[key])
+    ).join(',') + '}';
+  }
+  return JSON.stringify(value);
+};
+
 async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number }> {
   if (!env.EDGE_DATABASE_URL) return { error: 'EDGE database is not configured', status: 503 };
   const assessment = researchBundleCanPublish(body);
@@ -418,6 +429,13 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   let body: unknown;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
   if (!isObject(body)) return json({ error: 'request body must be a JSON object' }, 422);
+  if (body.research_only !== undefined && typeof body.research_only !== 'boolean') {
+    return json({ error: 'research_only must be boolean' }, 422);
+  }
+  const researchOnly = body.research_only === true;
+  if (researchOnly && !isObject(body.research_bundle)) {
+    return json({ error: 'research_only requires a governed research_bundle' }, 422);
+  }
   const command = parseEdgeCommand(body.command);
   if (!command) return json({ error: 'Command must be in the form EDGE <stock/company/ticker>' }, 422);
 
@@ -449,6 +467,55 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
     researchBundleId = saved.bundleId;
+
+    if (researchOnly) {
+      if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
+      const sql = neon(env.EDGE_DATABASE_URL);
+      const rows = await sql`
+        select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
+               payload_hash,status,payload
+          from edge_research_bundles
+         where bundle_id=${researchBundleId}
+         limit 1
+      `;
+      if (!rows.length) {
+        return json({ error: 'Stored research readback failed', code: 'EDGE_RESEARCH_READBACK_MISSING', ticker }, 500);
+      }
+      const row = rows[0] as Record<string, unknown>;
+      const exactPayloadReadback = isObject(row.payload)
+        && stableJson(row.payload) === stableJson(body.research_bundle);
+      const exactIdentity =
+        String(row.bundle_id) === researchBundleId
+        && String(row.ticker).toUpperCase() === ticker
+        && String(row.contract_version) === EDGE_RESEARCH_BUNDLE_VERSION
+        && String(row.research_authority) === 'CHATGPT'
+        && String(row.status) === 'READY'
+        && isNonEmptyString(row.payload_hash);
+      if (!exactPayloadReadback || !exactIdentity) {
+        return json({
+          error: 'Immutable stored research readback mismatch',
+          code: 'EDGE_RESEARCH_READBACK_MISMATCH',
+          ticker,
+          research_bundle_id: researchBundleId,
+        }, 500);
+      }
+      return json({
+        ok: true,
+        status: 'READY',
+        mode: 'RESEARCH_ONLY',
+        engine: 'EDGE_STOCKS',
+        research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        ticker,
+        command: command.raw,
+        research_bundle_id: researchBundleId,
+        research_fresh_at: row.research_fresh_at,
+        payload_hash: row.payload_hash,
+        research_bundle: row.payload,
+        exact_payload_readback: true,
+        publishing_enabled: false,
+        trading_enabled: false,
+      }, 201);
+    }
   } else {
     const fresh = await latestFreshEdgeResearchBundle(env, ticker, canonicalAttempt ? 90 : 24 * 60);
     researchBundleId = fresh?.bundleId;
