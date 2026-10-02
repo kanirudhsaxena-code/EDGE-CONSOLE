@@ -1,6 +1,8 @@
 import copy
 import importlib.util
 import unittest
+from types import SimpleNamespace
+from unittest.mock import patch
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
 spec = importlib.util.spec_from_file_location('store_research', Path(__file__).with_name('store-edge-research.py'))
@@ -83,5 +85,27 @@ class StoreTests(unittest.TestCase):
     def test_server_rejection_is_not_ready(self):
         with self.assertRaises(ValueError):
             m.store(self.request(), lambda *args: {'ok': False, 'status': 'BLOCKED'})
+
+
+    def test_api_uses_curl_service_token_transport(self):
+        env={'CF_ACCESS_CLIENT_ID':'cid','CF_ACCESS_CLIENT_SECRET':'secret'}
+        response={'ok':True,'status':'READY'}
+        completed=SimpleNamespace(returncode=0,stdout=json.dumps(response)+'\\n201',stderr='')
+        with patch.dict(m.os.environ,env,clear=False), patch.object(m.subprocess,'run',return_value=completed) as run:
+            result=m.api('POST','https://example.invalid/api',{'a':1})
+        self.assertEqual(result,response)
+        args=run.call_args.args[0]
+        self.assertIn('curl',args)
+        self.assertIn('CF-Access-Client-Id: cid',args)
+        self.assertIn('CF-Access-Client-Secret: secret',args)
+        self.assertEqual(run.call_args.kwargs['input'],'{"a":1}')
+        self.assertNotIn('cid',completed.stdout)
+        self.assertNotIn('secret',completed.stdout)
+
+    def test_api_fails_closed_on_non_2xx(self):
+        completed=SimpleNamespace(returncode=0,stdout='{"error":"forbidden"}\\n403',stderr='')
+        with patch.dict(m.os.environ,{'CF_ACCESS_CLIENT_ID':'cid','CF_ACCESS_CLIENT_SECRET':'secret'},clear=False), patch.object(m.subprocess,'run',return_value=completed):
+            with self.assertRaisesRegex(ValueError,'HTTP 403'):
+                m.api('POST','https://example.invalid/api',{'a':1})
 
 if __name__ == '__main__': unittest.main()
