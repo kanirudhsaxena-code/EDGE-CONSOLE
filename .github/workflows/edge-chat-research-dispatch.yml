@@ -41,11 +41,22 @@ jobs:
           assert bundle.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1'
           assert bundle.get('research_authority')=='CHATGPT'
           assert 'CHATGPT_WEB' in bundle.get('retrieval_providers',[])
+          mode=data.get('research_only',False)
+          assert isinstance(mode,bool), 'research_only must be boolean'
+          with open(__import__('os').environ['GITHUB_OUTPUT'],'a') as out:
+              out.write('research_only='+str(mode).lower()+'\n')
           print(path)
           PY
           echo "file=$FILE" >> "$GITHUB_OUTPUT"
 
+      - name: Store governed research without publishing
+        if: steps.request.outputs.research_only == 'true'
+        env:
+          REQUEST_FILE: ${{ steps.request.outputs.file }}
+        run: python scripts/store-edge-research.py "$REQUEST_FILE"
+
       - name: Invoke protected EDGE Console
+        if: steps.request.outputs.research_only != 'true'
         shell: bash
         run: |
           set -euo pipefail
