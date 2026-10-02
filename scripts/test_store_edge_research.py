@@ -37,24 +37,46 @@ class StoreTests(unittest.TestCase):
         calls = []
         def fake(method, url, body=None):
             calls.append((method, url))
-            if method == 'POST':
-                fake.bundle = copy.deepcopy(body)
-                return {'ok': True, 'status': 'READY', 'contract_version': body['contract_version'], 'bundle_id': body['bundle_id']}
-            row = copy.deepcopy(fake.bundle) | {'status': 'READY', 'payload_hash': 'test-hash', 'payload': copy.deepcopy(fake.bundle)}
-            if mutate: mutate(row)
-            return {'research_bundle': row}
+            if method != 'POST':
+                raise AssertionError('store-only path must use one POST')
+            bundle = copy.deepcopy(body['research_bundle'])
+            response = {
+                'ok': True,
+                'status': 'READY',
+                'mode': 'RESEARCH_ONLY',
+                'research_contract_version': bundle['contract_version'],
+                'research_bundle_id': bundle['bundle_id'],
+                'ticker': bundle['ticker'],
+                'research_fresh_at': bundle['research_fresh_at'],
+                'payload_hash': 'test-hash',
+                'research_bundle': bundle,
+                'exact_payload_readback': True,
+                'publishing_enabled': False,
+                'trading_enabled': False,
+            }
+            if mutate: mutate(response)
+            return response
         return fake, calls
 
-    def test_store_only_requires_exact_readback_and_never_invokes(self):
+    def test_store_only_requires_exact_readback_and_never_dispatches(self):
         fake, calls = self.transport()
         result = m.store(self.request(), fake)
         self.assertTrue(result['exact_payload_readback'])
         self.assertFalse(result['publishing_enabled'])
-        self.assertEqual([x[0] for x in calls], ['POST', 'GET'])
-        self.assertTrue(all('/research-bundles' in x[1] for x in calls))
+        self.assertFalse(result['trading_enabled'])
+        self.assertEqual([x[0] for x in calls], ['POST'])
+        self.assertTrue(all(x[1].endswith('/api/edge-stocks/invoke') for x in calls))
 
     def test_readback_tampering_fails_closed(self):
-        for mutate in (lambda r: r.update(status='BLOCKED'), lambda r: r['payload'].update(claims=['tampered']), lambda r: r.update(ticker='CUPID')):
+        for mutate in (
+            lambda r: r.update(status='BLOCKED'),
+            lambda r: r['research_bundle'].update(claims=['tampered']),
+            lambda r: r.update(ticker='CUPID'),
+            lambda r: r.update(mode='DISPATCHED'),
+            lambda r: r.update(exact_payload_readback=False),
+            lambda r: r.update(publishing_enabled=True),
+            lambda r: r.update(trading_enabled=True),
+        ):
             fake, _ = self.transport(mutate)
             with self.assertRaises(ValueError): m.store(self.request(), fake)
 
