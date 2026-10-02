@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const router=readFileSync('src/router.ts','utf8');
+const mobile=readFileSync('src/mobile-v1-entry.ts','utf8');
 
 test('5DR execution refreshes the governed assessment handoff before release gating',()=>{
   assert.match(router,/FIVE_DR_ASSESSMENT_HANDOFF_URL/);
@@ -33,4 +34,22 @@ test('assessment completeness requires D through D+4 and exact recommendation le
   assert.match(router,/\['D','D\+1','D\+2','D\+3','D\+4'\]/);
   assert.match(router,/recommendation_ledger_complete===true/);
   assert.match(router,/ledger\.length===expectedCount/);
+});
+
+
+test('stale handoff dispatches lightweight refresh and waits without weakening the gate',()=>{
+  assert.match(mobile,/dispatch5drAssessmentRefresh\(env,fetch\)/);
+  assert.match(mobile,/STALE_ASSESSMENT_HANDOFF/);
+  assert.match(mobile,/WAIT_FOR_ASSESSMENT_REFRESH/);
+  assert.match(mobile,/assessment_refresh_dispatch/);
+  assert.match(mobile,/status:'READY_FOR_ENGINE'/);
+  assert.match(router,/const FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS=2\*60\*60_000/);
+});
+
+test('non-stale assessment errors still fail closed at the original execution packet boundary',()=>{
+  const start=mobile.indexOf('const packetResponse=await router.fetch');
+  const end=mobile.indexOf('if(!Array.isArray(executionPacket.evidence)',start);
+  const block=mobile.slice(start,end);
+  assert.match(block,/staleAssessment=packetResponse\.status===409/);
+  assert.match(block,/return json\(\{\.\.\.normalizedBody,\.\.\.executionPacket\},packetResponse\.status\)/);
 });
