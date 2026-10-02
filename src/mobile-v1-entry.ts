@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
-import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drAssessmentRefresh, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
 import { sync5drAcquisitionResult, sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
@@ -384,7 +384,56 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
   const origin=new URL(requestUrl).origin;
   const packetResponse=await router.fetch(new Request(`${origin}/api/5dr/run-requests/${encodeURIComponent(requestId)}/execution-packet`,{method:'GET'}),env as any);
   const executionPacket=await responseJson(packetResponse);
-  if(!packetResponse.ok)return json({...normalizedBody,...executionPacket},packetResponse.status);
+  if(!packetResponse.ok){
+    const refreshState=isObject(executionPacket.assessment_refresh)?executionPacket.assessment_refresh:{};
+    const staleAssessment=packetResponse.status===409&&String(refreshState.detail??'')==='assessment handoff is stale';
+    if(staleAssessment){
+      const priorRefresh=isObject(metadata.assessment_refresh_dispatch)?metadata.assessment_refresh_dispatch:{};
+      const attemptedAt=String(priorRefresh.attempted_at??'');
+      const attemptedMs=attemptedAt&&!Number.isNaN(Date.parse(attemptedAt))?Date.parse(attemptedAt):0;
+      const recentlyDispatched=priorRefresh.status==='DISPATCHED'&&attemptedMs>0&&Date.now()-attemptedMs<3*60_000;
+      if(recentlyDispatched){
+        return json({
+          ...normalizedBody,
+          ok:true,
+          request_id:requestId,
+          status:'READY_FOR_ENGINE',
+          adapter_stage:'NORMALIZED_READY',
+          assessment_refresh_dispatch:priorRefresh,
+          next_step:'WAIT_FOR_ASSESSMENT_REFRESH'
+        },202);
+      }
+
+      const refreshDispatch=await dispatch5drAssessmentRefresh(env,fetch);
+      const refreshRecord={...refreshDispatch,attempted_at:new Date().toISOString(),reason:'STALE_ASSESSMENT_HANDOFF'};
+      const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+      const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:metadata;
+      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,assessment_refresh_dispatch:refreshRecord})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+
+      if(refreshDispatch.ok){
+        return json({
+          ...normalizedBody,
+          ok:true,
+          request_id:requestId,
+          status:'READY_FOR_ENGINE',
+          adapter_stage:'NORMALIZED_READY',
+          assessment_refresh_dispatch:refreshRecord,
+          next_step:'WAIT_FOR_ASSESSMENT_REFRESH'
+        },202);
+      }
+      return json({
+        ...normalizedBody,
+        ok:false,
+        request_id:requestId,
+        status:'READY_FOR_ENGINE',
+        adapter_stage:'NORMALIZED_READY',
+        assessment_refresh_dispatch:refreshRecord,
+        error:'5DR assessment refresh dispatch failed',
+        next_step:'RETRY_ASSESSMENT_REFRESH'
+      },503);
+    }
+    return json({...normalizedBody,...executionPacket},packetResponse.status);
+  }
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
   const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
