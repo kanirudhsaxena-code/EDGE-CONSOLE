@@ -8,7 +8,7 @@ import sys
 import urllib.request
 from datetime import datetime, timezone
 
-BASE = 'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/research-bundles'
+BASE = 'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke'
 
 
 def prepare(request):
@@ -56,22 +56,39 @@ def api(method, url, body=None):
 
 def store(request, transport=api):
     bundle = prepare(request)
-    saved = transport('POST', BASE, bundle)
-    if saved.get('ok') is not True or saved.get('status') != 'READY' or saved.get('contract_version') != bundle['contract_version'] or saved.get('bundle_id') != bundle['bundle_id']:
-        raise ValueError('governed storage did not confirm matching READY identity')
-    row = transport('GET', BASE + '/' + bundle['bundle_id']).get('research_bundle', {})
-    payload = row.get('payload')
-    if isinstance(payload, str):
-        payload = json.loads(payload)
-    if payload != bundle or any(row.get(key) != bundle[key] for key in ('bundle_id', 'ticker', 'contract_version', 'research_authority')) or row.get('status') != 'READY' or not row.get('payload_hash'):
+    payload = copy.deepcopy(request)
+    payload['research_bundle'] = bundle
+    saved = transport('POST', BASE, payload)
+    if (
+        saved.get('ok') is not True
+        or saved.get('status') != 'READY'
+        or saved.get('mode') != 'RESEARCH_ONLY'
+        or saved.get('research_contract_version') != bundle['contract_version']
+        or saved.get('research_bundle_id') != bundle['bundle_id']
+        or saved.get('ticker') != bundle['ticker']
+        or saved.get('exact_payload_readback') is not True
+        or saved.get('publishing_enabled') is not False
+        or saved.get('trading_enabled') is not False
+    ):
+        raise ValueError('governed storage did not confirm matching READY research-only identity')
+    row = saved.get('research_bundle')
+    if isinstance(row, str):
+        row = json.loads(row)
+    if row != bundle or not saved.get('payload_hash'):
         raise ValueError('immutable stored research readback mismatch')
-    for key in ('created_at', 'research_fresh_at'):
-        if datetime.fromisoformat(row[key].replace('Z', '+00:00')) != datetime.fromisoformat(bundle[key].replace('Z', '+00:00')):
-            raise ValueError('stored research timestamp mismatch')
-    assert_fresh(row['research_fresh_at'])
-    return {'status': 'READY', 'bundle_id': row['bundle_id'], 'ticker': row['ticker'],
-            'research_fresh_at': row['research_fresh_at'], 'payload_hash': row['payload_hash'],
-            'exact_payload_readback': True, 'publishing_enabled': False, 'trading_enabled': False}
+    if datetime.fromisoformat(str(saved['research_fresh_at']).replace('Z', '+00:00')) != datetime.fromisoformat(bundle['research_fresh_at'].replace('Z', '+00:00')):
+        raise ValueError('stored research timestamp mismatch')
+    assert_fresh(str(saved['research_fresh_at']))
+    return {
+        'status': 'READY',
+        'bundle_id': saved['research_bundle_id'],
+        'ticker': saved['ticker'],
+        'research_fresh_at': saved['research_fresh_at'],
+        'payload_hash': saved['payload_hash'],
+        'exact_payload_readback': True,
+        'publishing_enabled': False,
+        'trading_enabled': False,
+    }
 
 
 if __name__ == '__main__':
