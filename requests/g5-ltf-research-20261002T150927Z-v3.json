@@ -1,0 +1,172 @@
+{
+  "command": "EDGE LTF",
+  "research_only": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-02T15:09:27.462Z",
+    "research_fresh_at": "2026-10-02T15:09:27.462Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-q1-company",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/docs/default-source/default-document-library/q1fy27_financial_results_press_release_financials.pdf",
+        "title": "L&T Finance Q1 FY27 financial results press release",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": "2026-07-10T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-q1-secondary",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.moneycontrol.com/news/business/earnings/lt-finance-consolidated-june-2026-net-sales-at-rs-5212-92-crore-up-22-38-y-o-y-13988153.html",
+        "title": "L&T Finance June 2026 consolidated results summary",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": "2026-07-10T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-pine-company",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/docs/default-source/corporatedisclosure/l-t-finance-partners-with-pine-labs-to-introduce-agentic-commerce-and-payments-on-l-t-finance-planet-app_9th-september-2026.pdf",
+        "title": "L&T Finance and Pine Labs partnership announcement",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": "2026-09-09T00:00:00+05:30",
+        "event_date": "2026-09-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-regulatory-reuters",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/legal/litigation/indias-insurance-overhaul-what-changes-why-it-matters-2026-09-24/",
+        "title": "Reuters explainer on proposed Indian insurance distribution reforms",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": "2026-09-24T00:00:00+05:30",
+        "event_date": "2026-09-23T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-regulatory-reuters-bv",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/commentary/breakingviews/indias-big-insurance-overhaul-will-test-demand-2026-09-29/",
+        "title": "Reuters Breakingviews on insurance overhaul and distributors",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": "2026-09-29T00:00:00+05:30",
+        "event_date": "2026-09-29T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-financial-snapshot",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/LTF/consolidated/",
+        "title": "L&T Finance consolidated financial and shareholding snapshot",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-newsroom",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance official news room",
+        "retrieved_at": "2026-10-02T15:09:27.462Z",
+        "publication_date": null,
+        "event_date": null
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance's June 2026 quarter showed year-on-year growth in reported profit and retail book alongside disclosed asset-quality metrics; this is verified historical operating evidence, not a fresh October earnings announcement.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-q1-company",
+          "ltf-q1-secondary"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "The current secondary financial snapshot provides valuation context including earnings and book-value multiples, but this research does not infer fair value or a price target from those ratios.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-financial-snapshot"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "The latest reported quarterly shareholding mix available in the reviewed financial snapshot is broadly stable rather than evidence of a verified current-session institutional accumulation or exit.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-financial-snapshot"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-catalyst",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "L&T Finance announced a Pine Labs partnership on September 9, 2026. The partnership is verified, but no quantified incremental earnings contribution is established and it is not treated as a new October announcement.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-pine-company",
+          "ltf-newsroom"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-event-shock",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Review of current company disclosures and recent independent coverage did not identify a verified company-specific severe shock such as default, fraud, insolvency, ban, auditor resignation or comparable acute event. The insurance-distribution proposal is tracked separately as sector/regulatory risk rather than relabelled as a company-specific shock.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-newsroom",
+          "ltf-regulatory-reuters",
+          "ltf-regulatory-reuters-bv"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-sector-regulatory",
+        "evidence_category": "SECTOR_MACRO",
+        "statement": "Recent independent coverage identifies a proposed insurance-distribution framework that could affect distributor economics, including finance-company distribution models. The proposal is a sector/regulatory risk and is not represented here as an enacted rule or quantified L&T Finance earnings loss.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ltf-regulatory-reuters",
+          "ltf-regulatory-reuters-bv"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Freshness refers to this research session, not the age of the underlying corporate events.",
+      "No live Upstox price, ATR, liquidity or sector-regime value is supplied by this research artifact; production must acquire those independently.",
+      "The regulatory proposal is treated as sector/regulatory risk, not as proof of a company-specific severe Event-Shock.",
+      "No price target, current institutional flow, or production recommendation is created by this storage-only research artifact."
+    ]
+  }
+}
