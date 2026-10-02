@@ -3,6 +3,7 @@ export type EngineDispatchEnv={
   FIVEDR_REPOSITORY?:string;
   FIVEDR_WORKFLOW?:string;
   FIVEDR_ACQUIRE_WORKFLOW?:string;
+  FIVEDR_ASSESSMENT_WORKFLOW?:string;
   FIVEDR_WORKFLOW_REF?:string;
   FIVEDR_CALLBACK_URL?:string;
 };
@@ -18,6 +19,7 @@ export type EngineDispatchResult={
 const DEFAULT_REPOSITORY='kanirudhsaxena-code/5DR-V2';
 const DEFAULT_WORKFLOW='console-execute.yml';
 const DEFAULT_ACQUIRE_WORKFLOW='console-acquire.yml';
+const DEFAULT_ASSESSMENT_WORKFLOW='assessment-refresh.yml';
 const DEFAULT_REF='main';
 
 export type EngineDispatchHealth={
@@ -98,6 +100,14 @@ async function dispatchWorkflow(
 
 function callbackOrigin(env:EngineDispatchEnv,consoleUrl:string):string|null{
   try{return new URL(env.FIVEDR_CALLBACK_URL?.trim()||consoleUrl).origin}catch{return null}
+}
+
+export async function dispatch5drAssessmentRefresh(
+  env:EngineDispatchEnv,
+  fetcher:typeof fetch=fetch
+):Promise<EngineDispatchResult>{
+  const workflow=env.FIVEDR_ASSESSMENT_WORKFLOW?.trim()||DEFAULT_ASSESSMENT_WORKFLOW;
+  return dispatchWorkflow(env,workflow,{},fetcher);
 }
 
 export async function dispatch5drAcquisition(
