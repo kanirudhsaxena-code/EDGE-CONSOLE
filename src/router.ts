@@ -32,6 +32,14 @@ const integerOrZero = (value: unknown): number => {
   return Number.isInteger(n) && n >= 0 ? n : 0;
 };
 
+
+const dateOnly = (value: unknown): string => {
+  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  const text = String(value ?? '').trim();
+  const match = text.match(/^(\d{4}-\d{2}-\d{2})/);
+  return match ? match[1] : '';
+};
+
 async function testerEdgeSandboxGate(request:Request,env:Env):Promise<Response|null>{
   if(!isAccessIdentityEnforced(env))return null;
   const actor=await resolveAccessActor(request,env);
@@ -892,6 +900,107 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const effectiveConviction = Math.min(Math.abs(des) / 100, 1) * (marketTrust / 100);
   const overrideCode = active.active_override == null ? null : String(active.active_override);
 
+  const forecastPathHeaderRows = await sql`
+    select path_version,source_run_id,issued_at,payload_hash
+      from edge_stock_forecast_paths
+     where recommendation_id=${String(active.recommendation_id)}
+     limit 1
+  `;
+
+  let forecastPath: Record<string, unknown> | null = null;
+  let forecastSessions: Record<string, unknown>[] | null = null;
+
+  if (forecastPathHeaderRows.length) {
+    const header = forecastPathHeaderRows[0] as Record<string, unknown>;
+    const pathRows = await sql`
+      select horizon_index,horizon_label,target_trading_date,direction,
+             bull_probability,base_probability,bear_probability,expected_centre,
+             outer_expected_zone_low,outer_expected_zone_high,evidence_basis,
+             regime_context,verification_state,lineage
+        from edge_stock_forecast_path_rows
+       where recommendation_id=${String(active.recommendation_id)}
+       order by horizon_index asc
+    `;
+    const expectedLabels=['D','D+1','D+2','D+3','D+4'];
+    const labels=pathRows.map((row:Record<string,unknown>)=>String(row.horizon_label));
+    const indices=pathRows.map((row:Record<string,unknown>)=>Number(row.horizon_index));
+    if (
+      pathRows.length !== 5
+      || labels.some((label:string,index:number)=>label!==expectedLabels[index])
+      || indices.some((index:number,position:number)=>index!==position)
+    ) {
+      return json({
+        error:'EDGE Stocks G5 publication blocked: stored forecast path is incomplete or misordered',
+        code:'EDGE_G5_FORECAST_PATH_INCOMPLETE',
+        ticker:symbol,
+        recommendation_id:String(active.recommendation_id),
+        labels,
+        indices,
+      },409);
+    }
+
+    const sessions=pathRows.map((row:Record<string,unknown>,index:number)=>{
+      const tradingDate=dateOnly(row.target_trading_date);
+      const bull=numberOrNull(row.bull_probability);
+      const base=numberOrNull(row.base_probability);
+      const bear=numberOrNull(row.bear_probability);
+      const low=numberOrNull(row.outer_expected_zone_low);
+      const high=numberOrNull(row.outer_expected_zone_high);
+      const lineage=isObject(row.lineage) ? row.lineage as JsonRecord : null;
+      if (
+        !tradingDate || bull===null || base===null || bear===null
+        || low===null || high===null || low>high || !lineage
+        || Math.abs(bull+base+bear-100)>0.01
+      ) {
+        throw new Error('EDGE_G5_FORECAST_PATH_ROW_INVALID:'+expectedLabels[index]);
+      }
+      const direction=String(row.direction||'');
+      const leaders=[
+        ['BULL',bull],['BASE',base],['BEAR',bear]
+      ].sort((a,b)=>Number(b[1])-Number(a[1]));
+      if (!direction || direction!==leaders[0][0]) {
+        throw new Error('EDGE_G5_FORECAST_PATH_DIRECTION_INVALID:'+expectedLabels[index]);
+      }
+      return {
+        session_label:expectedLabels[index],
+        trading_date:tradingDate,
+        direction,
+        probabilities:{bull,base,bear},
+        expected_centre:numberOrNull(row.expected_centre),
+        expected_zone:{low,high},
+        evidence_basis:String(row.evidence_basis||''),
+        regime_context:String(row.regime_context||''),
+        verification_state:String(row.verification_state||''),
+        lineage,
+      };
+    });
+
+    const generatedAt = new Date(String(header.issued_at)).toISOString();
+    const payloadHash=String(header.payload_hash||'');
+    if (!payloadHash) {
+      return json({
+        error:'EDGE Stocks G5 publication blocked: forecast path hash missing',
+        code:'EDGE_G5_FORECAST_PATH_HASH_MISSING',
+        ticker:symbol,
+        recommendation_id:String(active.recommendation_id),
+      },409);
+    }
+    forecastSessions=sessions;
+    forecastPath={
+      version:String(header.path_version),
+      source_run_id:String(header.source_run_id),
+      generated_at:generatedAt,
+      payload_hash:payloadHash,
+      sessions:sessions.map(row=>({
+        label:row.session_label,
+        target_session:row.trading_date,
+        probabilities:row.probabilities,
+        expected_price_zone:row.expected_zone,
+        lineage_id:payloadHash+':'+String(row.session_label),
+      })),
+    };
+  }
+
   const canonicalRows = await sql`
     select canonical_key,target_trading_date,forecast_horizon,selection_status,canonical_type,
            selected_recommendation_id,selected_at,selection_reason
@@ -910,6 +1019,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    forecast_path: forecastPath,
     canonical_governance: canonical ? {
       canonical_key: canonical.canonical_key,
       target_trading_date: canonical.target_trading_date,
@@ -1020,7 +1130,8 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       },
       definitive_forecast: definitiveForecast,
       expected_price_zone: { low: numberOrNull(active.expected_price_zone_low), high: numberOrNull(active.expected_price_zone_high) },
-      forecast_horizon: forecastHorizon,
+      forecast_horizon: forecastPath ? 'D:D+4' : forecastHorizon,
+      forecast_sessions: forecastSessions,
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
       primary_action: primaryAction,
       decision_ladder: decisionLadder,
@@ -1068,7 +1179,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   // the live V1.3 report remains usable with the frozen aggregate forecast.
   // G5 acceptance stays strict everywhere else and must explicitly prove the
   // immutable five-row path before this compatibility flag is removed.
-  const errors = validateEdgeStocksResult(payload, { requireForecastPath: false });
+  const errors = validateEdgeStocksResult(payload, { requireForecastPath: forecastPath !== null });
   if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }
