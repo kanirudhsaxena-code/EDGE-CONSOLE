@@ -1,3 +1,4 @@
+import json
 import copy
 import importlib.util
 import unittest
@@ -90,7 +91,7 @@ class StoreTests(unittest.TestCase):
     def test_api_uses_curl_service_token_transport(self):
         env={'CF_ACCESS_CLIENT_ID':'cid','CF_ACCESS_CLIENT_SECRET':'secret'}
         response={'ok':True,'status':'READY'}
-        completed=SimpleNamespace(returncode=0,stdout=json.dumps(response)+'\\n201',stderr='')
+        completed=SimpleNamespace(returncode=0,stdout=json.dumps(response)+'\n201',stderr='')
         with patch.dict(m.os.environ,env,clear=False), patch.object(m.subprocess,'run',return_value=completed) as run:
             result=m.api('POST','https://example.invalid/api',{'a':1})
         self.assertEqual(result,response)
@@ -103,7 +104,7 @@ class StoreTests(unittest.TestCase):
         self.assertNotIn('secret',completed.stdout)
 
     def test_api_fails_closed_on_non_2xx(self):
-        completed=SimpleNamespace(returncode=0,stdout='{"error":"forbidden"}\\n403',stderr='')
+        completed=SimpleNamespace(returncode=0,stdout='{"error":"forbidden"}\n403',stderr='')
         with patch.dict(m.os.environ,{'CF_ACCESS_CLIENT_ID':'cid','CF_ACCESS_CLIENT_SECRET':'secret'},clear=False), patch.object(m.subprocess,'run',return_value=completed):
             with self.assertRaisesRegex(ValueError,'HTTP 403'):
                 m.api('POST','https://example.invalid/api',{'a':1})
