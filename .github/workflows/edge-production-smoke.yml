@@ -131,6 +131,28 @@ jobs:
             200)
               echo 'CURRENT_DAY_REUSE' > /tmp/ltf-invoke-mode
               ;;
+            202)
+              echo 'FRESH_RESEARCH_DISPATCHED' > /tmp/ltf-invoke-mode
+              python - <<'PY' > /tmp/ltf-dispatch.env
+          import json,shlex
+          d=json.load(open('/tmp/ltf-existing.json'))
+          assert d.get('status')=='DISPATCHED', d
+          assert d.get('ticker')=='LTF', d
+          assert d.get('next'), d
+          print('EDGE_STATUS_URL='+shlex.quote(str(d['next'])))
+          PY
+              source /tmp/ltf-dispatch.env
+              completed=false
+              for attempt in $(seq 1 48); do
+                curl --location --fail --silent --show-error "${AUTH[@]}" \
+                  "$BASE$EDGE_STATUS_URL" -o /tmp/ltf-dispatch-status.json
+                state="$(python -c "import json; print(str(json.load(open('/tmp/ltf-dispatch-status.json')).get('status','')))")"
+                if [ "$state" = "COMPLETE" ]; then completed=true; break; fi
+                if [ "$state" = "FAILED" ]; then cat /tmp/ltf-dispatch-status.json; exit 1; fi
+                sleep 5
+              done
+              test "$completed" = "true"
+              ;;
             409)
               echo 'PREPUBLISH_FAIL_CLOSED' > /tmp/ltf-invoke-mode
               ;;
@@ -174,6 +196,11 @@ jobs:
               run_dt=datetime.fromisoformat(str(invoke['run_timestamp']).replace('Z','+00:00')).astimezone(ZoneInfo('Asia/Kolkata'))
               now=datetime.now(timezone.utc).astimezone(ZoneInfo('Asia/Kolkata'))
               assert run_dt.date()==now.date(), (run_dt, now)
+          elif mode=='FRESH_RESEARCH_DISPATCHED':
+              assert invoke.get('status')=='DISPATCHED', invoke
+              assert invoke.get('ticker')=='LTF', invoke
+              assert invoke.get('research_bundle_id'), invoke
+              assert report.get('run_id'), report
           elif mode=='PREPUBLISH_FAIL_CLOSED':
               assert invoke.get('code')=='EDGE_RESEARCH_BUNDLE_REQUIRED', invoke
               assert invoke.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1', invoke
