@@ -1,0 +1,7 @@
+{
+  "module": "EDGE_STOCKS",
+  "capture_only": true,
+  "ticker": "CUPID",
+  "expected_result_id": "EDGE-CUPID-20261002-171606-AUTO",
+  "require_g5_parity": true
+}
