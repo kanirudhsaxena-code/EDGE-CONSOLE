@@ -225,6 +225,11 @@ jobs:
                   assert r.get('direction')==str(s.get('direction')), {'label':label,'rendered':r,'source':s}
                   assert float(r.get('zone_low'))==float(zone.get('low')), {'label':label,'rendered':r,'source':s}
                   assert float(r.get('zone_high'))==float(zone.get('high')), {'label':label,'rendered':r,'source':s}
+                  probs=s.get('probabilities') or {}
+                  assert float(r.get('bull'))==float(probs.get('bull')), {'label':label,'rendered':r,'source':s}
+                  assert float(r.get('base'))==float(probs.get('base')), {'label':label,'rendered':r,'source':s}
+                  assert float(r.get('bear'))==float(probs.get('bear')), {'label':label,'rendered':r,'source':s}
+                  assert abs(float(r.get('bull'))+float(r.get('base'))+float(r.get('bear'))-100.0)<=0.01, r
                   assert r.get('session_label')!='D+5',r
               expected_id=os.environ.get('EXPECTED_RESULT_ID','').strip()
               if expected_id:

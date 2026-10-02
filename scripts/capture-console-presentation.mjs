@@ -87,6 +87,9 @@ try{
           direction:node.getAttribute('data-edge-direction')||'',
           zone_low:node.getAttribute('data-edge-zone-low')||'',
           zone_high:node.getAttribute('data-edge-zone-high')||'',
+          bull:node.getAttribute('data-edge-bull')||'',
+          base:node.getAttribute('data-edge-base')||'',
+          bear:node.getAttribute('data-edge-bear')||'',
           text:node.innerText||''
         }));
       });
