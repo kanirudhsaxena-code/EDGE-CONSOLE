@@ -449,29 +449,22 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
     researchBundleId = saved.bundleId;
-  } else if (forceNew) {
+  } else {
     const fresh = await latestFreshEdgeResearchBundle(env, ticker, canonicalAttempt ? 90 : 24 * 60);
     researchBundleId = fresh?.bundleId;
     if (!researchBundleId) {
       return json({
         error: canonicalAttempt
           ? 'A pre-open canonical EDGE run requires a valid ChatGPT research bundle refreshed within the last 90 minutes'
-          : 'A fresh governed EDGE run was requested, but no valid ChatGPT research bundle from the last 24 hours is available for this ticker',
+          : 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch; no valid bundle from the last 24 hours is available for this ticker',
         code: canonicalAttempt ? 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED' : 'EDGE_RESEARCH_BUNDLE_REQUIRED',
         contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
         ticker,
-        fresh_run_requested: true,
+        fresh_run_requested: forceNew,
         canonical_attempt: canonicalAttempt,
         canonical_attempt_slot: canonicalAttemptSlot
       }, 409);
     }
-  } else {
-    return json({
-      error: 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch',
-      code: 'EDGE_RESEARCH_BUNDLE_REQUIRED',
-      contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-      ticker
-    }, 409);
   }
 
   const baseline = await latestEdgeRecommendation(env, ticker);
