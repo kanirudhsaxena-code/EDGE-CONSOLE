@@ -3,6 +3,7 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
+import { buildEdgeStockForecastReadModel } from './edge-stock-forecast-read';
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
@@ -748,6 +749,37 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ? researchPayload.claims.filter(isObject)
     : [];
 
+  const forecastHeaderRows = await sql`
+    select path_version,source_run_id,issued_at,payload_hash
+      from edge_stock_forecast_paths
+     where recommendation_id = ${String(active.recommendation_id)}
+     limit 1
+  `;
+  const forecastRowValues = forecastHeaderRows.length ? await sql`
+    select horizon_index,horizon_label,target_trading_date,direction,
+           bull_probability,base_probability,bear_probability,expected_centre,
+           outer_expected_zone_low,outer_expected_zone_high,evidence_basis,
+           regime_context,verification_state,lineage
+      from edge_stock_forecast_path_rows
+     where recommendation_id = ${String(active.recommendation_id)}
+     order by horizon_index asc
+  ` : [];
+  let forecastReadModel: ReturnType<typeof buildEdgeStockForecastReadModel>;
+  try {
+    forecastReadModel = buildEdgeStockForecastReadModel(
+      forecastHeaderRows.length ? forecastHeaderRows[0] : null,
+      forecastRowValues,
+      String(active.recommendation_id),
+    );
+  } catch (error) {
+    return json({
+      error: 'EDGE Stocks G5 forecast-path readback blocked',
+      detail: error instanceof Error ? error.message : String(error),
+      ticker: symbol,
+      recommendation_id: String(active.recommendation_id),
+    }, 409);
+  }
+
   const des = numberOrNull(active.des);
   const marketTrust = numberOrNull(active.resolved_market_trust_score);
   const directionalAgreement = numberOrNull(active.directional_agreement_score);
@@ -910,6 +942,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    forecast_path: forecastReadModel?.forecastPath ?? null,
     canonical_governance: canonical ? {
       canonical_key: canonical.canonical_key,
       target_trading_date: canonical.target_trading_date,
@@ -1020,7 +1053,8 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       },
       definitive_forecast: definitiveForecast,
       expected_price_zone: { low: numberOrNull(active.expected_price_zone_low), high: numberOrNull(active.expected_price_zone_high) },
-      forecast_horizon: forecastHorizon,
+      forecast_horizon: forecastReadModel ? 'D:D+4' : forecastHorizon,
+      forecast_sessions: forecastReadModel?.forecastSessions,
       risk_override: { status: overrideCode ? 'ACTIVE' : 'CLEAR', code: overrideCode },
       primary_action: primaryAction,
       decision_ladder: decisionLadder,
@@ -1064,11 +1098,11 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     drilldown
   };
 
-  // Lane-1 continuity firewall: until the genuine G5 D:D+4 producer is promoted,
-  // the live V1.3 report remains usable with the frozen aggregate forecast.
-  // G5 acceptance stays strict everywhere else and must explicitly prove the
-  // immutable five-row path before this compatibility flag is removed.
-  const errors = validateEdgeStocksResult(payload, { requireForecastPath: false });
+  // Genuine G5 rows are strict: once an immutable path exists for the active
+  // recommendation, the Console must publish that exact five-session read model.
+  // Legacy recommendations created before G5 persistence remain readable without
+  // synthesizing or backfilling a forecast path.
+  const errors = validateEdgeStocksResult(payload, { requireForecastPath: Boolean(forecastReadModel) });
   if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }
