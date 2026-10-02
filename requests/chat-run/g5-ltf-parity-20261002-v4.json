@@ -1,0 +1,7 @@
+{
+  "module": "EDGE_STOCKS",
+  "ticker": "LTF",
+  "capture_only": true,
+  "require_g5_parity": true,
+  "expected_result_id": "EDGE-LTF-20261002-171436-AUTO"
+}
