@@ -4,8 +4,8 @@ import hashlib
 import json
 import os
 import re
+import subprocess
 import sys
-import urllib.request
 from datetime import datetime, timezone
 
 BASE = 'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke'
@@ -37,21 +37,44 @@ def assert_fresh(timestamp):
         raise ValueError('research outside existing freshness window')
 
 
-class NoRedirect(urllib.request.HTTPRedirectHandler):
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        raise ValueError('protected API redirected; refusing credential forwarding')
-
-
 def api(method, url, body=None):
-    headers = {'Content-Type': 'application/json',
-               'CF-Access-Client-Id': os.environ['CF_ACCESS_CLIENT_ID'],
-               'CF-Access-Client-Secret': os.environ['CF_ACCESS_CLIENT_SECRET']}
-    if not all(headers.values()):
+    client_id = os.environ.get('CF_ACCESS_CLIENT_ID', '')
+    client_secret = os.environ.get('CF_ACCESS_CLIENT_SECRET', '')
+    if not client_id or not client_secret:
         raise ValueError('required service credentials unavailable')
-    data = None if body is None else json.dumps(body, ensure_ascii=False, separators=(',', ':')).encode()
-    request = urllib.request.Request(url, data=data, headers=headers, method=method)
-    with urllib.request.build_opener(NoRedirect()).open(request, timeout=60) as response:
-        return json.load(response)
+
+    args = [
+        'curl', '--location', '--silent', '--show-error', '--max-time', '60',
+        '-H', 'Content-Type: application/json',
+        '-H', 'Accept: application/json',
+        '-H', f'CF-Access-Client-Id: {client_id}',
+        '-H', f'CF-Access-Client-Secret: {client_secret}',
+        '-X', method,
+        '-w', '\\n%{http_code}',
+    ]
+    payload = None
+    if body is not None:
+        args += ['--data-binary', '@-']
+        payload = json.dumps(body, ensure_ascii=False, separators=(',', ':'))
+    args.append(url)
+
+    proc = subprocess.run(args, input=payload, text=True, capture_output=True, timeout=70)
+    raw = proc.stdout or ''
+    body_text, sep, code_text = raw.rpartition('\n')
+    try:
+        status = int(code_text.strip()) if sep else 0
+    except ValueError:
+        status = 0
+    if proc.returncode != 0 or not 200 <= status < 300:
+        detail = (body_text or proc.stderr or 'no response body').strip()[:1200]
+        raise ValueError(f'protected API request failed: HTTP {status or 0}: {detail}')
+    try:
+        decoded = json.loads(body_text)
+    except json.JSONDecodeError as exc:
+        raise ValueError('protected API returned invalid JSON') from exc
+    if not isinstance(decoded, dict):
+        raise ValueError('protected API returned non-object JSON')
+    return decoded
 
 
 def store(request, transport=api):
