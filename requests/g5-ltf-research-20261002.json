@@ -1,0 +1,216 @@
+{
+  "command": "EDGE LTF",
+  "research_only": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-02T14:44:00.798009+00:00",
+    "research_fresh_at": "2026-10-02T14:44:00.798009+00:00",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-q1",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/docs/default-source/default-document-library/q1fy27_financial_results_press_release_financials.pdf",
+        "title": "LTF Q1FY27 financial results press release",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": "2026-07-10T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-q1-corroboration",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.moneycontrol.com/news/business/earnings/lt-finance-consolidated-june-2026-net-sales-at-rs-5212-92-crore-up-22-38-y-o-y-13988153.html",
+        "title": "LTF consolidated June 2026 reported results",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-pine",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/docs/default-source/corporatedisclosure/l-t-finance-partners-with-pine-labs-to-introduce-agentic-commerce-and-payments-on-l-t-finance-planet-app_9th-september-2026.pdf",
+        "title": "LTF Pine Labs partnership",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": "2026-09-09T00:00:00+05:30",
+        "event_date": "2026-09-09T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-insurance",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/legal/litigation/indias-insurance-overhaul-what-changes-why-it-matters-2026-09-24/",
+        "title": "Reuters explainer: proposed insurance distribution reforms",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": "2026-09-24T00:00:00+05:30",
+        "event_date": "2026-09-23T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-insurance-air",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://newsonair.gov.in/irdai-proposes-overhaul-of-insurance-distribution-framework-safeguards-against-insurance-mis-selling/",
+        "title": "Akashvani: IRDAI proposed distribution framework",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-insurance-impact",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/commentary/breakingviews/indias-big-insurance-overhaul-will-test-demand-2026-09-29/",
+        "title": "Reuters Breakingviews: insurance overhaul and distributor reaction",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": "2026-09-29T00:00:00+05:30",
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-macro",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/rbi-raise-interest-rates-550-october-inflation-broadens-2026-09-28/",
+        "title": "Reuters economist poll: October RBI rate risk",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": "2026-09-28T00:00:00+05:30",
+        "event_date": "2026-09-28T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-screener",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/LTF/consolidated/",
+        "title": "LTF consolidated financials, valuation snapshot and ownership",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-ownership",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.sharekhan.com/stock/landt-finance-ltd",
+        "title": "LTF June 2026 shareholding announcement summary",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": null,
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ltf-calendar",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.tickertape.in/stocks/landt-finance-holdings-LTFH",
+        "title": "LTF October 15 board-meeting intimation",
+        "retrieved_at": "2026-10-02T14:44:00.798009+00:00",
+        "publication_date": null,
+        "event_date": "2026-10-15T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "For the June 2026 quarter LTF reported consolidated PAT of about Rs902 crore, up29% YoY, retail book growth28%, GS3 2.86% and NS3 0.90%. This is historical operating improvement, published July10; it is not a newly announced October earnings catalyst.",
+        "source_ids": [
+          "ltf-q1",
+          "ltf-q1-corroboration"
+        ],
+        "direction": "POSITIVE",
+        "materiality": "HIGH",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "The retrieved Screener snapshot dated October1 shows P/E20.7 and book value about Rs112 at a rounded Rs264 price. These secondary-source ratios are valuation context, not proof of undervaluation or a price target; do not substitute them for governed Upstox pricing.",
+        "source_ids": [
+          "ltf-screener"
+        ],
+        "direction": "NEUTRAL",
+        "materiality": "MODERATE",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-ownership-claim",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June2026 ownership shows FII7.71% and DII14.90%, versus7.64% and14.91% in March; combined22.61% is corroborated by the shareholding announcement summary. This historical, nearly flat ownership mix does not establish current-session institutional buying.",
+        "source_ids": [
+          "ltf-screener",
+          "ltf-ownership"
+        ],
+        "direction": "NEUTRAL",
+        "materiality": "MODERATE",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-partnership",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "LTF announced the Pine Labs PLANET payments/agentic-commerce partnership on September9. The announcement is verified but no quantified incremental earnings are established; it must not be recycled as an October2 announcement.",
+        "source_ids": [
+          "ltf-pine"
+        ],
+        "direction": "POSITIVE",
+        "materiality": "MODERATE",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-insurance-risk",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "IRDAI proposed distribution commission limits and anti-bundling reforms in September; Reuters identifies LTF among affected distributor-linked shares. This is a verified adverse regulatory-risk development, not an enacted final rule or a quantified LTF earnings loss. The proposal remains subject to consultation, with feedback due October25.",
+        "source_ids": [
+          "ltf-insurance",
+          "ltf-insurance-air",
+          "ltf-insurance-impact"
+        ],
+        "direction": "NEGATIVE",
+        "materiality": "HIGH",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-rate-risk",
+        "evidence_category": "SECTOR_MACRO",
+        "statement": "The September28 Reuters poll reports expectations of an RBI increase at the October5-7 meeting. This is a poll, not an implemented rate hike. Funding-cost risk for a lender is an analytical inference; no future policy outcome is asserted.",
+        "source_ids": [
+          "ltf-macro",
+          "ltf-q1"
+        ],
+        "direction": "NEGATIVE",
+        "materiality": "HIGH",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-calendar-claim",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Retrieved meeting-intimation summaries identify October15 as the board date for September-quarter results. This is a scheduled event, not completed results, and sits beyond the immediate five-session horizon beginning after October2.",
+        "source_ids": [
+          "ltf-calendar",
+          "ltf-screener"
+        ],
+        "direction": "BINARY_UNCERTAIN",
+        "materiality": "MODERATE",
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Freshness refers to this native ChatGPT web research session, not the age of underlying company events. Date-only publications/events use local midnight for representation, not a claimed publication time.",
+      "No live Upstox dataset, pricing, ATR, liquidity or sector factor is supplied by this research artifact; the candidate must independently acquire and validate these.",
+      "No assertion of current institutional flow or fair value. Corporate primary facts take precedence over secondary summary metrics. No production recommendation is created by storage.",
+      "The insurance proposal and future monetary-policy outcome remain uncertain; verified claims establish the proposal/poll and risk, not enactment or numerical financial impact.",
+      "Prior recommendation/efficacy context is not retrieved in this research-only submission; production orchestration must retain its existing assessment-first requirements."
+    ]
+  }
+}
