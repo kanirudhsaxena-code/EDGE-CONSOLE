@@ -25,3 +25,14 @@ Fail-closed rules:
 - Missing assessment-first output or meaningful VERIFIED interpretation: no production acceptance.
 
 Exa is optional and must never be a single point of failure or authority. Upstox is a supporting provider and cannot self-validate its own material research claims.
+
+## Candidate validation: store research before dispatch
+
+The existing `edge-chat-requests` bridge accepts `research_only: true` alongside
+`command` and `research_bundle`. This mode calls the existing governed research
+storage API and requires exact READY payload readback; it never invokes EDGE or
+publishes a recommendation. The workflow allocates a content-addressed bundle ID
+when omitted, without changing evidence, verification or freshness timestamps.
+Server-side V1 validation remains authoritative. Default requests retain the
+existing invocation behavior. Candidate runs can resolve the stored eligible
+bundle automatically; users do not need to construct or copy bundle IDs.
