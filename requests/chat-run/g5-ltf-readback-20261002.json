@@ -1,0 +1,6 @@
+{
+  "module": "EDGE_STOCKS",
+  "ticker": "LTF",
+  "capture_only": true,
+  "require_g5_parity": true
+}
