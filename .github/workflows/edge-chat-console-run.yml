@@ -96,6 +96,23 @@ jobs:
           else:
               assert isinstance(d.get('command'),str) and d['command'].upper().startswith('EDGE '), d
               bundle=d.get('research_bundle'); assert isinstance(bundle,dict), d
+              # G5 E is fail-closed. Reject an incomplete Chat/UAT bundle before
+              # dispatch rather than misclassifying a harness omission as an
+              # engine failure. Independent web attribution is required.
+              sources={
+                  str(s.get('source_id')):s
+                  for s in bundle.get('sources',[])
+                  if isinstance(s,dict) and s.get('source_id')
+              }
+              event_claims=[]
+              for claim in bundle.get('claims',[]):
+                  if not isinstance(claim,dict): continue
+                  if str(claim.get('evidence_category','')).upper()!='EVENT_SHOCK': continue
+                  if str(claim.get('verification_status','')).upper()!='VERIFIED': continue
+                  used=[sources.get(str(sid)) for sid in claim.get('source_ids',[])]
+                  if any(isinstance(src,dict) and str(src.get('provider','')).upper() in {'CHATGPT_WEB','EXA'} for src in used):
+                      event_claims.append(claim)
+              assert event_claims, {'research_bundle_blocker':'G5 EVENT_SHOCK independently verified research is required before user dispatch'}
               payload={'command':d['command'],'force_new':True,'research_bundle':bundle}
               open('/tmp/invoke.json','w').write(json.dumps(payload))
           PY

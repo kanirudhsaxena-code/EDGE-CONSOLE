@@ -80,6 +80,21 @@ test('dispatches lightweight assessment refresh with no request payload',async()
   assert.equal(String(seenInit?.body).includes('secret-value'),false);
 });
 
+test('assessment refresh uses dedicated 5DR repository even when acquisition proxies use EDGE V1',async()=>{
+  let seenUrl='';
+  const fetcher=async(url:RequestInfo|URL)=>{seenUrl=String(url);return new Response(null,{status:204});};
+  const result=await dispatch5drAssessmentRefresh({
+    GITHUB_ACTIONS_TOKEN:'secret-value',
+    FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    FIVEDR_ASSESSMENT_REPOSITORY:'kanirudhsaxena-code/5DR-V2',
+    FIVEDR_ASSESSMENT_WORKFLOW:'assessment-refresh.yml'
+  },fetcher as typeof fetch);
+  assert.equal(result.ok,true);
+  assert.equal(result.repository,'kanirudhsaxena-code/5DR-V2');
+  assert.match(seenUrl,/5DR-V2\/actions\/workflows\/assessment-refresh\.yml\/dispatches$/);
+  assert.doesNotMatch(seenUrl,/EDGE---V1/);
+});
+
 test('assessment refresh dispatch fails closed without GitHub credential',async()=>{
   const result=await dispatch5drAssessmentRefresh({},async()=>new Response(null,{status:204}) as any);
   assert.equal(result.ok,false);

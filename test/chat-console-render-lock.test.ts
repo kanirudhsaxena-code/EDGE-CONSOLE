@@ -60,3 +60,9 @@ test('EDGE NIFTY Chat capture expands full analysis before reading Console text'
   assert.match(workflow,/What could change the view\?/);
   assert.match(workflow,/Future performance scorecard/);
 });
+
+test('Chat stock UAT preflights independently verified Event-Shock research before dispatch',()=>{
+  assert.match(workflow,/G5 EVENT_SHOCK independently verified research is required before user dispatch/);
+  assert.match(workflow,/evidence_category.*EVENT_SHOCK/);
+  assert.match(workflow,/CHATGPT_WEB.*EXA/);
+});

@@ -5,6 +5,7 @@ export type EngineDispatchEnv={
   FIVEDR_ACQUIRE_WORKFLOW?:string;
   FIVEDR_PREOPEN_ACQUIRE_WORKFLOW?:string;
   FIVEDR_ASSESSMENT_WORKFLOW?:string;
+  FIVEDR_ASSESSMENT_REPOSITORY?:string;
   FIVEDR_WORKFLOW_REF?:string;
   FIVEDR_CALLBACK_URL?:string;
 };
@@ -75,9 +76,10 @@ async function dispatchWorkflow(
   env:EngineDispatchEnv,
   workflow:string,
   inputs:Record<string,string>,
-  fetcher:typeof fetch
+  fetcher:typeof fetch,
+  repositoryOverride?:string
 ):Promise<EngineDispatchResult>{
-  const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
+  const repository=repositoryOverride?.trim()||env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
   const ref=env.FIVEDR_WORKFLOW_REF?.trim()||DEFAULT_REF;
   const token=env.GITHUB_ACTIONS_TOKEN?.trim();
   if(!token)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'GitHub workflow dispatch secret is not configured'};
@@ -109,7 +111,8 @@ export async function dispatch5drAssessmentRefresh(
   fetcher:typeof fetch=fetch
 ):Promise<EngineDispatchResult>{
   const workflow=env.FIVEDR_ASSESSMENT_WORKFLOW?.trim()||DEFAULT_ASSESSMENT_WORKFLOW;
-  return dispatchWorkflow(env,workflow,{},fetcher);
+  const repository=env.FIVEDR_ASSESSMENT_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
+  return dispatchWorkflow(env,workflow,{},fetcher,repository);
 }
 
 export async function dispatch5drPreopenAcquisition(
