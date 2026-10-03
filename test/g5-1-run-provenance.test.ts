@@ -10,7 +10,7 @@ test('5DR Console persists acquisition provenance independently from canonical a
   assert.match(mobile,/run_provenance:/);
   assert.match(mobile,/trigger_type:canonicalAttempt\?'SCHEDULED':'USER'/);
   assert.match(mobile,/automatedRunProvenance\(body\)/);
-  assert.match(mobile,/run_provenance: isObject\(metadata\.run_provenance\)/);
+  assert.match(router,/run_provenance: isObject\(metadata\.run_provenance\)/);
 });
 
 test('EDGE report exposes persisted provenance and separate all-run efficacy',()=>{
