@@ -1,26 +1,30 @@
 {
   "acceptance_date_ist": "2026-10-04",
-  "errors": [
-    {
-      "error": "AssertionError: NIFTY production run did not complete inside closure window",
-      "task": "nifty"
+  "errors": [],
+  "generated_at": "2026-10-03T23:21:42.770231Z",
+  "nifty": {
+    "framework_version": "5DR_V2_1",
+    "g1_market_evidence": "PASS",
+    "g2_system_research": "PASS",
+    "g3_intelligence_reconciliation": "PASS",
+    "g4_normalized_dispatch": "PASS",
+    "g5_result_sync_publish": "PASS",
+    "output_contract_version": "5DR_V2_1_2",
+    "provenance": {
+      "benchmark_role": "NONE",
+      "evidence_mode": "CLOSED_SESSION",
+      "market_session_as_of": "2026-10-04",
+      "research_as_of": "2026-10-03T23:17:32.171608+00:00",
+      "target_session": null,
+      "trigger_type": "USER"
     },
-    {
-      "error": "AssertionError: LTF Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:01.302Z\"}",
-      "task": "LTF"
-    },
-    {
-      "error": "AssertionError: CUPID Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:58.293Z\"}",
-      "task": "CUPID"
-    },
-    {
-      "error": "AssertionError: RELIANCE Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:11:51.794Z\"}",
-      "task": "RELIANCE"
-    }
-  ],
-  "generated_at": "2026-10-03T23:12:34.978694Z",
+    "published": true,
+    "request_id": "5drreq_670b2c8b-49a5-41d2-a94e-6e3b1494c556",
+    "run_id": "5drrun_7d773cfd-6971-42f0-9682-dda93652f1a4",
+    "status": "PASS"
+  },
   "point_9_smoke": {
-    "checked_at": "2026-10-03T22:59:56.536136Z",
+    "checked_at": "2026-10-03T23:16:29.088670Z",
     "dispatch": "READY",
     "health": "READY",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V1",
@@ -28,10 +32,10 @@
   },
   "points": {
     "10": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "11": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "12": {
       "status": "FUTURE_LIVE_PROOF_REQUIRED",
@@ -42,9 +46,100 @@
       "status": "PASS"
     },
     "9": {
-      "status": "FAIL"
+      "status": "PASS"
     }
   },
   "schema": "MDOS_G5_1_CLOSURE_PROOF_V1",
-  "stocks": {}
+  "stocks": {
+    "CUPID": {
+      "contract_version": "EDGE_STOCKS_V1_3",
+      "forecast_horizon": "D:D+4",
+      "forecast_path_hash": "817c202b6efe122cd93cfc5a1f7f6b775ab48a721a559222e808b4e976557cfa",
+      "g1_fresh_research": "PASS",
+      "g2_bundle_validation": "PASS",
+      "g3_frozen_compute": "PASS",
+      "g4_governance_persistence": "PASS",
+      "g5_immutable_D_D4_presentation": "PASS",
+      "presentation_contract": "EFFICACY_V2",
+      "provenance": {
+        "benchmark_role": "NONE",
+        "candidate_type": "USER_CANONICAL_SNAPSHOT",
+        "evidence_mode": "CLOSED_SESSION",
+        "market_session_as_of": "2026-10-01T00:00:00.000Z",
+        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "target_session": "2026-10-05T00:00:00.000Z",
+        "trigger_type": "USER"
+      },
+      "research_bundle_id": "g51-closure-cupid-20261004",
+      "result_id": "EDGE-CUPID-20261003-232009-AUTO",
+      "session_labels": [
+        "D",
+        "D+1",
+        "D+2",
+        "D+3",
+        "D+4"
+      ],
+      "status": "PASS"
+    },
+    "LTF": {
+      "contract_version": "EDGE_STOCKS_V1_3",
+      "forecast_horizon": "D:D+4",
+      "forecast_path_hash": "92e9ccca56b3fa6a2b70552ac7c9d0397c96cbd99517ed364656885f298d6183",
+      "g1_fresh_research": "PASS",
+      "g2_bundle_validation": "PASS",
+      "g3_frozen_compute": "PASS",
+      "g4_governance_persistence": "PASS",
+      "g5_immutable_D_D4_presentation": "PASS",
+      "presentation_contract": "EFFICACY_V2",
+      "provenance": {
+        "benchmark_role": "NONE",
+        "candidate_type": "USER_CANONICAL_SNAPSHOT",
+        "evidence_mode": "CLOSED_SESSION",
+        "market_session_as_of": "2026-10-01T00:00:00.000Z",
+        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "target_session": "2026-10-05T00:00:00.000Z",
+        "trigger_type": "USER"
+      },
+      "research_bundle_id": "g51-closure-ltf-20261004",
+      "result_id": "EDGE-LTF-20261003-231916-AUTO",
+      "session_labels": [
+        "D",
+        "D+1",
+        "D+2",
+        "D+3",
+        "D+4"
+      ],
+      "status": "PASS"
+    },
+    "RELIANCE": {
+      "contract_version": "EDGE_STOCKS_V1_3",
+      "forecast_horizon": "D:D+4",
+      "forecast_path_hash": "9b86fc2d8b759212f314a2370bf32901c6d1025e6c8745fec0852802ee145a49",
+      "g1_fresh_research": "PASS",
+      "g2_bundle_validation": "PASS",
+      "g3_frozen_compute": "PASS",
+      "g4_governance_persistence": "PASS",
+      "g5_immutable_D_D4_presentation": "PASS",
+      "presentation_contract": "EFFICACY_V2",
+      "provenance": {
+        "benchmark_role": "NONE",
+        "candidate_type": "USER_CANONICAL_SNAPSHOT",
+        "evidence_mode": "CLOSED_SESSION",
+        "market_session_as_of": "2026-10-01T00:00:00.000Z",
+        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "target_session": "2026-10-05T00:00:00.000Z",
+        "trigger_type": "USER"
+      },
+      "research_bundle_id": "g51-closure-reliance-20261004",
+      "result_id": "EDGE-RELIANCE-20261003-232102-AUTO",
+      "session_labels": [
+        "D",
+        "D+1",
+        "D+2",
+        "D+3",
+        "D+4"
+      ],
+      "status": "PASS"
+    }
+  }
 }

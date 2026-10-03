@@ -5,35 +5,18 @@
       "basis": "authoritative 5DR assessment handoff refresh repaired and consumed by completed NIFTY execution"
     },
     "9": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "10": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "11": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "12": {
       "status": "FUTURE_LIVE_PROOF_REQUIRED",
       "target_date_ist": "2026-10-05"
     }
   },
-  "errors": [
-    {
-      "task": "nifty",
-      "error": "AssertionError: NIFTY production run did not complete inside closure window"
-    },
-    {
-      "task": "LTF",
-      "error": "AssertionError: LTF Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:01.302Z\"}"
-    },
-    {
-      "task": "CUPID",
-      "error": "AssertionError: CUPID Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:58.293Z\"}"
-    },
-    {
-      "task": "RELIANCE",
-      "error": "AssertionError: RELIANCE Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:11:51.794Z\"}"
-    }
-  ]
+  "errors": []
 }
