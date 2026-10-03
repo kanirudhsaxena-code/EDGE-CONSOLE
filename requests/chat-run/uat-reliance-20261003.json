@@ -1,0 +1,86 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat-reliance-20261003-1055",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-03T10:55:00Z",
+    "research_fresh_at": "2026-10-03T10:55:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-announcements",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investor/resource-center/corporate-announcements",
+        "title": "Reliance Industries Corporate Announcements",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "ril-financial-reporting",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/financial-reporting",
+        "title": "Reliance Industries Financial Reporting",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "ril-bond-demand",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/state-bank-india-buys-nearly-40-reliances-135-billion-debt-sale-2026-09-30/",
+        "title": "State Bank of India buys nearly 40% of Reliance's $1.35 billion debt sale",
+        "retrieved_at": "2026-10-03T10:55:00Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-ncd-oct1",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Reliance Industries' corporate-announcements page records allotment of Non-Convertible Debentures (PPD Series R) dated October 1, 2026.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-announcements"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ril-ratings",
+        "evidence_category": "VALUATION",
+        "statement": "Reliance's financial-reporting page lists top-tier domestic long-term debt ratings including CRISIL AAA and CARE AAA.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-financial-reporting"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ril-bond-demand",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Reuters reported that State Bank of India purchased nearly 40% of Reliance's recent 130-billion-rupee 10-year bond issue, indicating strong institutional demand for the debt offering.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-bond-demand"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "Closed-session user test: current equity price, volume and technical evidence must be supplied by the governed EDGE market-data path rather than inferred from Saturday web research."
+    ]
+  }
+}
