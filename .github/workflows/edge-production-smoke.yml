@@ -30,7 +30,7 @@ jobs:
               -o /tmp/deployed-index.html \
               && grep -q 'EDGE_STOCKS_V1_3' /tmp/edge-live.js \
               && grep -q 'edge-user-output' /tmp/edge-live.js \
-              && grep -q 'Official canonical status' /tmp/edge-live.js \
+              && grep -q 'Benchmark status' /tmp/edge-live.js \
               && grep -q 'Outcome checks recorded' /tmp/edge-live.js \
               && grep -q '5-DAY DIRECTION' /tmp/edge-live.js \
               && grep -q 'EXPECTED 5-DAY RANGE' /tmp/edge-live.js \
@@ -221,7 +221,7 @@ jobs:
           grep -q '5-DAY DIRECTION' /tmp/edge-live.js
           grep -q 'EXPECTED 5-DAY RANGE' /tmp/edge-live.js
           grep -q 'WHY IT MATTERS' /tmp/edge-live.js
-          grep -q 'Official canonical status' /tmp/edge-live.js
+          grep -q 'Benchmark status' /tmp/edge-live.js
           grep -q 'OFFICIAL metrics use selected CLOSED/scorable recommendations only' /tmp/edge-live.js
           ! grep -q '<b>Outcome:</b>' /tmp/edge-live.js
           grep -q 'Call date/time:' /tmp/edge-live.js

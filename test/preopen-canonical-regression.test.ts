@@ -5,6 +5,8 @@ import fs from 'node:fs';
 const nifty=fs.readFileSync('.github/workflows/5dr-preopen-canonical.yml','utf8');
 const stocks=fs.readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
 const entry=fs.readFileSync('src/production-entry.ts','utf8');
+const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
+const router=fs.readFileSync('src/router.ts','utf8');
 
 function assertProtectedSchedule(workflow:string){
   // Legacy GitHub jobs remain manual-only. Cloudflare Cron is the timing authority;
@@ -52,4 +54,31 @@ test('production wrapper preserves canonical orchestration fallback',()=>{
   assert.match(entry,/return mobile\.fetch\(request, env\)/);
   assert.doesNotMatch(entry,/url\.pathname === '\/api\/5dr\/automated-runs'/);
   assert.doesNotMatch(entry,/url\.pathname === '\/api\/edge-stocks\/invoke'/);
+});
+
+
+test('persisted NIFTY pre-open proof is queryable without exposing full metadata',()=>{
+  assert.match(mobile,/\/api\/5dr\/preopen-status/);
+  assert.match(mobile,/metadata->'canonical_attempt'->>'key'/);
+  assert.match(mobile,/canonical_attempt_key/);
+  assert.match(mobile,/run_provenance/);
+  assert.match(mobile,/benchmark_role/);
+  assert.match(mobile,/published/);
+  assert.match(mobile,/trading_enabled:false/);
+  const proofHelper=mobile.slice(mobile.indexOf('async function preopenStatus'),mobile.indexOf('export default {async fetch'));
+  assert.ok(proofHelper.length>0);
+  assert.ok(!proofHelper.includes('metadata:metadata'));
+  assert.ok(!proofHelper.includes('metadata: metadata'));
+  assert.ok(!proofHelper.includes('return json({metadata'));
+
+});
+
+
+test('persisted EDGE Stocks pre-open proof is queryable by ticker and date',()=>{
+  assert.match(router,/\/api\/edge-stocks\/preopen-status/);
+  assert.match(router,/edgeStocksPreopenStatus/);
+  assert.match(router,/PREOPEN_CANONICAL/);
+  assert.match(router,/SESSION_PREOPEN/);
+  assert.match(router,/edge_canonical_selections/);
+  assert.match(router,/observed_candidates/);
 });

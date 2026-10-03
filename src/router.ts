@@ -1286,6 +1286,69 @@ async function edgeStocksMaster(env: Env): Promise<Response> {
   return json({ master: rows[0] ?? null, labels: { official: 'OFFICIAL', provisional: 'PROVISIONAL' } });
 }
 
+async function edgeStocksPreopenStatus(env:Env,tickerRaw:string,dateRaw:string):Promise<Response>{
+  if(!env.EDGE_DATABASE_URL)return json({error:'EDGE database is not configured'},503);
+  const ticker=tickerRaw.trim().toUpperCase();
+  const targetDate=dateRaw.trim();
+  if(!/^[A-Z0-9._&-]{1,20}$/.test(ticker))return json({error:'ticker is invalid'},422);
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(targetDate))return json({error:'date=YYYY-MM-DD is mandatory'},422);
+  const parsed=new Date(targetDate+'T00:00:00Z');
+  if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==targetDate)return json({error:'date is invalid'},422);
+  const sql=neon(env.EDGE_DATABASE_URL);
+  const rows=await sql`
+    select g.recommendation_id,g.canonical_key,g.candidate_type,g.target_trading_date,
+           g.requested_at,g.completed_at,g.research_fresh_at,g.fallback_reason,
+           g.trigger_type,g.evidence_mode,g.market_session_as_of,g.benchmark_role,
+           r.run_timestamp,r.forecast_horizon
+      from edge_recommendation_governance g
+      join recommendations r using(recommendation_id)
+     where g.ticker=${ticker}
+       and g.target_trading_date=${targetDate}::date
+     order by g.requested_at desc
+  `;
+  const bounded=rows.map((row:any)=>({
+    recommendation_id:String(row.recommendation_id),
+    canonical_key:row.canonical_key,
+    candidate_type:row.candidate_type,
+    target_trading_date:row.target_trading_date,
+    requested_at:row.requested_at,
+    completed_at:row.completed_at,
+    research_fresh_at:row.research_fresh_at,
+    trigger_type:row.trigger_type,
+    evidence_mode:row.evidence_mode,
+    market_session_as_of:row.market_session_as_of,
+    benchmark_role:row.benchmark_role,
+    forecast_horizon:row.forecast_horizon,
+    fallback_reason:row.fallback_reason??null
+  }));
+  const preopen=bounded.find((row:any)=>
+    row.candidate_type==='PREOPEN_CANONICAL'&&
+    row.trigger_type==='SCHEDULED'&&
+    row.evidence_mode==='PREOPEN'&&
+    row.benchmark_role==='SESSION_PREOPEN'
+  )??null;
+  let selection:any=null;
+  if(preopen?.canonical_key){
+    const selected=await sql`
+      select selection_status,canonical_type,selected_recommendation_id,selected_at,selection_reason
+        from edge_canonical_selections
+       where canonical_key=${preopen.canonical_key}
+       limit 1
+    `;
+    selection=selected.length?selected[0]:null;
+  }
+  return json({
+    status:preopen?'PREOPEN_CANDIDATE_COMPLETE':'MISSING',
+    ticker,
+    target_date:targetDate,
+    preopen,
+    canonical_selection:selection,
+    observed_candidates:bounded,
+    trading_enabled:false
+  },preopen?200:404);
+}
+
+
 export default { async fetch(request: Request, env: Env): Promise<Response> {
   const url = new URL(request.url);
   if (url.pathname === '/api/5dr/run-requests' && request.method === 'POST') return readinessGate(request, env);
@@ -1305,6 +1368,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   const researchBundle = url.pathname.match(/^\/api\/edge-stocks\/research-bundles\/([^/]+)$/);
   if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
   if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
+  if (url.pathname === '/api/edge-stocks/preopen-status' && request.method === 'GET') return edgeStocksPreopenStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('date') || '');
   if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
