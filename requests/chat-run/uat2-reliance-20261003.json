@@ -1,0 +1,67 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat2-reliance-20261003-1150",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-03T11:50:00Z",
+    "research_fresh_at": "2026-10-03T11:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-shareholders",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/shareholders-information",
+        "title": "Reliance Industries Shareholders Information",
+        "retrieved_at": "2026-10-03T11:50:00Z"
+      },
+      {
+        "source_id": "energy-risk-20261002",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/business/energy/crude-oil-tanker-struck-by-unknown-projectile-off-oman-ukmto-says-2026-10-02/",
+        "title": "Crude oil tanker struck by unknown projectile off Oman, UKMTO says",
+        "retrieved_at": "2026-10-03T11:50:00Z",
+        "publication_date": "2026-10-02T00:00:00Z",
+        "event_date": "2026-10-02T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-event-neutral",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Reliance Industries' reviewed shareholder information lists recent credit-rating and investor-meeting disclosures; those cited disclosures do not by themselves establish a severe company-specific event shock.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-shareholders"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ril-event-energy-risk",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "A reported tanker strike off Oman adds negative geopolitical and energy-market risk relevant to an oil-and-gas exposed company, without establishing a Reliance-specific severe event.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "energy-risk-20261002"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "Closed-session user acceptance run; current equity price and technical evidence must come from governed provider data.",
+      "The energy-risk claim is an external sector risk and not a claim of a Reliance-specific incident."
+    ]
+  }
+}
