@@ -21,6 +21,10 @@ const required=new Set<string>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const isObject=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const validIso=(value:unknown)=>typeof value==='string'&&!Number.isNaN(Date.parse(value));
 const sha256=(value:unknown)=>typeof value==='string'&&/^[0-9a-f]{64}$/i.test(value);
+const dateOnly=(value:unknown)=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value);
+const evidenceModes=new Set(['CLOSED_SESSION','PREOPEN','LIVE_INTRADAY','SESSION_FINAL']);
+const triggerTypes=new Set(['USER','SCHEDULED']);
+const benchmarkRoles=new Set(['NONE','SESSION_PREOPEN']);
 
 function forbiddenKeyPresent(value:unknown):boolean{
   if(Array.isArray(value))return value.some(forbiddenKeyPresent);
@@ -42,6 +46,14 @@ export function assessAutomatedMarketEvidence(body:unknown,expectedRequestId:str
   if(body.forecast_release_enabled!==false)errors.push('forecast_release_enabled must remain false');
   if(body.methodology_changed!==false)errors.push('methodology_changed must remain false');
   if(!validIso(body.captured_at))errors.push('captured_at must be a valid timestamp');
+  if(!triggerTypes.has(String(body.trigger_type??'')))errors.push('trigger_type is invalid');
+  if(!evidenceModes.has(String(body.evidence_mode??'')))errors.push('evidence_mode is invalid');
+  if(!dateOnly(body.market_session_as_of))errors.push('market_session_as_of must be YYYY-MM-DD');
+  if(!validIso(body.research_as_of))errors.push('research_as_of must be a valid timestamp');
+  if(body.target_session!==null&&!dateOnly(body.target_session))errors.push('target_session must be YYYY-MM-DD or null');
+  if(!benchmarkRoles.has(String(body.benchmark_role??'')))errors.push('benchmark_role is invalid');
+  if(body.trigger_type==='USER'&&body.benchmark_role!=='NONE')errors.push('user invocation cannot claim scheduled benchmark role');
+  if(body.benchmark_role==='SESSION_PREOPEN'&&(body.trigger_type!=='SCHEDULED'||body.evidence_mode!=='PREOPEN'))errors.push('SESSION_PREOPEN benchmark requires scheduled PREOPEN evidence');
   if(forbiddenKeyPresent(body))errors.push('forbidden secret/raw provider field is present');
 
   const status=String(body.status??'');
