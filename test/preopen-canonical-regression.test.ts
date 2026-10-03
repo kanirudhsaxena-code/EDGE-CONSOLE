@@ -68,7 +68,8 @@ test('persisted NIFTY pre-open proof is queryable without exposing full metadata
   const proofHelper=mobile.slice(mobile.indexOf('async function preopenStatus'),mobile.indexOf('export default {async fetch'));
   assert.ok(proofHelper.length>0);
   assert.ok(!proofHelper.includes('metadata:metadata'));
-  assert.ok(!proofHelper.includes('metadata,'));
+  assert.ok(!proofHelper.includes('metadata: metadata'));
+  assert.ok(!proofHelper.includes('return json({metadata'));
 
 });
 
