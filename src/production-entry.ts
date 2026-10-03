@@ -8,6 +8,7 @@ import { handleP0IpoCanonicalHistoryRead } from './p0-ipo-canonical-history-read
 import { handleP0CanonicalHistoryRead } from './p0-canonical-history-read';
 import { gateCanonicalHistoryResponse } from './canonical-history-release-gate';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
+import { runPreopenScheduledTick } from './preopen-scheduler';
 
 /**
  * Production entrypoint shim.
@@ -88,5 +89,8 @@ export default {
       return app.fetch(request, env);
     }
     return mobile.fetch(request, env);
+  },
+  async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runPreopenScheduledTick(env, new Date(), controller.scheduledTime));
   },
 };
