@@ -46,14 +46,6 @@ export function assessAutomatedMarketEvidence(body:unknown,expectedRequestId:str
   if(body.forecast_release_enabled!==false)errors.push('forecast_release_enabled must remain false');
   if(body.methodology_changed!==false)errors.push('methodology_changed must remain false');
   if(!validIso(body.captured_at))errors.push('captured_at must be a valid timestamp');
-  if(!triggerTypes.has(String(body.trigger_type??'')))errors.push('trigger_type is invalid');
-  if(!evidenceModes.has(String(body.evidence_mode??'')))errors.push('evidence_mode is invalid');
-  if(!dateOnly(body.market_session_as_of))errors.push('market_session_as_of must be YYYY-MM-DD');
-  if(!validIso(body.research_as_of))errors.push('research_as_of must be a valid timestamp');
-  if(body.target_session!==null&&!dateOnly(body.target_session))errors.push('target_session must be YYYY-MM-DD or null');
-  if(!benchmarkRoles.has(String(body.benchmark_role??'')))errors.push('benchmark_role is invalid');
-  if(body.trigger_type==='USER'&&body.benchmark_role!=='NONE')errors.push('user invocation cannot claim scheduled benchmark role');
-  if(body.benchmark_role==='SESSION_PREOPEN'&&(body.trigger_type!=='SCHEDULED'||body.evidence_mode!=='PREOPEN'))errors.push('SESSION_PREOPEN benchmark requires scheduled PREOPEN evidence');
   if(forbiddenKeyPresent(body))errors.push('forbidden secret/raw provider field is present');
 
   const status=String(body.status??'');
@@ -65,6 +57,14 @@ export function assessAutomatedMarketEvidence(body:unknown,expectedRequestId:str
     return {ready:false,blocked:errors.length===0,errors,observations:[]};
   }
   if(status!=='AUTOMATED_MARKET_DATA_READY')errors.push('automated evidence status is invalid');
+  if(!triggerTypes.has(String(body.trigger_type??'')))errors.push('trigger_type is invalid');
+  if(!evidenceModes.has(String(body.evidence_mode??'')))errors.push('evidence_mode is invalid');
+  if(!dateOnly(body.market_session_as_of))errors.push('market_session_as_of must be YYYY-MM-DD');
+  if(!validIso(body.research_as_of))errors.push('research_as_of must be a valid timestamp');
+  if(body.target_session!==null&&!dateOnly(body.target_session))errors.push('target_session must be YYYY-MM-DD or null');
+  if(!benchmarkRoles.has(String(body.benchmark_role??'')))errors.push('benchmark_role is invalid');
+  if(body.trigger_type==='USER'&&body.benchmark_role!=='NONE')errors.push('user invocation cannot claim scheduled benchmark role');
+  if(body.benchmark_role==='SESSION_PREOPEN'&&(body.trigger_type!=='SCHEDULED'||body.evidence_mode!=='PREOPEN'))errors.push('SESSION_PREOPEN benchmark requires scheduled PREOPEN evidence');
   if(!sha256(body.bundle_sha256))errors.push('bundle_sha256 is invalid');
   if(!observations.length)errors.push('automated evidence observations are missing');
   if(observations.length>12)errors.push('automated evidence observation count exceeds bound');
