@@ -38,7 +38,7 @@ test('assessment completeness requires D through D+4 and exact recommendation le
 
 
 test('stale handoff dispatches lightweight refresh and waits without weakening the gate',()=>{
-  assert.match(mobile,/dispatch5drAssessmentRefresh\(env,requestId,request\.url,fetch\)/);
+  assert.match(mobile,/dispatch5drAssessmentRefresh\(env,requestId,requestUrl,fetch\)/);
   assert.match(mobile,/STALE_ASSESSMENT_HANDOFF/);
   assert.match(mobile,/WAIT_FOR_ASSESSMENT_REFRESH/);
   assert.match(mobile,/assessment_refresh_dispatch/);
