@@ -1,0 +1,86 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat-ltf-20261003-1055",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-03T10:55:00Z",
+    "research_fresh_at": "2026-10-03T10:55:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-official-investors",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors",
+        "title": "L&T Finance Investors",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "ltf-official-news",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance News Room",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "ltf-market-macro",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-set-weak-october-foreign-investors-ramp-up-shorts-brokerages-say-2026-09-30/",
+        "title": "Indian shares set for weak October as foreign investors ramp up shorts, brokerages say",
+        "retrieved_at": "2026-10-03T10:55:00Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-q1-materials",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance's investor page lists Q1 FY27 financial results and investor materials for the quarter ended June 30, 2026.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-official-investors"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ltf-pine-labs",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "L&T Finance announced a partnership with Pine Labs on September 9, 2026 to introduce agentic commerce and payments on the PLANET app.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-official-news"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ltf-market-risk",
+        "evidence_category": "SECTOR_MACRO",
+        "statement": "Indian equity conditions entering October were weak, with foreign investors increasing index-future shorts and broad market pressure creating a negative macro backdrop for financial stocks.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ltf-market-macro"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "Closed-session user test: market-sensitive price/volume evidence must come from the governed EDGE market-data path; this research bundle does not represent live Saturday trading data."
+    ]
+  }
+}
