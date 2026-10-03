@@ -30,7 +30,14 @@ test('ChatGPT dispatch workflow transports a governed research bundle, not a tic
 
 test('EDGE Stocks pre-open canonical workflow is two-stage, timing-fail-closed and research-fail-closed',()=>{
   const y=fs.readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
-  assert.ok(y.includes("cron: '20,40 3 * * 1-5'"));
+  const wrangler=fs.readFileSync('wrangler.jsonc','utf8');
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(y,/workflow_dispatch:/);
+  assert.doesNotMatch(y,/\n\s*schedule:/);
+  assert.match(wrangler,/"20 3 \\* \\* 1-5"/);
+  assert.match(wrangler,/"40-44 3 \\* \\* 1-5"/);
+  assert.match(scheduler,/c\.hour===8&&c\.minute===50/);
+  assert.match(scheduler,/c\.hour===9&&c\.minute>=10&&c\.minute<=14/);
   assert.ok(y.includes('prep_start=now.replace(hour=8,minute=50'));
   assert.ok(y.includes('auction_start=now.replace(hour=9,minute=10'));
   assert.ok(y.includes('auction_cutoff=now.replace(hour=9,minute=14,second=59'));
