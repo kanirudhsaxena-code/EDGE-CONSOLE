@@ -1,5 +1,5 @@
 import router from './router';
-import { createAutomatedRun } from './mobile-v1-entry';
+import { createAutomatedRun, resumeProcessing } from './mobile-v1-entry';
 import { dispatch5drAssessmentRefresh, type EngineDispatchEnv } from './engine-dispatch';
 
 type JsonRecord=Record<string,unknown>;
@@ -99,13 +99,42 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
     })
   });
   const nifty=await createAutomatedRun(niftyRequest,env as never);
-  const niftyBody=await responseJson(nifty);
+  let niftyBody=await responseJson(nifty);
+  const niftyRequestId=String(niftyBody.request_id??(niftyBody.request as JsonRecord|undefined)?.request_id??'');
+  let niftyState=String(niftyBody.status??(niftyBody.request as JsonRecord|undefined)?.status??'');
+  let resumed:JsonRecord|null=null;
+  if(niftyRequestId&&niftyState!=='COMPLETED'){
+    const resumeRequest=new Request(`https://edge-console.internal/api/5dr/run-requests/${encodeURIComponent(niftyRequestId)}/resume-processing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:'{}'
+    });
+    const resumeResponse=await resumeProcessing(resumeRequest,env as never,niftyRequestId);
+    resumed=await responseJson(resumeResponse);
+    niftyState=String(resumed.status??niftyState);
+    if(String(resumed.adapter_stage??'')==='AUTOMATED_MARKET_DATA_BLOCKED'){
+      const retryRequest=new Request('https://edge-console.internal/api/5dr/automated-runs',{
+        method:'POST',
+        headers:{'content-type':'application/json'},
+        body:JSON.stringify({
+          force_new:true,
+          canonical_attempt:true,
+          canonical_attempt_slot:clock.slot,
+          client_invocation_id:`cf-preopen-${clock.date}`,
+          assessment:{objective:'BOTH',risk_posture:'CONSERVATIVE',capital_priority:'CAPITAL_PROTECTION'}
+        })
+      });
+      const retry=await createAutomatedRun(retryRequest,env as never);
+      niftyBody=await responseJson(retry);
+      niftyState=String(niftyBody.status??niftyState);
+    }
+  }
   console.log(JSON.stringify({
     status:'PREOPEN_NIFTY_ATTEMPT',
     slot:clock.slot,
     http_status:nifty.status,
-    request_id:niftyBody.request_id??(niftyBody.request as JsonRecord|undefined)?.request_id??null,
-    state:niftyBody.status??(niftyBody.request as JsonRecord|undefined)?.status??null,
+    request_id:niftyRequestId||null,
+    state:niftyState||null,
+    adapter_stage:niftyBody.adapter_stage??resumed?.adapter_stage??null,
+    next_step:niftyBody.next_step??resumed?.next_step??null,
     idempotent:niftyBody.idempotent??false,
     trading_enabled:false
   }));
