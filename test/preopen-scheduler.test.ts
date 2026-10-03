@@ -37,3 +37,17 @@ test('NIFTY pre-open scheduler calls canonical endpoint with daily idempotency p
   assert.match(mobile,/dispatch5drPreopenAcquisition/);
   assert.match(mobile,/UPSTOX_PREOPEN_PRIMARY/);
 });
+
+
+test('NIFTY pre-open retries recover the same daily request instead of duplicating it',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
+  assert.match(scheduler,/resumeProcessing\(resumeRequest,env as never,niftyRequestId\)/);
+  assert.match(scheduler,/AUTOMATED_MARKET_DATA_BLOCKED/);
+  assert.match(scheduler,/const retry=await createAutomatedRun/);
+  assert.match(mobile,/status in \('READY_FOR_ENGINE','PROCESSING','COMPLETED','FAILED'\)/);
+  assert.match(mobile,/retryablePreopenBlock/);
+  assert.match(mobile,/PREOPEN_ACQUISITION_RETRY/);
+  assert.match(mobile,/preopen_retry_count/);
+  assert.match(mobile,/dispatch5drPreopenAcquisition\(env,String\(row\.request_id\)/);
+});
