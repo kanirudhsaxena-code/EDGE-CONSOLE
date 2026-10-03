@@ -7,9 +7,10 @@ const stocks=fs.readFileSync('.github/workflows/edge-stocks-preopen-canonical.ym
 const entry=fs.readFileSync('src/production-entry.ts','utf8');
 
 function assertProtectedSchedule(workflow:string){
-  // 08:50 IST is preparation only. Canonical attempts are permitted only from
-  // 09:10:00 through 09:14:59 IST; runtime wall-clock is authoritative.
-  assert.match(workflow,/cron:\s*'20,40 3 \* \* 1-5'/);
+  // Legacy GitHub jobs remain manual-only. Cloudflare Cron is the timing authority;
+  // if invoked manually, runtime wall-clock still enforces 09:10:00-09:14:59 IST.
+  assert.match(workflow,/workflow_dispatch:/);
+  assert.doesNotMatch(workflow,/\n\s*schedule:/);
   assert.match(workflow,/ZoneInfo\("Asia\/Kolkata"\)/);
   assert.match(workflow,/replace\(hour=8,minute=50,second=0,microsecond=0\)/);
   assert.match(workflow,/replace\(hour=9,minute=10,second=0,microsecond=0\)/);

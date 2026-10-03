@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {check5drWorkflowAccess,dispatch5drAssessmentRefresh,dispatch5drEngine} from '../src/engine-dispatch';
+import {check5drWorkflowAccess,dispatch5drAssessmentRefresh,dispatch5drPreopenAcquisition,dispatch5drEngine} from '../src/engine-dispatch';
 
 test('fails closed when dispatch token is absent',async()=>{
   const result=await dispatch5drEngine({},'5drreq_test','https://edge-console.example.test/api/5dr/run-requests/5drreq_test/normalized',async()=>new Response(null,{status:204}) as any);
@@ -84,4 +84,20 @@ test('assessment refresh dispatch fails closed without GitHub credential',async(
   const result=await dispatch5drAssessmentRefresh({},async()=>new Response(null,{status:204}) as any);
   assert.equal(result.ok,false);
   assert.equal(result.status,'CONFIGURATION_BLOCKED');
+});
+
+
+test('dispatches dedicated pre-open acquisition workflow',async()=>{
+  let seenUrl='';let seenInit:RequestInit|undefined;
+  const fetcher=async(url:RequestInfo|URL,init?:RequestInit)=>{seenUrl=String(url);seenInit=init;return new Response(null,{status:204});};
+  const result=await dispatch5drPreopenAcquisition(
+    {GITHUB_ACTIONS_TOKEN:'secret-value',FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',FIVEDR_PREOPEN_ACQUIRE_WORKFLOW:'5dr-console-preopen-acquire-proxy.yml'},
+    '5drreq_test',
+    'https://edge-console.example.test/api/5dr/automated-runs',
+    fetcher as typeof fetch
+  );
+  assert.equal(result.ok,true);
+  assert.match(seenUrl,/5dr-console-preopen-acquire-proxy\.yml\/dispatches$/);
+  const body=JSON.parse(String(seenInit?.body));
+  assert.deepEqual(body,{ref:'main',inputs:{request_id:'5drreq_test',console_url:'https://edge-console.example.test'}});
 });

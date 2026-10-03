@@ -2,9 +2,6 @@ name: EDGE NIFTY Pre-open Canonical Attempts
 
 on:
   workflow_dispatch:
-  schedule:
-    # UTC: 03:20 = 08:50 IST prep; 03:40 = 09:10 IST auction attempt.
-    - cron: '20,40 3 * * 1-5'
 
 permissions:
   contents: read
