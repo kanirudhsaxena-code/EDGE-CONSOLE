@@ -1,0 +1,71 @@
+name: G5.1 Monday Pre-open Proof
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '50 3 5 10 *'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: g5-1-monday-preopen-proof
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Verify persisted 2026-10-05 pre-open evidence
+        id: proof
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          python scripts/g5-1-preopen-proof.py | tee /tmp/g5-1-preopen-proof.log
+
+      - name: Preserve pre-open proof on dedicated state branch
+        if: always()
+        run: |
+          set -euo pipefail
+          test -s /tmp/g5-1-preopen-proof.json
+          git fetch origin state/g5-1-preopen-proof
+          rm -rf /tmp/g5-1-preopen-state
+          git worktree add /tmp/g5-1-preopen-state origin/state/g5-1-preopen-proof
+          cd /tmp/g5-1-preopen-state
+          mkdir -p runtime
+          cp /tmp/g5-1-preopen-proof.json runtime/g5-1-preopen-proof.json
+          cp /tmp/g5-1-preopen-proof.log runtime/g5-1-preopen-proof.log
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add runtime/g5-1-preopen-proof.json runtime/g5-1-preopen-proof.log
+          if git diff --cached --quiet; then
+            echo "preopen_proof_state_unchanged"
+          else
+            git commit -m "Record G5.1 Monday pre-open proof [skip ci]"
+            git push origin HEAD:state/g5-1-preopen-proof
+          fi
+
+      - name: Upload bounded pre-open artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: g5-1-monday-preopen-proof
+          path: |
+            /tmp/g5-1-preopen-proof.json
+            /tmp/g5-1-preopen-proof.log
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Enforce Monday live proof
+        if: always()
+        run: test "${{ steps.proof.outcome }}" = "success"
