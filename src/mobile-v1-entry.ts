@@ -33,6 +33,17 @@ function decisionSetup(body:unknown):{value?:Record<string,unknown>;error?:strin
   return {value:{horizon:'D+1_TO_D+5',objective,risk_posture,capital_priority,assessed_at:new Date().toISOString()}};
 }
 
+function automatedRunProvenance(body:Record<string,unknown>):Record<string,unknown>{
+  return {
+    trigger_type:body.trigger_type??null,
+    evidence_mode:body.evidence_mode??null,
+    market_session_as_of:body.market_session_as_of??null,
+    research_as_of:body.research_as_of??null,
+    target_session:body.target_session??null,
+    benchmark_role:body.benchmark_role??null,
+  };
+}
+
 function automatedMarketObservations(metadata:Record<string,unknown>):Record<string,unknown>[]{
   const automated=isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence:{};
   return automated.status==='AUTOMATED_MARKET_DATA_READY'&&Array.isArray(automated.observations)
@@ -223,6 +234,14 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot},
+    run_provenance:{
+      trigger_type:canonicalAttempt?'SCHEDULED':'USER',
+      evidence_mode:canonicalAttempt?'PREOPEN':null,
+      market_session_as_of:null,
+      research_as_of:null,
+      target_session:null,
+      benchmark_role:canonicalAttempt?'SESSION_PREOPEN':'NONE'
+    },
     canonical_attempt:canonicalAttempt?{type:'PREOPEN_CANONICAL_ATTEMPT',key:canonicalAttemptKey,slot:canonicalAttemptSlot,requested_at:new Date().toISOString()}:null,
     adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
   };
@@ -259,7 +278,13 @@ async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:
     return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',blockers:isObject(body)&&Array.isArray(body.blockers)?body.blockers:[],next_step:'USE_SCREENSHOT_BACKUP'});
   }
   if(!gate.ready)return json({error:'Automated market evidence is not ready'},409);
-  const next={...metadata,automated_market_evidence:envelope,freshness_at:isObject(body)?body.captured_at:null,adapter_stage:'AUTOMATED_MARKET_DATA_READY'};
+  const next={
+    ...metadata,
+    automated_market_evidence:envelope,
+    run_provenance:isObject(body)?automatedRunProvenance(body):metadata.run_provenance,
+    freshness_at:isObject(body)?body.captured_at:null,
+    adapter_stage:'AUTOMATED_MARKET_DATA_READY'
+  };
   await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(next)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
   const research=await systemResearch(env,requestId);
   const researchBody=await responseJson(research);

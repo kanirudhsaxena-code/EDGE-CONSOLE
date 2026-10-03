@@ -229,6 +229,8 @@ export function renderEdgeV13(report){
   if(Math.abs(sum-100)>0.02)throw new Error('EDGE probabilities do not total 100');
 
   const master=r.master_assessment||{},stock=master.stock_assessment||{};
+  const allRun=master.all_run_efficacy||{},stockAllRun=stock.all_run_efficacy||{};
+  const provenance=r.run_provenance||{};
   const calls=Array.isArray(r.active_calls)?r.active_calls:[];
   const drill=Array.isArray(r.drilldown)?r.drilldown:[];
   const previous=stock.previous_recommendation||null;
@@ -247,7 +249,9 @@ export function renderEdgeV13(report){
   const govTarget=gov.target_trading_date?new Date(String(gov.target_trading_date)).toLocaleDateString('en-IN'):'—';
   const govSelected=gov.current_run_is_selected===true;
   const govMissed=String(gov.canonical_type||'').toUpperCase()==='CANONICAL_MISSED'||String(gov.selection_status||'').toUpperCase()==='CANONICAL_MISSED';
-  const canonicalCard='<div class="scorecard-context canonical-status-card"><span>Official canonical status</span><strong>'+esc(govType)+' · '+esc(govTarget)+'</strong><p>'+(govMissed?'No qualifying canonical was selected for this target. The displayed stock call remains informational/tracked and does not create a new official efficacy observation.':(govSelected?'This displayed recommendation is the selected canonical for its target key and is eligible for official efficacy when mature.':'The displayed run is not the selected canonical for the latest governed target; it does not add to official efficacy.'))+'</p></div>';
+  const userSnapshot=String(provenance.candidate_type||'').toUpperCase()==='USER_CANONICAL_SNAPSHOT';
+  const canonicalCard='<div class="scorecard-context canonical-status-card"><span>Benchmark status</span><strong>'+esc(govType)+' · '+esc(govTarget)+'</strong><p>'+(govMissed?'No qualifying session benchmark was selected for this target. The displayed run remains stored and assessable in all-run efficacy when scorable.':(govSelected?'This displayed recommendation is the selected session benchmark and is eligible for benchmark efficacy when mature.':(userSnapshot?'This is a valid user canonical snapshot. It remains stored and assessable in all-run efficacy, but it does not replace the standardized session benchmark.':'The displayed run is not the selected session benchmark; it remains tracked under its governed run classification.')))+'</p></div>';
+  const provenanceCard='<div class="scorecard-context canonical-status-card"><span>Run provenance</span><strong>'+esc(human(provenance.trigger_type||'—'))+' · '+esc(human(provenance.evidence_mode||'—'))+'</strong><p>Market evidence through '+esc(provenance.market_session_as_of?String(provenance.market_session_as_of):'—')+' · Research through '+esc(provenance.research_as_of?dateTimeText(provenance.research_as_of):'—')+' · Target session '+esc(provenance.target_session?String(provenance.target_session):'—')+' · Benchmark role '+esc(human(provenance.benchmark_role||'NONE'))+'.</p></div>';
 
   const previousCard=previous
     ? '<div class="edge-previous-call"><div><span>Previous call</span><strong>'+esc(userForecastLabel(previous.definitive_forecast))+'</strong><small>'+esc(human(previous.definitive_recommendation||'—'))+'</small></div><div><span>What happened?</span><strong>'+esc(human(previous.outcome_verdict||previous.lifecycle_status||'Open'))+'</strong><small>'+(previous.current_return_pct==null?'Still being tracked':'Move since that earlier call: '+esc(pct(previous.current_return_pct))+(String(previous.outcome_verdict||previous.lifecycle_status||'').toUpperCase()==='OPEN'?' · still provisional':'') )+'</small></div></div>'
@@ -269,10 +273,17 @@ export function renderEdgeV13(report){
       metricCard('Provisional direction',Number(master.provisional_forecast_scorable||0)?pct(master.provisional_forecast_accuracy_pct):'Not enough history',(master.provisional_forecast_hits??0)+' / '+(master.provisional_forecast_scorable??0)+' scorable checkpoint hits')+
       metricCard('Provisional price zone',Number(master.provisional_zone_scorable||0)?pct(master.provisional_zone_accuracy_pct):'Not enough history',(master.provisional_zone_hits??0)+' / '+(master.provisional_zone_scorable??0)+' scorable zone hits')+
     '</div>'+
+    '<div class="step-label">ALL VALID PRODUCTION RUNS · SEPARATE FROM SESSION BENCHMARK</div>'+
+    '<div class="edge-key-grid">'+
+      metricCard('All-run recommendations',allRun.recommendations??'N/A',(allRun.open_recommendations??0)+' OPEN / '+(allRun.closed_recommendations??0)+' CLOSED · every valid governed run, not only the benchmark.')+
+      metricCard('All-run recommendation hit rate',Number(allRun.scorable_recommendations||0)?pct(allRun.recommendation_hit_rate_pct):'N/A',(allRun.scorable_recommendations??0)+' scorable resolved runs; NOT DUE / NOT SCORABLE remain outside the denominator.')+
+      metricCard('All-run direction / target',Number(allRun.scorable_recommendations||0)?(pct(allRun.direction_hit_rate_pct)+' / '+pct(allRun.target_hit_rate_pct)):'N/A','Separate diagnostic population; benchmark metrics above remain standardized one-per-session.')+
+    '</div>'+
     '<div class="step-label">SELECTED STOCK · '+esc(r.ticker||'—')+'</div>'+
     previousCard+
     '<div class="edge-key-grid">'+
       metricCard('Tracked calls',stock.recommendations??0,(stock.open_recommendations??0)+' OPEN / '+(stock.closed_recommendations??0)+' CLOSED')+
+      metricCard('All-run stock efficacy',Number(stockAllRun.scorable_recommendations||0)?pct(stockAllRun.recommendation_hit_rate_pct):'N/A',(stockAllRun.recommendations??0)+' valid runs · '+(stockAllRun.scorable_recommendations??0)+' scorable resolved runs')+
       metricCard('Official recommendation accuracy',official?pct(stock.recommendation_hit_rate_pct):'N/A',official?(official+' closed/scorable recommendation'+(official===1?'':'s')+'.'):'0 closed/scorable · not yet a percentage')+
       metricCard('Directional / target hit rate',official?(pct(stock.direction_hit_rate_pct)+' / '+pct(stock.target_hit_rate_pct)):'N/A','Direction correctness / defined target attainment.')+
       metricCard('Average gain / loss',official?(pct(stock.avg_gain_pct)+' / '+pct(stock.avg_loss_pct)):'N/A','Standardized resolved recommendation results.')+
@@ -286,6 +297,7 @@ export function renderEdgeV13(report){
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
     '<div class="edge-result-hero"><div class="result-kicker">3 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
+    provenanceCard+
     canonicalCard+
     '<div class="edge-decision-highlights">'+
       '<div class="edge-highlight-card direction"><span>5-DAY DIRECTION</span><strong>'+esc(userForecastLabel(d.definitive_forecast))+'</strong><small>Current price '+money(d.current_price)+'</small></div>'+

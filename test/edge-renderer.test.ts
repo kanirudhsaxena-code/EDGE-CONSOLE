@@ -216,10 +216,46 @@ test('current approved presentation contract validates cleanly',()=>{
 });
 
 
-test('EDGE Stocks renderer exposes canonical governance status',()=>{
+test('EDGE Stocks renderer exposes benchmark governance and all-run separation',()=>{
   const js=readFileSync('public/edge-live.js','utf8');
-  assert.ok(js.includes('Official canonical status'));
+  assert.ok(js.includes('Benchmark status'));
   assert.ok(js.includes('OFFICIAL metrics use selected CLOSED/scorable recommendations only'));
-  assert.ok(js.includes('No qualifying canonical was selected for this target'));
+  assert.ok(js.includes('No qualifying session benchmark was selected for this target'));
+  assert.ok(js.includes('valid user canonical snapshot'));
+  assert.ok(js.includes('ALL VALID PRODUCTION RUNS'));
+  assert.ok(js.includes('Run provenance'));
   assert.ok(js.includes('current_run_is_selected'));
+});
+
+test('user canonical snapshot provenance is rendered without claiming benchmark status',()=>{
+  const current=structuredClone(report);
+  current.run_provenance={
+    trigger_type:'USER',
+    evidence_mode:'CLOSED_SESSION',
+    market_session_as_of:'2026-10-01',
+    research_as_of:'2026-10-04T15:30:00Z',
+    target_session:'2026-10-05',
+    benchmark_role:'NONE',
+    candidate_type:'USER_CANONICAL_SNAPSHOT'
+  };
+  current.canonical_governance={
+    canonical_type:'NOT_AVAILABLE',
+    selection_status:'NOT_AVAILABLE',
+    current_run_is_selected:false
+  };
+  current.master_assessment.all_run_efficacy={
+    recommendations:7,open_recommendations:3,closed_recommendations:4,
+    scorable_recommendations:4,recommendation_hit_rate_pct:75,
+    direction_hit_rate_pct:75,target_hit_rate_pct:50
+  };
+  current.master_assessment.stock_assessment.all_run_efficacy={
+    recommendations:3,open_recommendations:1,closed_recommendations:2,
+    scorable_recommendations:2,recommendation_hit_rate_pct:50,
+    direction_hit_rate_pct:50,target_hit_rate_pct:50
+  };
+  const html=renderEdgeV13(current);
+  assert.ok(html.includes('User · Closed Session'));
+  assert.ok(html.includes('2026-10-01'));
+  assert.ok(html.includes('valid user canonical snapshot'));
+  assert.ok(html.includes('All-run recommendation hit rate'));
 });

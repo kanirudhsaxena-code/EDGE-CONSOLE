@@ -295,6 +295,7 @@ async function fiveDrCanonicalHandoff(env: Env): Promise<Response> {
           intelligence_handoff: normalized ? { normalized } : {},
           automated_market_evidence: market,
           invocation: isObject(metadata.invocation) ? metadata.invocation : {},
+          run_provenance: isObject(metadata.run_provenance) ? metadata.run_provenance : {},
           canonical_attempt: isObject(metadata.canonical_attempt) ? metadata.canonical_attempt : null,
         },
       },
@@ -697,6 +698,32 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const master = masterRows[0] as Record<string, unknown>;
   const stock = stockRows[0] as Record<string, unknown>;
   const active = activeRows[0] as Record<string, unknown>;
+
+  let currentGovernance: Record<string, unknown> | null = null;
+  let allRunMaster: Record<string, unknown> | null = null;
+  let allRunStock: Record<string, unknown> | null = null;
+  try {
+    const governanceRows = await sql`
+      select candidate_type,target_trading_date,requested_at,research_fresh_at,
+             trigger_type,evidence_mode,market_session_as_of,benchmark_role
+        from edge_recommendation_governance
+       where recommendation_id=${String(active.recommendation_id)}
+       limit 1
+    `;
+    currentGovernance = governanceRows.length ? governanceRows[0] as Record<string, unknown> : null;
+  } catch {
+    // Additive G5.1 migration may be staged immediately before Console deployment.
+    currentGovernance = null;
+  }
+  try {
+    const allRows = await sql`select * from v_edge_all_run_assessment limit 1`;
+    allRunMaster = allRows.length ? allRows[0] as Record<string, unknown> : null;
+    const stockAllRows = await sql`select * from v_edge_stock_all_run_assessment where ticker=${symbol} limit 1`;
+    allRunStock = stockAllRows.length ? stockAllRows[0] as Record<string, unknown> : null;
+  } catch {
+    allRunMaster = null;
+    allRunStock = null;
+  }
   const parentRecommendationId = isNonEmptyString(active.parent_recommendation_id)
     ? String(active.parent_recommendation_id)
     : null;
@@ -1019,6 +1046,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    run_provenance: currentGovernance ? {
+      trigger_type: currentGovernance.trigger_type ?? null,
+      evidence_mode: currentGovernance.evidence_mode ?? null,
+      market_session_as_of: currentGovernance.market_session_as_of ?? null,
+      research_as_of: currentGovernance.research_fresh_at ?? null,
+      target_session: currentGovernance.target_trading_date ?? null,
+      benchmark_role: currentGovernance.benchmark_role ?? null,
+      candidate_type: currentGovernance.candidate_type ?? null,
+      requested_at: currentGovernance.requested_at ?? null,
+    } : null,
     forecast_path: forecastPath,
     canonical_governance: canonical ? {
       canonical_key: canonical.canonical_key,
@@ -1043,6 +1080,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       table_4: 'DRILLDOWN'
     },
     master_assessment: {
+      all_run_efficacy: allRunMaster ? {
+        recommendations: integerOrZero(allRunMaster.recommendations),
+        unique_stocks: integerOrZero(allRunMaster.unique_stocks),
+        open_recommendations: integerOrZero(allRunMaster.open_recommendations),
+        closed_recommendations: integerOrZero(allRunMaster.closed_recommendations),
+        scorable_recommendations: integerOrZero(allRunMaster.scorable_recommendations),
+        recommendation_hit_rate_pct: numberOrNull(allRunMaster.recommendation_hit_rate_pct),
+        direction_hit_rate_pct: numberOrNull(allRunMaster.direction_hit_rate_pct),
+        target_hit_rate_pct: numberOrNull(allRunMaster.target_hit_rate_pct),
+      } : null,
       recommendations: integerOrZero(master.recommendations),
       unique_stocks: integerOrZero(master.unique_stocks),
       open_recommendations: integerOrZero(master.open_recommendations),
@@ -1068,6 +1115,15 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       provisional_zone_accuracy_pct: numberOrNull(master.provisional_zone_accuracy_pct),
       stock_assessment: {
         ticker: symbol,
+        all_run_efficacy: allRunStock ? {
+          recommendations: integerOrZero(allRunStock.recommendations),
+          open_recommendations: integerOrZero(allRunStock.open_recommendations),
+          closed_recommendations: integerOrZero(allRunStock.closed_recommendations),
+          scorable_recommendations: integerOrZero(allRunStock.scorable_recommendations),
+          recommendation_hit_rate_pct: numberOrNull(allRunStock.recommendation_hit_rate_pct),
+          direction_hit_rate_pct: numberOrNull(allRunStock.direction_hit_rate_pct),
+          target_hit_rate_pct: numberOrNull(allRunStock.target_hit_rate_pct),
+        } : null,
         recommendations: integerOrZero(stock.recommendations),
         open_recommendations: integerOrZero(stock.open_recommendations),
         closed_recommendations: integerOrZero(stock.closed_recommendations),

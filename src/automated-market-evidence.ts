@@ -21,6 +21,10 @@ const required=new Set<string>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const isObject=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
 const validIso=(value:unknown)=>typeof value==='string'&&!Number.isNaN(Date.parse(value));
 const sha256=(value:unknown)=>typeof value==='string'&&/^[0-9a-f]{64}$/i.test(value);
+const dateOnly=(value:unknown)=>typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value);
+const evidenceModes=new Set(['CLOSED_SESSION','PREOPEN','LIVE_INTRADAY','SESSION_FINAL']);
+const triggerTypes=new Set(['USER','SCHEDULED']);
+const benchmarkRoles=new Set(['NONE','SESSION_PREOPEN']);
 
 function forbiddenKeyPresent(value:unknown):boolean{
   if(Array.isArray(value))return value.some(forbiddenKeyPresent);
@@ -53,6 +57,14 @@ export function assessAutomatedMarketEvidence(body:unknown,expectedRequestId:str
     return {ready:false,blocked:errors.length===0,errors,observations:[]};
   }
   if(status!=='AUTOMATED_MARKET_DATA_READY')errors.push('automated evidence status is invalid');
+  if(!triggerTypes.has(String(body.trigger_type??'')))errors.push('trigger_type is invalid');
+  if(!evidenceModes.has(String(body.evidence_mode??'')))errors.push('evidence_mode is invalid');
+  if(!dateOnly(body.market_session_as_of))errors.push('market_session_as_of must be YYYY-MM-DD');
+  if(!validIso(body.research_as_of))errors.push('research_as_of must be a valid timestamp');
+  if(body.target_session!==null&&!dateOnly(body.target_session))errors.push('target_session must be YYYY-MM-DD or null');
+  if(!benchmarkRoles.has(String(body.benchmark_role??'')))errors.push('benchmark_role is invalid');
+  if(body.trigger_type==='USER'&&body.benchmark_role!=='NONE')errors.push('user invocation cannot claim scheduled benchmark role');
+  if(body.benchmark_role==='SESSION_PREOPEN'&&(body.trigger_type!=='SCHEDULED'||body.evidence_mode!=='PREOPEN'))errors.push('SESSION_PREOPEN benchmark requires scheduled PREOPEN evidence');
   if(!sha256(body.bundle_sha256))errors.push('bundle_sha256 is invalid');
   if(!observations.length)errors.push('automated evidence observations are missing');
   if(observations.length>12)errors.push('automated evidence observation count exceeds bound');
