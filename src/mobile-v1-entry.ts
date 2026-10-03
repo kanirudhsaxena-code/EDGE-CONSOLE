@@ -2,7 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import router from './router';
 import { uploadCategorizedEvidence } from './categorized-evidence-upload';
 import { analyzeScreenshot, probeVisionReadiness, type ScreenshotCategory } from './vision-producer';
-import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drAssessmentRefresh, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
+import { check5drWorkflowAccess, dispatch5drAcquisition, dispatch5drPreopenAcquisition, dispatch5drAssessmentRefresh, dispatch5drEngine, type EngineDispatchEnv } from './engine-dispatch';
 import { sync5drAcquisitionResult, sync5drEngineResult } from './engine-result-sync';
 import { acquireSystemResearch } from './system-research';
 import { produceIntelligence } from './intelligence-producer';
@@ -129,7 +129,7 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
   return null;
 }
 
-async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
+export async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const dispatchHealth=await check5drWorkflowAccess(env,fetch);
   if(!dispatchHealth.ok)return json({error:'5DR automated dispatch is not ready',code:'FIVEDR_DISPATCH_NOT_READY',dispatch_health:dispatchHealth,next_step:'FIX_5DR_GITHUB_ACTIONS_PERMISSION'},503);
@@ -145,6 +145,34 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
   const sql=neon(env.DATABASE_URL);
+  const istParts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+  const canonicalAttemptKey=canonicalAttempt?`5DR:${istParts.year}-${istParts.month}-${istParts.day}:PREOPEN`:null;
+  if(canonicalAttempt&&canonicalAttemptKey){
+    const existing=await sql`
+      select request_id,status,run_id,metadata
+        from analysis_requests
+       where engine='5DR'
+         and metadata->'canonical_attempt'->>'key'=${canonicalAttemptKey}
+         and status in ('READY_FOR_ENGINE','PROCESSING','COMPLETED')
+       order by created_at desc
+       limit 1
+    `;
+    if(existing.length){
+      const row=existing[0];
+      return json({
+        ok:true,
+        fresh_run:false,
+        reused_output:true,
+        idempotent:true,
+        request_id:String(row.request_id),
+        status:String(row.status),
+        run_id:row.run_id??null,
+        canonical_attempt:true,
+        canonical_attempt_key:canonicalAttemptKey,
+        next_step:String(row.status)==='COMPLETED'?'CANONICAL_ATTEMPT_COMPLETE':'RESUME_EXISTING_CANONICAL_ATTEMPT'
+      },String(row.status)==='COMPLETED'?200:202);
+    }
+  }
   if((isAccessIdentityEnforced(env)&&actor.role==='TESTER')||sandboxRequested){
     const recent=await sql`select count(*)::int as count from analysis_requests where engine='5DR' and created_at>now()-interval '60 seconds' and metadata->'actor'->>'id'=${runActor.id}`;
     if(Number(recent[0]?.count??0)>=3)return json({error:'Run limit reached. Try again after the current minute.'},429);
@@ -157,15 +185,17 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     sandbox_requested:sandboxRequested,
     decision_setup:setup.value,
     evidence_file_count:0,
-    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
+    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot},
-    canonical_attempt:canonicalAttempt?{type:'PREOPEN_CANONICAL_ATTEMPT',slot:canonicalAttemptSlot,requested_at:new Date().toISOString()}:null,
+    canonical_attempt:canonicalAttempt?{type:'PREOPEN_CANONICAL_ATTEMPT',key:canonicalAttemptKey,slot:canonicalAttemptSlot,requested_at:new Date().toISOString()}:null,
     adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
-  const dispatch=await dispatch5drAcquisition(env,requestId,request.url,fetch);
+  const dispatch=canonicalAttempt
+    ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
+    :await dispatch5drAcquisition(env,requestId,request.url,fetch);
   const acquisitionDispatch={...dispatch,attempted_at:new Date().toISOString()};
   metadata={...metadata,acquisition_dispatch:acquisitionDispatch};
   if(!dispatch.ok){
@@ -174,7 +204,7 @@ async function createAutomatedRun(request:Request,env:Env):Promise<Response>{
     return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',next_step:'AUTOMATED_MARKET_ACQUISITION'},201);
+  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',canonical_attempt_key:canonicalAttemptKey,next_step:canonicalAttempt?'PREOPEN_MARKET_ACQUISITION':'AUTOMATED_MARKET_ACQUISITION'},201);
 }
 
 async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{
