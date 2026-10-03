@@ -1,0 +1,100 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat-cupid-20261003-1055-r2",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-10-03T10:55:00Z",
+    "research_fresh_at": "2026-10-03T10:55:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "cupid-notices",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited Shareholders Notice 2026-2027",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "cupid-financials",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/financial-reports/",
+        "title": "Cupid Limited Financial Reports",
+        "retrieved_at": "2026-10-03T10:55:00Z"
+      },
+      {
+        "source_id": "cupid-nse-pledge",
+        "provider": "CHATGPT_WEB",
+        "authority": "EXCHANGE",
+        "url": "https://www.nseindia.com/companies-listing/corporate-filings-regulation-31-event?symbol=TRIVENI&tabIndex=equity",
+        "title": "NSE Regulation 31 Event Based Filings",
+        "retrieved_at": "2026-10-03T10:55:00Z",
+        "event_date": "2026-09-23T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "cupid-q2-business-update",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Cupid Limited's shareholder-notice page records a Q2 FY27 business update press-release intimation dated September 30, 2026.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-notices"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "cupid-q1-financials",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Cupid Limited's financial-reports page lists Q1 FY27 quarterly financial results for 2026-27.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "cupid-financials"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "cupid-promoter-pledge",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "NSE event-based Regulation 31 filings show a September 23, 2026 pledge-creation disclosure involving promoter Aditya Halwasiya.",
+        "materiality": "MODERATE",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "cupid-nse-pledge"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "cupid-event-screen",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Review of Cupid Limited's current shareholder notices and financial-reporting disclosures does not identify a severe company-specific event shock requiring an adverse event override.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "cupid-notices",
+          "cupid-financials"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "The NSE search URL is a dynamic event-filings page; the governed engine should rely on its own exchange/provider evidence for exact current pledge state and market-sensitive values.",
+      "Closed-session user test: no claim in this bundle represents live Saturday trading data.",
+      "Event-shock screening is based on reviewed public disclosures and does not claim absence of undisclosed events."
+    ]
+  }
+}
