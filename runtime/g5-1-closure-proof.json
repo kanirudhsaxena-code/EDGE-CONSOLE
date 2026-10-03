@@ -1,0 +1,50 @@
+{
+  "acceptance_date_ist": "2026-10-04",
+  "errors": [
+    {
+      "error": "AssertionError: NIFTY production run did not complete inside closure window",
+      "task": "nifty"
+    },
+    {
+      "error": "AssertionError: LTF Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:01.302Z\"}",
+      "task": "LTF"
+    },
+    {
+      "error": "AssertionError: CUPID Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:10:58.293Z\"}",
+      "task": "CUPID"
+    },
+    {
+      "error": "AssertionError: RELIANCE Sunday run class mismatch :: {\"trigger_type\": \"USER\", \"evidence_mode\": \"CLOSED_SESSION\", \"market_session_as_of\": \"2026-10-01T00:00:00.000Z\", \"research_as_of\": \"2026-10-03T22:53:00.000Z\", \"target_session\": \"2026-10-05T00:00:00.000Z\", \"benchmark_role\": \"NONE\", \"candidate_type\": \"OVERNIGHT_FALLBACK_CANONICAL\", \"requested_at\": \"2026-10-03T23:11:51.794Z\"}",
+      "task": "RELIANCE"
+    }
+  ],
+  "generated_at": "2026-10-03T23:12:34.978694Z",
+  "point_9_smoke": {
+    "checked_at": "2026-10-03T22:59:56.536136Z",
+    "dispatch": "READY",
+    "health": "READY",
+    "research_contract": "EDGE_RESEARCH_BUNDLE_V1",
+    "status": "PASS"
+  },
+  "points": {
+    "10": {
+      "status": "FAIL"
+    },
+    "11": {
+      "status": "FAIL"
+    },
+    "12": {
+      "status": "FUTURE_LIVE_PROOF_REQUIRED",
+      "target_date_ist": "2026-10-05"
+    },
+    "8": {
+      "basis": "authoritative 5DR assessment handoff refresh repaired and consumed by completed NIFTY execution",
+      "status": "PASS"
+    },
+    "9": {
+      "status": "FAIL"
+    }
+  },
+  "schema": "MDOS_G5_1_CLOSURE_PROOF_V1",
+  "stocks": {}
+}
