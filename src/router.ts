@@ -295,6 +295,7 @@ async function fiveDrCanonicalHandoff(env: Env): Promise<Response> {
           intelligence_handoff: normalized ? { normalized } : {},
           automated_market_evidence: market,
           invocation: isObject(metadata.invocation) ? metadata.invocation : {},
+          run_provenance: isObject(metadata.run_provenance) ? metadata.run_provenance : {},
           canonical_attempt: isObject(metadata.canonical_attempt) ? metadata.canonical_attempt : null,
         },
       },
