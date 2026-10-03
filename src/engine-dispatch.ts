@@ -108,11 +108,15 @@ function callbackOrigin(env:EngineDispatchEnv,consoleUrl:string):string|null{
 
 export async function dispatch5drAssessmentRefresh(
   env:EngineDispatchEnv,
+  requestId:string,
+  consoleUrl:string,
   fetcher:typeof fetch=fetch
 ):Promise<EngineDispatchResult>{
   const workflow=env.FIVEDR_ASSESSMENT_WORKFLOW?.trim()||DEFAULT_ASSESSMENT_WORKFLOW;
   const repository=env.FIVEDR_ASSESSMENT_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
-  return dispatchWorkflow(env,workflow,{},fetcher,repository);
+  const origin=callbackOrigin(env,consoleUrl);
+  if(!requestId.trim()||!origin)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Governed assessment refresh metadata or Console callback origin is invalid'};
+  return dispatchWorkflow(env,workflow,{request_id:requestId,console_url:origin},fetcher,repository);
 }
 
 export async function dispatch5drPreopenAcquisition(

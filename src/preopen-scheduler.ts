@@ -63,7 +63,12 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
   const clock=istClock(now);
   const [targets,assessment]=await Promise.all([
     stockTargets(env),
-    dispatch5drAssessmentRefresh(env,fetch)
+    dispatch5drAssessmentRefresh(
+      env,
+      `preopen-prep-${clock.date}`,
+      env.FIVEDR_CALLBACK_URL?.trim()||'https://edge-console.k-anirudhsaxena.workers.dev',
+      fetch
+    )
   ]);
   const cutoff=now.getTime()-90*60_000;
   const readiness=targets.map(target=>{

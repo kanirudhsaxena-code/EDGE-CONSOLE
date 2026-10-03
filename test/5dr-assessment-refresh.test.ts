@@ -38,7 +38,7 @@ test('assessment completeness requires D through D+4 and exact recommendation le
 
 
 test('stale handoff dispatches lightweight refresh and waits without weakening the gate',()=>{
-  assert.match(mobile,/dispatch5drAssessmentRefresh\(env,fetch\)/);
+  assert.match(mobile,/dispatch5drAssessmentRefresh\(env,requestId,requestUrl,fetch\)/);
   assert.match(mobile,/STALE_ASSESSMENT_HANDOFF/);
   assert.match(mobile,/WAIT_FOR_ASSESSMENT_REFRESH/);
   assert.match(mobile,/assessment_refresh_dispatch/);
@@ -52,4 +52,10 @@ test('non-stale assessment errors still fail closed at the original execution pa
   const block=mobile.slice(start,end);
   assert.match(block,/staleAssessment=packetResponse\.status===409/);
   assert.match(block,/return json\(\{\.\.\.normalizedBody,\.\.\.executionPacket\},packetResponse\.status\)/);
+});
+
+test('assessment refresh production binding uses EDGE proxy transport while preserving 5DR implementation authority',()=>{
+  const wrangler=readFileSync('wrangler.jsonc','utf8');
+  assert.match(wrangler,/"FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code\/EDGE---V1"/);
+  assert.match(wrangler,/"FIVEDR_ASSESSMENT_WORKFLOW": "5dr-assessment-refresh-proxy\.yml"/);
 });

@@ -494,7 +494,7 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
         },202);
       }
 
-      const refreshDispatch=await dispatch5drAssessmentRefresh(env,fetch);
+      const refreshDispatch=await dispatch5drAssessmentRefresh(env,requestId,requestUrl,fetch);
       const refreshRecord={...refreshDispatch,attempted_at:new Date().toISOString(),reason:'STALE_ASSESSMENT_HANDOFF'};
       const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
       const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:metadata;
