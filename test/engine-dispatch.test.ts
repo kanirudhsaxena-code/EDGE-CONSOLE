@@ -68,35 +68,41 @@ test('5DR workflow health fails closed when credential is absent',async()=>{
 });
 
 
-test('dispatches lightweight assessment refresh with no request payload',async()=>{
+test('dispatches assessment refresh with same request identity and governed Console origin',async()=>{
   let seenUrl='';let seenInit:RequestInit|undefined;
   const fetcher=async(url:RequestInfo|URL,init?:RequestInit)=>{seenUrl=String(url);seenInit=init;return new Response(null,{status:204});};
-  const result=await dispatch5drAssessmentRefresh({GITHUB_ACTIONS_TOKEN:'secret-value'},fetcher as typeof fetch);
+  const result=await dispatch5drAssessmentRefresh(
+    {GITHUB_ACTIONS_TOKEN:'secret-value'},
+    '5drreq_test',
+    'https://edge-console.example.test/api/5dr/run-requests/5drreq_test/resume-processing',
+    fetcher as typeof fetch
+  );
   assert.equal(result.ok,true);
   assert.equal(result.status,'DISPATCHED');
   assert.match(seenUrl,/5DR-V2\/actions\/workflows\/assessment-refresh\.yml\/dispatches$/);
   const body=JSON.parse(String(seenInit?.body));
-  assert.deepEqual(body,{ref:'main',inputs:{}});
+  assert.deepEqual(body,{ref:'main',inputs:{request_id:'5drreq_test',console_url:'https://edge-console.example.test'}});
   assert.equal(String(seenInit?.body).includes('secret-value'),false);
 });
 
-test('assessment refresh uses dedicated 5DR repository even when acquisition proxies use EDGE V1',async()=>{
-  let seenUrl='';
-  const fetcher=async(url:RequestInfo|URL)=>{seenUrl=String(url);return new Response(null,{status:204});};
+test('assessment refresh transport may use EDGE V1 while acquisition and canonical implementation authority remain separate',async()=>{
+  let seenUrl='';let seenInit:RequestInit|undefined;
+  const fetcher=async(url:RequestInfo|URL,init?:RequestInit)=>{seenUrl=String(url);seenInit=init;return new Response(null,{status:204});};
   const result=await dispatch5drAssessmentRefresh({
     GITHUB_ACTIONS_TOKEN:'secret-value',
     FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
-    FIVEDR_ASSESSMENT_REPOSITORY:'kanirudhsaxena-code/5DR-V2',
-    FIVEDR_ASSESSMENT_WORKFLOW:'assessment-refresh.yml'
-  },fetcher as typeof fetch);
+    FIVEDR_ASSESSMENT_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    FIVEDR_ASSESSMENT_WORKFLOW:'5dr-assessment-refresh-proxy.yml'
+  },'5drreq_test','https://edge-console.example.test',fetcher as typeof fetch);
   assert.equal(result.ok,true);
-  assert.equal(result.repository,'kanirudhsaxena-code/5DR-V2');
-  assert.match(seenUrl,/5DR-V2\/actions\/workflows\/assessment-refresh\.yml\/dispatches$/);
-  assert.doesNotMatch(seenUrl,/EDGE---V1/);
+  assert.equal(result.repository,'kanirudhsaxena-code/EDGE---V1');
+  assert.match(seenUrl,/EDGE---V1\/actions\/workflows\/5dr-assessment-refresh-proxy\.yml\/dispatches$/);
+  const body=JSON.parse(String(seenInit?.body));
+  assert.deepEqual(body.inputs,{request_id:'5drreq_test',console_url:'https://edge-console.example.test'});
 });
 
 test('assessment refresh dispatch fails closed without GitHub credential',async()=>{
-  const result=await dispatch5drAssessmentRefresh({},async()=>new Response(null,{status:204}) as any);
+  const result=await dispatch5drAssessmentRefresh({},'5drreq_test','https://edge-console.example.test',async()=>new Response(null,{status:204}) as any);
   assert.equal(result.ok,false);
   assert.equal(result.status,'CONFIGURATION_BLOCKED');
 });
