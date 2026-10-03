@@ -4,7 +4,9 @@ import fs from 'node:fs';
 
 const nifty=fs.readFileSync('.github/workflows/5dr-preopen-canonical.yml','utf8');
 const stocks=fs.readFileSync('.github/workflows/edge-stocks-preopen-canonical.yml','utf8');
-const entry=fs.readFileSync('src/production-entry.ts','utf8');\nconst mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');\nconst router=fs.readFileSync('src/router.ts','utf8');
+const entry=fs.readFileSync('src/production-entry.ts','utf8');
+const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
+const router=fs.readFileSync('src/router.ts','utf8');
 
 function assertProtectedSchedule(workflow:string){
   // Legacy GitHub jobs remain manual-only. Cloudflare Cron is the timing authority;
