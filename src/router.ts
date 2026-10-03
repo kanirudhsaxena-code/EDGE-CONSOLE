@@ -1368,7 +1368,8 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   const researchBundle = url.pathname.match(/^\/api\/edge-stocks\/research-bundles\/([^/]+)$/);
   if (researchBundle && request.method === 'GET') return getEdgeResearchBundle(env, decodeURIComponent(researchBundle[1]));
   if (url.pathname === '/api/edge-stocks/dispatch-health' && request.method === 'GET') return edgeStocksDispatchHealth(env);
-  if (url.pathname === '/api/edge-stocks/preopen-status' && request.method === 'GET') return edgeStocksPreopenStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('date') || '');\n  if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
+  if (url.pathname === '/api/edge-stocks/preopen-status' && request.method === 'GET') return edgeStocksPreopenStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('date') || '');
+  if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
   if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
