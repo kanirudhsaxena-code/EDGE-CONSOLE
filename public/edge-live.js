@@ -60,7 +60,7 @@ function stockChangeItems(report){
   const d=report.current_stock_outcome||{},items=[],z=d.expected_price_zone||{},p=d.probabilities||{},forecast=String(d.definitive_forecast||'');
   if(z.high!=null)items.push('A sustained close above '+z.high+' with stronger breadth/volume and improving directional agreement would strengthen the bullish case.');
   if(z.low!=null)items.push('A sustained close below '+z.low+' with confirming price-volume weakness would strengthen the bearish case.');
-  if(/BASE|RANGE/i.test(forecast))items.push('The current base/range forecast changes only if price accepts outside the expected D+5 zone rather than briefly touching it.');
+  if(/BASE|RANGE/i.test(forecast))items.push('The current base/range forecast changes only if price accepts outside the expected five-session zone rather than briefly touching it.');
   if(Number(d.directional_agreement||0)<65)items.push('More of the underlying signals need to point the same way before this view deserves higher confidence.');
   if(Number(d.market_trust?.score||0)<70)items.push('The evidence needs to become fresher and more consistent before the view deserves higher confidence.');
   if(d.risk_override?.status==='ACTIVE')items.push('An extra safety block is active and must clear before the setup can become actionable.');
@@ -70,7 +70,7 @@ function stockChangeItems(report){
 }
 function activeCallCards(calls,currentTicker){
   if(!Array.isArray(calls)||!calls.length)return'<p class="muted">No active calls.</p>';
-  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small><b>Call date/time:</b> '+esc(dateTimeText(c.call_timestamp))+'</small><small>Current '+money(c.current_price)+' · D+5 zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
+  return '<div class="active-call-grid">'+calls.map(c=>{const selected=String(c.ticker||'')===String(currentTicker||'');return '<div class="active-call-card '+(selected?'selected':'')+'"><div><strong>'+esc(c.ticker||'—')+'</strong><span>'+esc(human(c.definitive_forecast||'—'))+'</span></div><p>'+esc(noTrade(c.definitive_recommendation)?'No trade':human(c.definitive_recommendation||'—'))+'</p><small><b>Call date/time:</b> '+esc(dateTimeText(c.call_timestamp))+'</small><small>Current '+money(c.current_price)+' · 5-session zone '+esc(zone(c.expected_price_zone))+'</small><small>Move since call '+pct(c.current_return_pct)+' · '+esc(human(c.outcome_verdict||'OPEN'))+'</small></div>'}).join('')+'</div>'
 }
 function executionCard(d){
   const e=d.execution||{},none=String(e.instrument||'NONE')==='NONE';
@@ -290,18 +290,18 @@ export function renderEdgeV13(report){
       metricCard('MFE / MAE',official?(pct(stock.avg_mfe_pct)+' / '+pct(stock.avg_mae_pct)):'N/A','Best / worst excursion during recommendation window.')+
       metricCard('Provisional forecast tracking',forecastScorable?pct(stock.provisional_forecast_accuracy_pct):'Not enough history',forecastScorable?(forecastHits+' / '+forecastScorable+' direction checkpoints hit.'):'No completed forecast checks yet.')+
       metricCard('Provisional zone tracking',zoneScorable?pct(stock.provisional_zone_accuracy_pct):'Not enough history',zoneScorable?(zoneHits+' / '+zoneScorable+' price-zone checkpoints hit.'):'No completed zone checks yet.')+
-      metricCard('Outcome checks recorded',forecastChecks+' / '+dueChecks,'Each call is checked from D+1 through D+5; missing evidence stays unscored.')+
+      metricCard('Outcome checks recorded',forecastChecks+' / '+dueChecks,'Each call is checked across its five governed target sessions; missing evidence stays unscored.')+
     '</div>'+
     edgeStockLegends()+
   '</section>';
 
   const section2='<section class="edge-user-section" data-edge-section="current-stock-outcome">'+
-    '<div class="edge-result-hero"><div class="result-kicker">3 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D+5')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
+    '<div class="edge-result-hero"><div class="result-kicker">3 — CURRENT STOCK OUTCOME · '+esc(d.forecast_horizon||'D:D+4')+'</div><h3>'+esc(r.ticker||'—')+' decision view</h3><p class="run-timestamp">Run date/time: '+esc(dateTimeText(r.generated_at))+'</p></div>'+
     provenanceCard+
     canonicalCard+
     '<div class="edge-decision-highlights">'+
       '<div class="edge-highlight-card direction"><span>5-DAY DIRECTION</span><strong>'+esc(userForecastLabel(d.definitive_forecast))+'</strong><small>Current price '+money(d.current_price)+'</small></div>'+
-      '<div class="edge-highlight-card range"><span>EXPECTED 5-DAY RANGE</span><strong>'+esc(d.expected_price_zone?.low==null&&d.expected_price_zone?.high==null?'—':money(d.expected_price_zone?.low)+' – '+money(d.expected_price_zone?.high))+'</strong><small>Expected trading area over D+5; this is not a guaranteed target.</small></div>'+
+      '<div class="edge-highlight-card range"><span>EXPECTED 5-DAY RANGE</span><strong>'+esc(d.expected_price_zone?.low==null&&d.expected_price_zone?.high==null?'—':money(d.expected_price_zone?.low)+' – '+money(d.expected_price_zone?.high))+'</strong><small>Expected trading area over the governed D:D+4 five-session path; this is not a guaranteed target.</small></div>'+
     '</div>'+
     '<div class="probability-line edge-user-probabilities"><span class="bull">Bull <strong>'+pct(p.bull)+'</strong></span><span class="range">Base <strong>'+pct(p.base)+'</strong></span><span class="bear">Bear <strong>'+pct(p.bear)+'</strong></span></div>'+
     '<div class="edge-key-grid">'+
