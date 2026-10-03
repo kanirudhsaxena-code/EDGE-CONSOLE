@@ -153,12 +153,46 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
         from analysis_requests
        where engine='5DR'
          and metadata->'canonical_attempt'->>'key'=${canonicalAttemptKey}
-         and status in ('READY_FOR_ENGINE','PROCESSING','COMPLETED')
+         and status in ('READY_FOR_ENGINE','PROCESSING','COMPLETED','FAILED')
        order by created_at desc
        limit 1
     `;
     if(existing.length){
       const row=existing[0];
+      const existingMetadata=isObject(row.metadata)?row.metadata:{};
+      const existingStage=String(existingMetadata.adapter_stage??'');
+      const retryablePreopenBlock=existingStage==='AUTOMATED_MARKET_DATA_BLOCKED'&&['READY_FOR_ENGINE','FAILED'].includes(String(row.status));
+      if(retryablePreopenBlock){
+        const retryDispatch=await dispatch5drPreopenAcquisition(env,String(row.request_id),request.url,fetch);
+        const retryRecord={...retryDispatch,attempted_at:new Date().toISOString(),reason:'PREOPEN_ACQUISITION_RETRY',slot:canonicalAttemptSlot};
+        const priorRetryCount=Number(existingMetadata.preopen_retry_count??0);
+        const nextMetadata={
+          ...existingMetadata,
+          adapter_stage:retryDispatch.ok?'AUTOMATED_MARKET_DATA_PENDING':'AUTOMATED_MARKET_DATA_BLOCKED',
+          acquisition_dispatch:retryRecord,
+          preopen_retry_count:Number.isFinite(priorRetryCount)?priorRetryCount+1:1
+        };
+        await sql`update analysis_requests
+          set status='READY_FOR_ENGINE',
+              metadata=${JSON.stringify(nextMetadata)}::jsonb,
+              error=${retryDispatch.ok?null:JSON.stringify({stage:'PREOPEN_ACQUISITION_RETRY',detail:retryDispatch.detail??retryDispatch.status})}::jsonb,
+              updated_at=now()
+          where request_id=${String(row.request_id)}`;
+        return json({
+          ok:retryDispatch.ok,
+          fresh_run:false,
+          reused_output:true,
+          idempotent:true,
+          request_id:String(row.request_id),
+          status:'READY_FOR_ENGINE',
+          adapter_stage:nextMetadata.adapter_stage,
+          run_id:row.run_id??null,
+          canonical_attempt:true,
+          canonical_attempt_key:canonicalAttemptKey,
+          acquisition_dispatch:retryRecord,
+          next_step:retryDispatch.ok?'WAIT_FOR_PREOPEN_ACQUISITION_RETRY':'RETRY_PREOPEN_ACQUISITION_DISPATCH'
+        },retryDispatch.ok?202:503);
+      }
       return json({
         ok:true,
         fresh_run:false,
@@ -166,6 +200,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
         idempotent:true,
         request_id:String(row.request_id),
         status:String(row.status),
+        adapter_stage:existingStage||null,
         run_id:row.run_id??null,
         canonical_attempt:true,
         canonical_attempt_key:canonicalAttemptKey,
@@ -485,7 +520,7 @@ async function normalizedAndDispatch(request:Request,env:Env,requestId:string):P
   return dispatchNormalizedReady(env,requestId,request.url,normalizedBody);
 }
 
-async function resumeProcessing(request:Request,env:Env,requestId:string):Promise<Response>{
+export async function resumeProcessing(request:Request,env:Env,requestId:string):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const sql=neon(env.DATABASE_URL);
   const rows=await sql`select status,metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
