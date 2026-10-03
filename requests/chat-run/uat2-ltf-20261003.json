@@ -1,0 +1,67 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat2-ltf-20261003-1150",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-03T11:50:00Z",
+    "research_fresh_at": "2026-10-03T11:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-newsroom",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance News Room",
+        "retrieved_at": "2026-10-03T11:50:00Z"
+      },
+      {
+        "source_id": "india-market-risk-20261003",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-set-weak-october-foreign-investors-ramp-up-shorts-brokerages-say-2026-09-30/",
+        "title": "Indian shares set for weak October as foreign investors ramp up shorts, brokerages say",
+        "retrieved_at": "2026-10-03T11:50:00Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-event-neutral",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Reviewed L&T Finance official disclosures include recent business and CSR updates and do not by themselves establish a severe company-specific event shock.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-newsroom"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "ltf-event-macro-risk",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "The broader Indian equity backdrop entering October includes elevated foreign selling and short positioning, which is a negative external risk input even if no severe LTF-specific shock is established.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "india-market-risk-20261003"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "Closed-session user acceptance run. Market price/volume/technical evidence must come from governed provider data; research does not represent live Saturday trading.",
+      "Event-shock claims cover reviewed public sources and do not imply knowledge of undisclosed events."
+    ]
+  }
+}
