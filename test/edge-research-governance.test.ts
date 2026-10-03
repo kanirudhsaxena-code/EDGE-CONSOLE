@@ -34,8 +34,8 @@ test('EDGE Stocks pre-open canonical workflow is two-stage, timing-fail-closed a
   const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
   assert.match(y,/workflow_dispatch:/);
   assert.doesNotMatch(y,/\n\s*schedule:/);
-  assert.match(wrangler,/"20 3 \\* \\* 1-5"/);
-  assert.match(wrangler,/"40-44 3 \\* \\* 1-5"/);
+  assert.ok(wrangler.includes('"20 3 * * 1-5"'));
+  assert.ok(wrangler.includes('"40-44 3 * * 1-5"'));
   assert.match(scheduler,/c\.hour===8&&c\.minute===50/);
   assert.match(scheduler,/c\.hour===9&&c\.minute>=10&&c\.minute<=14/);
   assert.ok(y.includes('prep_start=now.replace(hour=8,minute=50'));
