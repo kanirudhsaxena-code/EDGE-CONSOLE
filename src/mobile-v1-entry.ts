@@ -660,6 +660,76 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
   return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
 
+async function preopenStatus(request:Request,env:Env):Promise<Response>{
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const url=new URL(request.url);
+  const targetDate=String(url.searchParams.get('date')??'').trim();
+  if(!/^\\d{4}-\\d{2}-\\d{2}$/.test(targetDate))return json({error:'date=YYYY-MM-DD is mandatory'},422);
+  const parsed=new Date(targetDate+'T00:00:00Z');
+  if(Number.isNaN(parsed.getTime())||parsed.toISOString().slice(0,10)!==targetDate)return json({error:'date is invalid'},422);
+  const canonicalAttemptKey=`5DR:${targetDate}:PREOPEN`;
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`
+    select request_id,status,run_id,metadata,created_at,updated_at
+      from analysis_requests
+     where engine='5DR'
+       and metadata->'canonical_attempt'->>'key'=${canonicalAttemptKey}
+     order by created_at desc
+     limit 1
+  `;
+  if(!rows.length)return json({
+    status:'MISSING',
+    target_date:targetDate,
+    canonical_attempt_key:canonicalAttemptKey,
+    request_id:null,
+    run_id:null,
+    published:false,
+    trading_enabled:false
+  },404);
+  const row=rows[0];
+  const metadata=isObject(row.metadata)?row.metadata:{};
+  const provenance=isObject(metadata.run_provenance)?metadata.run_provenance:{};
+  const canonicalAttempt=isObject(metadata.canonical_attempt)?metadata.canonical_attempt:{};
+  const runId=row.run_id?String(row.run_id):null;
+  const runRows=runId?await sql`
+    select published,learning_eligible,generated_at,framework_version,contract_version
+      from analysis_runs
+     where engine='5DR' and run_id=${runId}
+     limit 1
+  `:[];
+  const run=runRows.length?runRows[0]:null;
+  return json({
+    status:String(row.status),
+    target_date:targetDate,
+    canonical_attempt_key:canonicalAttemptKey,
+    request_id:String(row.request_id),
+    run_id:runId,
+    request_created_at:row.created_at,
+    request_updated_at:row.updated_at,
+    canonical_attempt:{
+      type:canonicalAttempt.type??null,
+      key:canonicalAttempt.key??null,
+      slot:canonicalAttempt.slot??null,
+      requested_at:canonicalAttempt.requested_at??null
+    },
+    run_provenance:{
+      trigger_type:provenance.trigger_type??null,
+      evidence_mode:provenance.evidence_mode??null,
+      market_session_as_of:provenance.market_session_as_of??null,
+      research_as_of:provenance.research_as_of??null,
+      target_session:provenance.target_session??null,
+      benchmark_role:provenance.benchmark_role??null
+    },
+    published:run?run.published===true:false,
+    learning_eligible:run?run.learning_eligible===true:false,
+    generated_at:run?.generated_at??null,
+    framework_version:run?.framework_version??null,
+    contract_version:run?.contract_version??null,
+    trading_enabled:false
+  });
+}
+
+
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
@@ -667,7 +737,7 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
   if(exactRequest&&request.method==='GET')return exact5drRequest(request,env,decodeURIComponent(exactRequest[1]));
   const scopedRead=await scoped5drRead(request,env);if(scopedRead)return scopedRead;
-  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
+  if(url.pathname==='/api/5dr/preopen-status'&&request.method==='GET')return preopenStatus(request,env);\n  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
   const automatedMarket=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/automated-market-evidence$/);
