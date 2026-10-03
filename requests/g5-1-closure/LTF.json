@@ -1,0 +1,66 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "g51-closure-ltf-20261004",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-03T22:53:00Z",
+    "research_fresh_at": "2026-10-03T22:53:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-src-1",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/l%26t-finance-holdings-ltd./stocksupdate/companyid-30050.cms?from=mdr",
+        "title": "L&T Finance company business update and corporate announcements",
+        "retrieved_at": "2026-10-03T22:53:00Z",
+        "publication_date": "2026-10-03T13:04:00Z",
+        "event_date": "2026-10-03T13:04:00Z"
+      },
+      {
+        "source_id": "ltf-src-2",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance News Room",
+        "retrieved_at": "2026-10-03T22:53:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-claim-1",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "L&T Finance disclosed a Q2 FY2026-27 company business update on 3 October 2026.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-src-1"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-claim-2",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance's official newsroom shows continuing FY2026-27 operating and distribution initiatives, including recent Q2-period business announcements.",
+        "materiality": "LOW",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-src-2"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Closure-run research records only directly verified public disclosures; detailed Q2 business-update figures were not inferred beyond the retrieved source text."
+    ]
+  }
+}
