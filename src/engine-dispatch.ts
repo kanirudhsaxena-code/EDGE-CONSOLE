@@ -3,6 +3,7 @@ export type EngineDispatchEnv={
   FIVEDR_REPOSITORY?:string;
   FIVEDR_WORKFLOW?:string;
   FIVEDR_ACQUIRE_WORKFLOW?:string;
+  FIVEDR_PREOPEN_ACQUIRE_WORKFLOW?:string;
   FIVEDR_ASSESSMENT_WORKFLOW?:string;
   FIVEDR_WORKFLOW_REF?:string;
   FIVEDR_CALLBACK_URL?:string;
@@ -19,6 +20,7 @@ export type EngineDispatchResult={
 const DEFAULT_REPOSITORY='kanirudhsaxena-code/5DR-V2';
 const DEFAULT_WORKFLOW='console-execute.yml';
 const DEFAULT_ACQUIRE_WORKFLOW='console-acquire.yml';
+const DEFAULT_PREOPEN_ACQUIRE_WORKFLOW='console-preopen-acquire.yml';
 const DEFAULT_ASSESSMENT_WORKFLOW='assessment-refresh.yml';
 const DEFAULT_REF='main';
 
@@ -108,6 +110,19 @@ export async function dispatch5drAssessmentRefresh(
 ):Promise<EngineDispatchResult>{
   const workflow=env.FIVEDR_ASSESSMENT_WORKFLOW?.trim()||DEFAULT_ASSESSMENT_WORKFLOW;
   return dispatchWorkflow(env,workflow,{},fetcher);
+}
+
+export async function dispatch5drPreopenAcquisition(
+  env:EngineDispatchEnv,
+  requestId:string,
+  consoleUrl:string,
+  fetcher:typeof fetch=fetch
+):Promise<EngineDispatchResult>{
+  const workflow=env.FIVEDR_PREOPEN_ACQUIRE_WORKFLOW?.trim()||DEFAULT_PREOPEN_ACQUIRE_WORKFLOW;
+  const origin=callbackOrigin(env,consoleUrl);
+  const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
+  if(!requestId.trim()||!origin)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Governed pre-open request metadata or Console callback origin is invalid'};
+  return dispatchWorkflow(env,workflow,{request_id:requestId,console_url:origin},fetcher);
 }
 
 export async function dispatch5drAcquisition(
