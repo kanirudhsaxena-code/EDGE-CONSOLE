@@ -1,0 +1,67 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-uat2-cupid-20261003-1150",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-10-03T11:50:00Z",
+    "research_fresh_at": "2026-10-03T11:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "cupid-notices",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited Shareholders Notice 2026-2027",
+        "retrieved_at": "2026-10-03T11:50:00Z"
+      },
+      {
+        "source_id": "india-market-risk-20261003",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-set-weak-october-foreign-investors-ramp-up-shorts-brokerages-say-2026-09-30/",
+        "title": "Indian shares set for weak October as foreign investors ramp up shorts, brokerages say",
+        "retrieved_at": "2026-10-03T11:50:00Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "cupid-event-neutral",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Cupid Limited's current shareholder notices include a September 30 Q2 FY27 business update and routine corporate disclosures; the reviewed source does not by itself establish a severe company-specific event shock.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "cupid-notices"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      },
+      {
+        "claim_id": "cupid-event-macro-risk",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "The broader Indian equity backdrop entering October includes elevated foreign selling and short positioning, creating a negative external risk input for smaller equities.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "india-market-risk-20261003"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": false
+      }
+    ],
+    "limitations": [
+      "Closed-session user acceptance run; no claim represents live Saturday market data.",
+      "Event-shock claims cover reviewed public sources and do not imply knowledge of undisclosed events."
+    ]
+  }
+}
