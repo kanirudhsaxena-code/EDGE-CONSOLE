@@ -33,7 +33,10 @@ Rule: code, persistence, API, Console and ChatGPT may not redefine a frozen mast
 | S-09 | EDGE Stocks | Decision Ladder meaning visible | frozen decision engine | ladder legend | renderer tests | ENFORCED |
 | S-10 | EDGE Stocks | Execution plan remains declarative; no-trade remains explicit | frozen execution engine | execution card | renderer tests | ENFORCED |
 | S-11 | EDGE Stocks | Master efficacy keeps official vs provisional populations separate | efficacy views | Master Assessment | validator/renderer tests | ENFORCED |
+| S-12 | EDGE Stocks | Standard user output visibly includes exact persisted D:D+4 with date, direction, probabilities, zone, regime, evidence and verification | G5 forecast-path persistence/read model | CURRENT STOCK OUTCOME five-session path | schema/renderer/parity tests | ENFORCED |
+| S-13 | EDGE Stocks | VERIFIED drill-down semantics must be persisted evidence-grounded; no score-derived narrative reconstruction | component_scores notes | Drill-down | V1.3 validator + production report gate | ENFORCED |
 | X-01 | Cross-channel | ChatGPT uses live Console presentation, not a second template | governed chat runner | DOM capture | chat render-lock CI | ENFORCED |
+| X-04 | Cross-channel | EDGE Stocks Chat capture cannot complete until exact D:D+4 parity including regime/evidence/verification is present | governed chat runner | complete five-session DOM | chat render-lock + parity CI | ENFORCED |
 | X-02 | Governance | Missing required fields fail closed; UI does not invent values | validators/release gates | Not available / legacy incomplete | contract tests | ENFORCED |
 | X-03 | Governance | Visual design changes cannot redefine analytical contract | contract precedes renderer | existing cards/typography retained | conformance tests | ENFORCED |
 
