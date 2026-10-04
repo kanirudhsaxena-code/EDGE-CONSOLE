@@ -60,3 +60,25 @@ test('assessment refresh production binding uses authoritative 5DR repository di
   assert.match(wrangler,/"FIVEDR_ASSESSMENT_WORKFLOW": "assessment-refresh\.yml"/);
   assert.doesNotMatch(wrangler,/5dr-assessment-refresh-proxy\.yml/);
 });
+
+
+test('stale assessment is rebuilt from the authoritative 5DR database before remote handoff fallback',()=>{
+  const start=router.indexOf('async function refreshFiveDrAssessmentState');
+  const end=router.indexOf('async function fiveDrExecutionContext',start);
+  const block=router.slice(start,end);
+  const local=block.indexOf('buildFiveDrAssessmentFromDatabase(sql)');
+  const remote=block.indexOf('FIVE_DR_ASSESSMENT_HANDOFF_URL');
+  assert.ok(local>0,'local assessment rebuild must be present');
+  assert.ok(remote>local,'remote immutable handoff may only be a fallback after local DB rebuild');
+  assert.match(block,/source:'LOCAL_CANONICAL_DB_REBUILD'/);
+  assert.match(block,/persistFiveDrAssessment\(sql,assessment\)/);
+});
+
+test('execution packet can satisfy the assessment-first gate without GitHub workflow dispatch',()=>{
+  const start=router.indexOf('async function executionPacket');
+  const end=router.indexOf('async function failRequest',start);
+  const block=router.slice(start,end);
+  assert.match(block,/refreshFiveDrAssessmentState\(sql\)/);
+  assert.match(block,/fiveDrExecutionContext\(sql\)/);
+  assert.doesNotMatch(block,/dispatch5drAssessmentRefresh/);
+});
