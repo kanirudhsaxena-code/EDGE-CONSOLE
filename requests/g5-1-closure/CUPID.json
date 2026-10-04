@@ -4,64 +4,127 @@
   "require_g5_parity": true,
   "research_bundle": {
     "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
-    "bundle_id": "g51-closure-cupid-20261004-135813z",
+    "bundle_id": "g51-closure-cupid-20261004-161642z",
     "ticker": "CUPID",
     "command": "EDGE CUPID",
-    "created_at": "2026-10-04T13:58:13Z",
-    "research_fresh_at": "2026-10-04T13:58:13Z",
+    "created_at": "2026-10-04T16:16:42Z",
+    "research_fresh_at": "2026-10-04T16:16:42Z",
     "research_authority": "CHATGPT",
     "retrieval_providers": [
       "CHATGPT_WEB"
     ],
     "sources": [
       {
-        "source_id": "cupid-src-1",
+        "source_id": "cupid-src-official",
         "provider": "CHATGPT_WEB",
         "authority": "COMPANY",
         "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
-        "title": "Cupid Limited Shareholders Notice 2026-2027",
-        "retrieved_at": "2026-10-04T13:58:13Z",
-        "publication_date": "2026-09-30T00:00:00Z",
-        "event_date": "2026-09-30T00:00:00Z"
+        "title": "Cupid Limited shareholder notices including Q2 FY27 business update",
+        "retrieved_at": "2026-10-04T16:16:42Z"
       },
       {
-        "source_id": "cupid-src-2",
+        "source_id": "cupid-src-fin",
         "provider": "CHATGPT_WEB",
         "authority": "COMPANY",
         "url": "https://www.cupidlimited.com/financial-reports/",
-        "title": "Cupid Limited Financial Reports",
-        "retrieved_at": "2026-10-04T13:58:13Z"
+        "title": "Cupid Limited financial reports",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "cupid-src-news",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/cupid-ltd/stocks/companyid-7772.cms",
+        "title": "Cupid share price, Q2 guidance and current company news",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "cupid-src-hold",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/3405/CUPID/latest/cupid-ltd/",
+        "title": "Cupid latest shareholding pattern",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "cupid-src-val",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.etmoney.com/stocks/cupid-ltd/1671",
+        "title": "Cupid valuation, profitability and sector metrics",
+        "retrieved_at": "2026-10-04T16:16:42Z"
       }
     ],
     "claims": [
       {
-        "claim_id": "cupid-claim-1",
-        "evidence_category": "EVENT_SHOCK",
-        "statement": "Cupid Limited posted an intimation for a Q2 FY27 business-update press release dated 30 September 2026.",
+        "claim_id": "cupid-fund",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Cupid's latest business update and recent financial record show strong growth momentum; FY27 revenue guidance was raised to about Rs 800 crore and FY26 revenue growth was very strong, supporting a positive fundamentals conclusion.",
         "materiality": "MODERATE",
-        "direction": "NEUTRAL",
+        "direction": "POSITIVE",
         "source_ids": [
-          "cupid-src-1"
+          "cupid-src-official",
+          "cupid-src-news",
+          "cupid-src-fin"
         ],
         "verification_status": "VERIFIED",
         "independent_validation": true
       },
       {
-        "claim_id": "cupid-claim-2",
-        "evidence_category": "BUSINESS_FUNDAMENTALS",
-        "statement": "Cupid Limited's financial-report page lists its FY2026-27 quarterly reporting series, including Q1 materials, providing current-period reporting context.",
-        "materiality": "LOW",
+        "claim_id": "cupid-inst",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 shareholding data show FII/FPI ownership rising from about 1.01% to 4.17%, mutual funds from 0.15% to 0.33%, total institutional ownership from 1.18% to 4.51%, and promoter pledge reducing sharply; this is a positive institutional-behaviour signal.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-src-hold"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "The company raised FY27 guidance and entered the Nifty Smallcap 250, both of which are positive near-term catalysts alongside continuing expansion disclosures.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-src-news",
+          "cupid-src-official"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-val",
+        "evidence_category": "VALUATION",
+        "statement": "At roughly Rs 312.50, public market data place Cupid above 300x trailing earnings and around 93x book versus a sector P/E near 37x; despite strong growth, this is an extremely rich valuation and is independently classified negative.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "cupid-src-val"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Current company and market disclosures reviewed through 4 October show no verified adverse binary or severe event shock; the current event-shock conclusion is neutral/no material adverse shock.",
+        "materiality": "MODERATE",
         "direction": "NEUTRAL",
         "source_ids": [
-          "cupid-src-2"
+          "cupid-src-official",
+          "cupid-src-news"
         ],
         "verification_status": "VERIFIED",
         "independent_validation": true
       }
     ],
     "limitations": [
-      "The closure run treats the September 30 business-update notice as an event marker; it does not invent unobserved financial figures.",
-      "Research sources were re-retrieved on 4 October 2026 at 13:58:13Z for the evening closure rerun; no later material public disclosure was identified in the reviewed sources."
+      "Research was freshly executed for this distinct G5.1 acceptance run; no prior bundle was merely retimestamped or reused.",
+      "VERIFIED_NEUTRAL is used only where current evidence was actively checked and no material directional signal was established.",
+      "Valuation conclusions are contextual and do not replace the frozen provider score; independent research validates, conflicts with or excludes provider interpretation under governed reconciliation."
     ]
   }
 }

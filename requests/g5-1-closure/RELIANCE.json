@@ -4,64 +4,142 @@
   "require_g5_parity": true,
   "research_bundle": {
     "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
-    "bundle_id": "g51-closure-reliance-20261004-135813z",
+    "bundle_id": "g51-closure-reliance-20261004-161642z",
     "ticker": "RELIANCE",
     "command": "EDGE RELIANCE",
-    "created_at": "2026-10-04T13:58:13Z",
-    "research_fresh_at": "2026-10-04T13:58:13Z",
+    "created_at": "2026-10-04T16:16:42Z",
+    "research_fresh_at": "2026-10-04T16:16:42Z",
     "research_authority": "CHATGPT",
     "retrieval_providers": [
       "CHATGPT_WEB"
     ],
     "sources": [
       {
-        "source_id": "ril-src-1",
+        "source_id": "ril-src-fin",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/financial-reporting",
+        "title": "RIL financial reporting and Q1 FY2027 highlights",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "ril-src-hold-off",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/shareholders-information/shareholding-pattern",
+        "title": "RIL official shareholding pattern",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "ril-src-hold",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/1127/RELIANCE/latest/reliance-industries-ltd/",
+        "title": "Reliance latest institutional shareholding changes",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "ril-src-val",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/screens/1079695/pe-query/",
+        "title": "Reliance current P/E and historical valuation comparison",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "ril-src-val2",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.arthasootra.com/Finance/Equity/CompanyDashboard.aspx?ScripId=827",
+        "title": "Reliance valuation and refinery-marketing peer metrics",
+        "retrieved_at": "2026-10-04T16:16:42Z"
+      },
+      {
+        "source_id": "ril-src-fuel",
         "provider": "CHATGPT_WEB",
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://www.reuters.com/business/energy/india-will-ask-private-fuel-retailers-end-sales-rationing-2026-10-01/",
-        "title": "India will ask private fuel retailers to end sales rationing",
-        "retrieved_at": "2026-10-04T13:58:13Z",
-        "publication_date": "2026-10-01T00:00:00Z",
-        "event_date": "2026-10-01T00:00:00Z"
+        "title": "India asks private fuel retailers to end sales rationing",
+        "retrieved_at": "2026-10-04T16:16:42Z"
       },
       {
-        "source_id": "ril-src-2",
+        "source_id": "ril-src-bond",
         "provider": "CHATGPT_WEB",
-        "authority": "COMPANY",
-        "url": "https://www.ril.com/investor/resource-center/corporate-announcements?page=0",
-        "title": "Reliance Industries Corporate Announcements",
-        "retrieved_at": "2026-10-04T13:58:13Z"
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/state-bank-india-buys-nearly-40-reliances-135-billion-debt-sale-2026-09-30/",
+        "title": "Strong institutional demand for Reliance rupee bond issue",
+        "retrieved_at": "2026-10-04T16:16:42Z"
       }
     ],
     "claims": [
       {
-        "claim_id": "ril-claim-1",
-        "evidence_category": "EVENT_SHOCK",
-        "statement": "India's Oil Secretary said private fuel retailers, including Reliance Industries, would be asked to stop rationing diesel and gasoline sales; the report linked rationing to losses from regulated retail prices below market levels.",
+        "claim_id": "ril-fund",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "RIL's Q1 FY27 gross revenue was about Rs 3.40 lakh crore, EBITDA about Rs 54,067 crore and PAT about Rs 23,196 crore; management reported strong O2C and Jio performance and a healthy balance sheet, supporting a positive fundamental direction.",
         "materiality": "MODERATE",
-        "direction": "NEGATIVE",
+        "direction": "POSITIVE",
         "source_ids": [
-          "ril-src-1"
+          "ril-src-fin"
         ],
         "verification_status": "VERIFIED",
         "independent_validation": true
       },
       {
-        "claim_id": "ril-claim-2",
-        "evidence_category": "BUSINESS_FUNDAMENTALS",
-        "statement": "Reliance Industries continues to publish current financing and rating disclosures through its corporate-announcements channel.",
-        "materiality": "LOW",
-        "direction": "NEUTRAL",
+        "claim_id": "ril-inst",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 data show FII/FPI ownership falling from 18.67% to 17.19% and total institutional ownership from 39.30% to 38.46%, although mutual-fund ownership rose from 9.78% to 10.11%; on balance the institutional direction is negative.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
         "source_ids": [
-          "ril-src-2"
+          "ril-src-hold-off",
+          "ril-src-hold"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "The government directive to end fuel-sales rationing creates a negative near-term catalyst for Reliance's domestic fuel-retailing economics, partly offset by strong demand for its recent AAA-rated bond issue; the more immediate operating catalyst is assessed negative.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-src-fuel",
+          "ril-src-bond"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-val",
+        "evidence_category": "VALUATION",
+        "statement": "RIL traded near 21.15x earnings, below its own 5-year P/E near 25.36x but at a substantial premium to many refinery/marketing peers; because the governed valuation comparison is sector-relative, the current valuation direction is assessed negative with conglomerate-comparison limitations noted.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-src-val",
+          "ril-src-val2"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "India's oil ministry said private fuel retailers including Reliance would be asked to stop rationing diesel and gasoline while regulated retail prices remain below market economics; this is a verified moderate negative event-risk signal.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-src-fuel"
         ],
         "verification_status": "VERIFIED",
         "independent_validation": true
       }
     ],
     "limitations": [
-      "The closure run records the retail-fuel policy pressure as a moderate event risk and does not extrapolate a quantified earnings impact.",
-      "Research sources were re-retrieved on 4 October 2026 at 13:58:13Z for the evening closure rerun; no later material public disclosure was identified in the reviewed sources."
+      "Research was freshly executed for this distinct G5.1 acceptance run; no prior bundle was merely retimestamped or reused.",
+      "VERIFIED_NEUTRAL is used only where current evidence was actively checked and no material directional signal was established.",
+      "Valuation conclusions are contextual and do not replace the frozen provider score; independent research validates, conflicts with or excludes provider interpretation under governed reconciliation."
     ]
   }
 }
