@@ -4,11 +4,11 @@
   "require_g5_parity": true,
   "research_bundle": {
     "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
-    "bundle_id": "g51-closure-ltf-20261004",
+    "bundle_id": "g51-closure-ltf-20261004-135813z",
     "ticker": "LTF",
     "command": "EDGE LTF",
-    "created_at": "2026-10-03T22:53:00Z",
-    "research_fresh_at": "2026-10-03T22:53:00Z",
+    "created_at": "2026-10-04T13:58:13Z",
+    "research_fresh_at": "2026-10-04T13:58:13Z",
     "research_authority": "CHATGPT",
     "retrieval_providers": [
       "CHATGPT_WEB"
@@ -20,7 +20,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://economictimes.indiatimes.com/l%26t-finance-holdings-ltd./stocksupdate/companyid-30050.cms?from=mdr",
         "title": "L&T Finance company business update and corporate announcements",
-        "retrieved_at": "2026-10-03T22:53:00Z",
+        "retrieved_at": "2026-10-04T13:58:13Z",
         "publication_date": "2026-10-03T13:04:00Z",
         "event_date": "2026-10-03T13:04:00Z"
       },
@@ -30,7 +30,7 @@
         "authority": "COMPANY",
         "url": "https://www.ltfinance.com/news-room",
         "title": "L&T Finance News Room",
-        "retrieved_at": "2026-10-03T22:53:00Z"
+        "retrieved_at": "2026-10-04T13:58:13Z"
       }
     ],
     "claims": [
@@ -60,7 +60,8 @@
       }
     ],
     "limitations": [
-      "Closure-run research records only directly verified public disclosures; detailed Q2 business-update figures were not inferred beyond the retrieved source text."
+      "Closure-run research records only directly verified public disclosures; detailed Q2 business-update figures were not inferred beyond the retrieved source text.",
+      "Research sources were re-retrieved on 4 October 2026 at 13:58:13Z for the evening closure rerun; no later material public disclosure was identified in the reviewed sources."
     ]
   }
 }
