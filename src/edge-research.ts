@@ -11,6 +11,14 @@ export type EvidenceCategory=
 export type Materiality='LOW'|'MODERATE'|'HIGH'|'CRITICAL';
 export type Direction='POSITIVE'|'NEUTRAL'|'NEGATIVE'|'BINARY_UNCERTAIN';
 
+export const MANDATORY_EDGE_RESEARCH_CATEGORIES=[
+  'BUSINESS_FUNDAMENTALS',
+  'INSTITUTIONAL_BEHAVIOUR',
+  'NEWS_EVENTS_CATALYSTS',
+  'VALUATION',
+  'EVENT_SHOCK',
+] as const;
+
 export type EdgeResearchSource={
   source_id:string;
   provider:RetrievalProvider;
@@ -82,6 +90,7 @@ export function validateEdgeResearchBundle(body:unknown,now=new Date()):string[]
   });
 
   if(!Array.isArray(body.claims)||body.claims.length===0)errors.push('claims must be a non-empty array');
+  const independentlyVerified=new Set<string>();
   if(Array.isArray(body.claims))body.claims.forEach((raw,i)=>{
     if(!isObject(raw)){errors.push(`claims[${i}] must be an object`);return}
     if(!id(raw.claim_id))errors.push(`claims[${i}].claim_id is invalid`);
@@ -106,7 +115,21 @@ export function validateEdgeResearchBundle(body:unknown,now=new Date()):string[]
       const providerOnly=used.length>0&&used.every((source:unknown)=>isObject(source)&&source.provider==='UPSTOX');
       if(!independent||providerOnly)errors.push(`claims[${i}] material VERIFIED claim cannot be provider-only`);
     }
+
+    if(verified&&raw.independent_validation===true&&Array.isArray(raw.source_ids)){
+      const ids=raw.source_ids.map(x=>String(x));
+      const sourceRows=Array.isArray(body.sources)?body.sources:[];
+      const independent=sourceRows.some((source:unknown)=>
+        isObject(source)&&ids.includes(String(source.source_id))&&(source.provider==='CHATGPT_WEB'||source.provider==='EXA')
+      );
+      if(independent&&MANDATORY_EDGE_RESEARCH_CATEGORIES.includes(String(raw.evidence_category) as typeof MANDATORY_EDGE_RESEARCH_CATEGORIES[number])){
+        independentlyVerified.add(String(raw.evidence_category));
+      }
+    }
   });
+
+  const missingResearch=MANDATORY_EDGE_RESEARCH_CATEGORIES.filter(category=>!independentlyVerified.has(category));
+  if(missingResearch.length)errors.push('mandatory research coverage incomplete: '+missingResearch.join(', '));
 
   if(!Array.isArray(body.limitations))errors.push('limitations must be an array');
   const fresh=iso(body.research_fresh_at)?new Date(String(body.research_fresh_at)):null;
