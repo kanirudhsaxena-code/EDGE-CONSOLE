@@ -41,19 +41,23 @@ test('EDGE Stocks pre-open canonical workflow is two-stage, timing-fail-closed a
   assert.ok(y.includes('prep_start=now.replace(hour=8,minute=50'));
   assert.ok(y.includes('auction_start=now.replace(hour=9,minute=10'));
   assert.ok(y.includes('auction_cutoff=now.replace(hour=9,minute=14,second=59'));
-  assert.ok(y.includes('PREP_BUNDLE_TARGETS_RESOLVED'));
+  assert.ok(y.includes('PREP_DATA_RESEARCH_LIFECYCLE_STARTED'));
   assert.ok(y.includes('PREOPEN_MISSING_OUTSIDE_AUCTION_WINDOW'));
   assert.match(y,/api\/edge-stocks\/canonical-targets/);
   assert.match(y,/canonical_attempt/);
   assert.match(y,/EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED/);
   assert.match(y,/RESEARCH_REFRESH_REQUIRED.*MISSING/s);
   assert.match(y,/canonical_requested_at/);
+  assert.match(y,/research_not_before/);
   assert.doesNotMatch(y,/PREOPEN_SLOT_SKIPPED_OUTSIDE_WINDOW/);
 });
 
-test('EDGE router enforces 90-minute research freshness for canonical attempts',()=>{
+test('EDGE router requires new-run research and same-cycle preopen research',()=>{
   const source=fs.readFileSync('src/router.ts','utf8');
-  assert.match(source,/canonicalAttempt \? 90 : 24 \* 60/);
+  assert.match(source,/EDGE_NEW_RUN_RESEARCH_REQUIRED/);
+  assert.match(source,/EDGE_CANONICAL_RESEARCH_LIFECYCLE_REQUIRED/);
+  assert.match(source,/latestFreshEdgeResearchBundle\(env, ticker, 90, researchNotBefore\)/);
   assert.match(source,/EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED/);
+  assert.match(source,/research_not_before/);
   assert.match(source,/\/api\/edge-stocks\/canonical-targets/);
 });

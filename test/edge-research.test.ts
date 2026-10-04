@@ -19,7 +19,10 @@ const base=()=>({
   ],
   claims:[
     {claim_id:'claim1',evidence_category:'NEWS_EVENTS_CATALYSTS',statement:'Material catalyst independently corroborated.',materiality:'HIGH',direction:'POSITIVE',source_ids:['src1','src2'],verification_status:'VERIFIED',independent_validation:true},
-    {claim_id:'claim2',evidence_category:'BUSINESS_FUNDAMENTALS',statement:'Latest reported fundamentals were checked.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['src1','src2'],verification_status:'VERIFIED',independent_validation:true}
+    {claim_id:'claim2',evidence_category:'BUSINESS_FUNDAMENTALS',statement:'Latest reported fundamentals were checked.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['src1','src2'],verification_status:'VERIFIED',independent_validation:true},
+    {claim_id:'claim3',evidence_category:'INSTITUTIONAL_BEHAVIOUR',statement:'Latest institutional ownership/flow evidence was checked.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['src2'],verification_status:'VERIFIED',independent_validation:true},
+    {claim_id:'claim4',evidence_category:'VALUATION',statement:'Valuation was independently checked against current evidence.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['src2'],verification_status:'VERIFIED',independent_validation:true},
+    {claim_id:'claim5',evidence_category:'EVENT_SHOCK',statement:'No material event shock was identified in current primary evidence.',materiality:'HIGH',direction:'NEUTRAL',source_ids:['src2'],verification_status:'VERIFIED',independent_validation:true}
   ],
   limitations:[]
 });
@@ -51,7 +54,10 @@ test('unresolved HIGH conflict blocks publication',()=>{
   assert.ok(result.errors.some(e=>e.includes('HIGH/CRITICAL claims are unresolved')));
 });
 
-test('moderate unverified claim is retained but does not self-validate',()=>{
+test('missing independent mandatory research dimension blocks publication',()=>{
   const b:any=base(); b.claims[1].verification_status='NOT_VERIFIED'; b.claims[1].independent_validation=false;
-  assert.equal(researchBundleCanPublish(b,NOW).ready,true);
+  const result=researchBundleCanPublish(b,NOW);
+  assert.equal(result.ready,false);
+  assert.ok(result.errors.some(e=>e.includes('mandatory research coverage incomplete')));
+  assert.ok(result.errors.some(e=>e.includes('BUSINESS_FUNDAMENTALS')));
 });

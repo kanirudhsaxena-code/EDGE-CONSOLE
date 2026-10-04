@@ -151,7 +151,9 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   const forceNew=!isObject(body)||body.force_new!==false;
   const clientInvocationId=isObject(body)&&typeof body.client_invocation_id==='string'&&body.client_invocation_id.trim()?body.client_invocation_id.trim():null;
   const canonicalAttempt=isObject(body)&&body.canonical_attempt===true;
+  const prepOnly=isObject(body)&&body.prep_only===true;
   const canonicalAttemptSlot=isObject(body)&&typeof body.canonical_attempt_slot==='string'?body.canonical_attempt_slot.trim():null;
+  if(prepOnly&&canonicalAttempt)return json({error:'prep_only cannot create a canonical attempt'},422);
   const runActor=sandboxRequested?{id:actor.authenticated?actor.id:'sandbox_acceptance',role:'TESTER' as const,authenticated:actor.authenticated}:actor;
   const setup=decisionSetup(body);
   if(!setup.value)return json({error:setup.error??'Invalid decision setup'},422);
@@ -231,12 +233,13 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     sandbox_requested:sandboxRequested,
     decision_setup:setup.value,
     evidence_file_count:0,
-    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
+    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:prepOnly?'UPSTOX_PREOPEN_PREP':canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
-    invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot},
+    invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot,prep_only:prepOnly},
+    preopen_prep_only:prepOnly,
     run_provenance:{
-      trigger_type:canonicalAttempt?'SCHEDULED':'USER',
-      evidence_mode:canonicalAttempt?'PREOPEN':null,
+      trigger_type:prepOnly?'SCHEDULED_PREP':canonicalAttempt?'SCHEDULED':'USER',
+      evidence_mode:prepOnly?'PREOPEN_PREP':canonicalAttempt?'PREOPEN':null,
       market_session_as_of:null,
       research_as_of:null,
       target_session:null,
@@ -247,7 +250,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
-  const dispatch=canonicalAttempt
+  const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
   const acquisitionDispatch={...dispatch,attempted_at:new Date().toISOString()};
@@ -258,7 +261,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',canonical_attempt_key:canonicalAttemptKey,next_step:canonicalAttempt?'PREOPEN_MARKET_ACQUISITION':'AUTOMATED_MARKET_ACQUISITION'},201);
+  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',canonical_attempt_key:canonicalAttemptKey,prep_only:prepOnly,next_step:prepOnly?'PREOPEN_PREP_MARKET_ACQUISITION':canonicalAttempt?'PREOPEN_MARKET_ACQUISITION':'AUTOMATED_MARKET_ACQUISITION'},201);
 }
 
 async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{
@@ -289,6 +292,24 @@ async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:
   const research=await systemResearch(env,requestId);
   const researchBody=await responseJson(research);
   if(!research.ok)return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_READY',research:researchBody,next_step:'RETRY_SYSTEM_RESEARCH'});
+  if(metadata.preopen_prep_only===true){
+    const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+    const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:next;
+    const prepared={...latestMetadata,adapter_stage:'PREOPEN_PREP_RESEARCH_READY',preopen_prep_completed_at:new Date().toISOString()};
+    await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(prepared)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({
+      ok:true,
+      callback_accepted:true,
+      request_id:requestId,
+      status:'READY_FOR_ENGINE',
+      adapter_stage:'PREOPEN_PREP_RESEARCH_READY',
+      data_acquisition:'PASS',
+      deep_research_executed_this_run:'PASS',
+      canonical_created:false,
+      trading_enabled:false,
+      next_step:'WAIT_FOR_CANONICAL_WINDOW'
+    },200);
+  }
   const reconciled=await reconcileIntelligence(request,env,requestId);
   const reconciledBody=await responseJson(reconciled);
   return json({...reconciledBody,callback_accepted:true,request_id:requestId},200);

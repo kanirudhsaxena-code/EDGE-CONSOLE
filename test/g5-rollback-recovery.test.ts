@@ -55,9 +55,11 @@ test('G5 does not weaken the governed two-stage NIFTY/LTF pre-open contract',()=
     assert.match(workflow,/PREOPEN_MISSING_OUTSIDE_AUCTION_WINDOW/);
     assert.doesNotMatch(workflow,/replace\(hour=8,minute=40/);
   }
-  assert.match(canonicalNifty,/PREP_BUNDLE_WINDOW_OK/);
+  assert.match(canonicalNifty,/PREOPEN_PREP_STARTED/);
+  assert.match(canonicalNifty,/"prep_only":True/);
   assert.match(canonicalNifty,/\/api\/5dr\/automated-runs/);
-  assert.match(canonicalStocks,/PREP_BUNDLE_TARGETS_RESOLVED/);
+  assert.match(canonicalStocks,/PREP_DATA_RESEARCH_LIFECYCLE_STARTED/);
+  assert.match(canonicalStocks,/research_not_before/);
   assert.match(canonicalStocks,/\/api\/edge-stocks\/canonical-targets/);
   assert.match(canonicalStocks,/"trading_enabled":False/);
 });

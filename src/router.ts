@@ -398,10 +398,18 @@ async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id:
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
-async function latestFreshEdgeResearchBundle(env: Env, ticker: string, maxAgeMinutes = 24 * 60): Promise<{ bundleId: string; researchFreshAt: unknown } | null> {
+async function latestFreshEdgeResearchBundle(
+  env: Env,
+  ticker: string,
+  maxAgeMinutes = 24 * 60,
+  notBefore?: string | null,
+): Promise<{ bundleId: string; researchFreshAt: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
-  const cutoff = new Date(Date.now() - Math.max(1, maxAgeMinutes) * 60_000).toISOString();
+  const ageCutoff = new Date(Date.now() - Math.max(1, maxAgeMinutes) * 60_000);
+  const explicitCutoff = notBefore && !Number.isNaN(Date.parse(notBefore)) ? new Date(notBefore) : null;
+  const cutoffDate = explicitCutoff && explicitCutoff > ageCutoff ? explicitCutoff : ageCutoff;
+  const cutoff = cutoffDate.toISOString();
   const rows = await sql`
     select bundle_id,payload,research_fresh_at
       from edge_research_bundles
@@ -455,6 +463,9 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const forceNew = body.force_new === true;
   const canonicalAttempt = body.canonical_attempt === true;
   const canonicalAttemptSlot = typeof body.canonical_attempt_slot === 'string' ? body.canonical_attempt_slot.trim() : null;
+  const researchNotBefore = typeof body.research_not_before === 'string' && !Number.isNaN(Date.parse(body.research_not_before))
+    ? new Date(body.research_not_before).toISOString()
+    : null;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
   if (existingToday && !forceNew && !isObject(body.research_bundle)) {
     return json({
@@ -526,19 +537,39 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       }, 201);
     }
   } else {
-    const fresh = await latestFreshEdgeResearchBundle(env, ticker, canonicalAttempt ? 90 : 24 * 60);
+    if (!canonicalAttempt) {
+      return json({
+        error: 'A distinct new EDGE run requires a newly executed governed research bundle in this request; prior bundles cannot be reused by age alone',
+        code: 'EDGE_NEW_RUN_RESEARCH_REQUIRED',
+        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        ticker,
+        fresh_run_requested: forceNew,
+        trading_enabled: false,
+      }, 409);
+    }
+    if (!researchNotBefore) {
+      return json({
+        error: 'Pre-open canonical EDGE requires the start timestamp of its own PREP research lifecycle',
+        code: 'EDGE_CANONICAL_RESEARCH_LIFECYCLE_REQUIRED',
+        ticker,
+        canonical_attempt: true,
+        canonical_attempt_slot: canonicalAttemptSlot,
+        trading_enabled: false,
+      }, 409);
+    }
+    const fresh = await latestFreshEdgeResearchBundle(env, ticker, 90, researchNotBefore);
     researchBundleId = fresh?.bundleId;
     if (!researchBundleId) {
       return json({
-        error: canonicalAttempt
-          ? 'A pre-open canonical EDGE run requires a valid ChatGPT research bundle refreshed within the last 90 minutes'
-          : 'Fresh ChatGPT research bundle is mandatory before EDGE dispatch; no valid bundle from the last 24 hours is available for this ticker',
-        code: canonicalAttempt ? 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED' : 'EDGE_RESEARCH_BUNDLE_REQUIRED',
+        error: 'A pre-open canonical EDGE run requires a complete five-dimension ChatGPT research bundle created during this PREP lifecycle and within the 90-minute ceiling',
+        code: 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED',
         contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
         ticker,
         fresh_run_requested: forceNew,
         canonical_attempt: canonicalAttempt,
-        canonical_attempt_slot: canonicalAttemptSlot
+        canonical_attempt_slot: canonicalAttemptSlot,
+        research_not_before: researchNotBefore,
+        trading_enabled: false,
       }, 409);
     }
   }
@@ -582,6 +613,8 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     canonical_attempt: canonicalAttempt,
     canonical_attempt_slot: canonicalAttemptSlot,
     canonical_requested_at: canonicalRequestedAt ?? null,
+    research_not_before: researchNotBefore,
+    research_executed_this_run: true,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
   }, 202);

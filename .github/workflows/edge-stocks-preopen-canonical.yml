@@ -59,9 +59,19 @@ jobs:
           # Preparation is intentionally non-canonical. Resolve lineages and surface
           # research freshness before auction time; never create a market-state candidate here.
           if prep_start <= now <= prep_end:
-              print(json.dumps({"status":"PREP_BUNDLE_TARGETS_RESOLVED","actual":now.isoformat(),
+              print(json.dumps({
+                  "status":"PREP_DATA_RESEARCH_LIFECYCLE_STARTED",
+                  "actual":now.isoformat(),
+                  "research_not_before":prep_start.isoformat(),
                   "targets":[str((t or {}).get("ticker") or "").upper() for t in targets if (t or {}).get("ticker")],
-                  "canonical_created":False},sort_keys=True))
+                  "requirements":{
+                      "new_market_data_acquisition":True,
+                      "new_deep_research":True,
+                      "stock_research_coverage":"5/5",
+                      "publish_canonical":False,
+                  },
+                  "canonical_created":False
+              },sort_keys=True))
               raise SystemExit(0)
 
           # GitHub cron is not timing proof. Late starts fail closed as MISSING.
@@ -76,7 +86,8 @@ jobs:
               ticker=str((target or {}).get("ticker") or "").strip().upper()
               if not ticker: continue
               body={"command":f"EDGE {ticker}","force_new":True,"canonical_attempt":True,
-                    "canonical_attempt_slot":slot,"canonical_requested_at":requested_at}
+                    "canonical_attempt_slot":slot,"canonical_requested_at":requested_at,
+                    "research_not_before":prep_start.isoformat()}
               code,result=request_json(base+"/api/edge-stocks/invoke","POST",body)
               if code==202 and result.get("status")=="DISPATCHED":
                   dispatched[ticker]={"after":result.get("dispatched_at"),"research_bundle_id":result.get("research_bundle_id")}

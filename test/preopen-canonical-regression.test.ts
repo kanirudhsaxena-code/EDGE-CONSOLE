@@ -28,7 +28,8 @@ function assertProtectedSchedule(workflow:string){
 test('protected NIFTY pre-open canonical contract remains fixed',()=>{
   assertProtectedSchedule(nifty);
   assert.match(nifty,/EDGE NIFTY Pre-open Canonical Attempts/);
-  assert.match(nifty,/PREP_BUNDLE_WINDOW_OK/);
+  assert.match(nifty,/PREOPEN_PREP_STARTED/);
+  assert.match(nifty,/"prep_only":True/);
   assert.match(nifty,/\/api\/5dr\/automated-runs/);
   assert.match(nifty,/force_new":True/);
   assert.match(nifty,/PREOPEN_RUN_COMPLETED/);
@@ -39,12 +40,13 @@ test('protected NIFTY pre-open canonical contract remains fixed',()=>{
 test('protected EDGE Stocks/LTF pre-open canonical contract remains fixed',()=>{
   assertProtectedSchedule(stocks);
   assert.match(stocks,/EDGE Stocks Pre-open Canonical Attempts/);
-  assert.match(stocks,/PREP_BUNDLE_TARGETS_RESOLVED/);
+  assert.match(stocks,/PREP_DATA_RESEARCH_LIFECYCLE_STARTED/);
   assert.match(stocks,/\/api\/edge-stocks\/canonical-targets/);
   assert.match(stocks,/\/api\/edge-stocks\/invoke/);
   assert.match(stocks,/\/api\/edge-stocks\/invoke\/status/);
   assert.match(stocks,/command":f"EDGE \{ticker\}"/);
   assert.match(stocks,/RESEARCH_REFRESH_REQUIRED/);
+  assert.match(stocks,/research_not_before/);
   assert.match(stocks,/"state":"MISSING"/);
   assert.match(stocks,/EDGE_STOCKS_PREOPEN_ATTEMPT_COMPLETE/);
   assert.match(stocks,/"trading_enabled":False/);
