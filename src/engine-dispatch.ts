@@ -116,7 +116,15 @@ export async function dispatch5drAssessmentRefresh(
   const repository=env.FIVEDR_ASSESSMENT_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
   const origin=callbackOrigin(env,consoleUrl);
   if(!requestId.trim()||!origin)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Governed assessment refresh metadata or Console callback origin is invalid'};
-  return dispatchWorkflow(env,workflow,{request_id:requestId,console_url:origin},fetcher,repository);
+  const nativeAssessmentRefresh=
+    repository==='kanirudhsaxena-code/5DR-V2'&&workflow==='assessment-refresh.yml';
+  return dispatchWorkflow(
+    env,
+    workflow,
+    nativeAssessmentRefresh?{}:{request_id:requestId,console_url:origin},
+    fetcher,
+    repository
+  );
 }
 
 export async function dispatch5drPreopenAcquisition(

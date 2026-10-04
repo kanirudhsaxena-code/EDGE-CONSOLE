@@ -54,8 +54,9 @@ test('non-stale assessment errors still fail closed at the original execution pa
   assert.match(block,/return json\(\{\.\.\.normalizedBody,\.\.\.executionPacket\},packetResponse\.status\)/);
 });
 
-test('assessment refresh production binding uses EDGE proxy transport while preserving 5DR implementation authority',()=>{
+test('assessment refresh production binding uses authoritative 5DR repository directly',()=>{
   const wrangler=readFileSync('wrangler.jsonc','utf8');
-  assert.match(wrangler,/"FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code\/EDGE---V1"/);
-  assert.match(wrangler,/"FIVEDR_ASSESSMENT_WORKFLOW": "5dr-assessment-refresh-proxy\.yml"/);
+  assert.match(wrangler,/"FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code\/5DR-V2"/);
+  assert.match(wrangler,/"FIVEDR_ASSESSMENT_WORKFLOW": "assessment-refresh\.yml"/);
+  assert.doesNotMatch(wrangler,/5dr-assessment-refresh-proxy\.yml/);
 });
