@@ -30,8 +30,8 @@
     "FIVEDR_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
     "FIVEDR_ACQUIRE_WORKFLOW": "5dr-console-acquire-proxy.yml",
     "FIVEDR_PREOPEN_ACQUIRE_WORKFLOW": "5dr-console-preopen-acquire-proxy.yml",
-    "FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
-    "FIVEDR_ASSESSMENT_WORKFLOW": "5dr-assessment-refresh-proxy.yml",
+    "FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code/5DR-V2",
+    "FIVEDR_ASSESSMENT_WORKFLOW": "assessment-refresh.yml",
     "FIVEDR_WORKFLOW": "5dr-console-execute-proxy.yml",
     "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev"
   }
