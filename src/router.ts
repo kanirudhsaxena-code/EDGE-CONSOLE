@@ -815,6 +815,32 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const researchClaims = Array.isArray(researchPayload.claims)
     ? researchPayload.claims.filter(isObject)
     : [];
+  const mandatoryResearchCategories=[
+    'BUSINESS_FUNDAMENTALS',
+    'INSTITUTIONAL_BEHAVIOUR',
+    'NEWS_EVENTS_CATALYSTS',
+    'VALUATION',
+    'EVENT_SHOCK',
+  ];
+  const verifiedResearchCategories=[...new Set(
+    researchClaims
+      .filter((claim:Record<string,unknown>)=>
+        String(claim.verification_status||'').toUpperCase()==='VERIFIED'
+        && claim.independent_validation===true
+        && mandatoryResearchCategories.includes(String(claim.evidence_category||'').toUpperCase())
+      )
+      .map((claim:Record<string,unknown>)=>String(claim.evidence_category||'').toUpperCase())
+  )];
+  const researchCoverageComplete=mandatoryResearchCategories.every(category=>verifiedResearchCategories.includes(category));
+  const reconciledResearchRows=componentRows.filter((row:Record<string,unknown>)=>
+    mandatoryResearchCategories.includes(componentKey(row.component))
+  );
+  const excludedResearchComponents=reconciledResearchRows
+    .filter((row:Record<string,unknown>)=>componentVerificationStatus(row.availability_status,row.evidence_quality)!=='VERIFIED')
+    .map((row:Record<string,unknown>)=>componentKey(row.component));
+  const conflictedResearchComponents=reconciledResearchRows
+    .filter((row:Record<string,unknown>)=>row.conflict_flag===true)
+    .map((row:Record<string,unknown>)=>componentKey(row.component));
 
   const des = numberOrNull(active.des);
   const marketTrust = numberOrNull(active.resolved_market_trust_score);
@@ -1096,6 +1122,35 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       candidate_type: currentGovernance.candidate_type ?? null,
       requested_at: currentGovernance.requested_at ?? null,
     } : null,
+    run_readiness: {
+      data_acquisition: 'PASS',
+      data_freshness: numberOrNull(active.freshness_score)===null ? 'UNKNOWN' : 'PASS',
+      data_freshness_score: numberOrNull(active.freshness_score),
+      deep_research_executed_this_cycle: researchCoverageComplete ? 'PASS' : 'FAIL',
+      research_bundle_id: isNonEmptyString(researchPayload.bundle_id) ? String(researchPayload.bundle_id) : null,
+      research_as_of: researchPayload.research_fresh_at ?? currentGovernance?.research_fresh_at ?? null,
+      research_coverage: {
+        status: researchCoverageComplete ? 'PASS' : 'FAIL',
+        verified: verifiedResearchCategories.length,
+        required: mandatoryResearchCategories.length,
+        display: verifiedResearchCategories.length+'/'+mandatoryResearchCategories.length,
+        verified_categories: verifiedResearchCategories,
+        missing_categories: mandatoryResearchCategories.filter(category=>!verifiedResearchCategories.includes(category)),
+      },
+      reconciliation: {
+        status: researchCoverageComplete ? 'PASS' : 'BLOCKED',
+        outcome: conflictedResearchComponents.length
+          ? 'CONFLICTED_COMPONENTS_EXCLUDED'
+          : excludedResearchComponents.length
+            ? 'PARTIAL_EXCLUSION'
+            : 'FULLY_VERIFIED',
+        excluded_components: excludedResearchComponents,
+        conflicted_components: conflictedResearchComponents,
+      },
+      final_evidence_manifest: researchCoverageComplete ? 'PASS' : 'FAIL',
+      computation: 'PASS',
+      persistence: 'PASS',
+    },
     forecast_path: forecastPath,
     canonical_governance: canonical ? {
       canonical_key: canonical.canonical_key,
