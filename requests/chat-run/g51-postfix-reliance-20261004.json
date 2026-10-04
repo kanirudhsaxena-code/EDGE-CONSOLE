@@ -1,0 +1,66 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "g51-postfix-reliance-20261004",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-03T22:53:00Z",
+    "research_fresh_at": "2026-10-03T22:53:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-src-1",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/business/energy/india-will-ask-private-fuel-retailers-end-sales-rationing-2026-10-01/",
+        "title": "India will ask private fuel retailers to end sales rationing",
+        "retrieved_at": "2026-10-03T22:53:00Z",
+        "publication_date": "2026-10-01T00:00:00Z",
+        "event_date": "2026-10-01T00:00:00Z"
+      },
+      {
+        "source_id": "ril-src-2",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investor/resource-center/corporate-announcements?page=0",
+        "title": "Reliance Industries Corporate Announcements",
+        "retrieved_at": "2026-10-03T22:53:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-claim-1",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "India's Oil Secretary said private fuel retailers, including Reliance Industries, would be asked to stop rationing diesel and gasoline sales; the report linked rationing to losses from regulated retail prices below market levels.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-src-1"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-claim-2",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Reliance Industries continues to publish current financing and rating disclosures through its corporate-announcements channel.",
+        "materiality": "LOW",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-src-2"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The closure run records the retail-fuel policy pressure as a moderate event risk and does not extrapolate a quantified earnings impact."
+    ]
+  }
+}
