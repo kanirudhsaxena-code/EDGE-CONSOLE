@@ -50,9 +50,27 @@ jobs:
           auction_start=now.replace(hour=9,minute=10,second=0,microsecond=0)
           auction_cutoff=now.replace(hour=9,minute=14,second=59,microsecond=999999)
 
-          # 08:50 is preparation only. It MUST NOT create a canonical candidate.
+          # 08:50 is active preparation only. Acquire genuine pre-open evidence
+          # and execute fresh governed web research, but stop before canonical computation.
           if prep_start <= now <= prep_end:
-              print(json.dumps({"status":"PREP_BUNDLE_WINDOW_OK","actual":now.isoformat(),"canonical_created":False},sort_keys=True))
+              prep_body={
+                  "force_new":True,
+                  "prep_only":True,
+                  "client_invocation_id":f"manual-preopen-prep-{now:%Y%m%d}",
+                  "assessment":{"objective":"BOTH","risk_posture":"CONSERVATIVE","capital_priority":"CAPITAL_PROTECTION"}
+              }
+              prep=request_json(base+"/api/5dr/automated-runs","POST",prep_body)
+              request_id=((prep.get("request") or {}).get("request_id"))
+              if not request_id:
+                  raise SystemExit(f"PREOPEN_PREP_CREATE_FAILED {prep}")
+              print(json.dumps({
+                  "status":"PREOPEN_PREP_STARTED",
+                  "actual":now.isoformat(),
+                  "request_id":request_id,
+                  "next_step":prep.get("next_step"),
+                  "canonical_created":False,
+                  "trading_enabled":False
+              },sort_keys=True))
               raise SystemExit(0)
 
           # GitHub cron is only a wake-up mechanism. Runtime wall-clock is authoritative.
