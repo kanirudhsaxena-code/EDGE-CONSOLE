@@ -126,6 +126,15 @@ def run_nifty(proof):
     require((meta.get("intelligence_reconciliation") or {}).get("status")=="NORMALIZED_AND_DISPATCHED","NIFTY intelligence handoff not dispatched",meta.get("intelligence_reconciliation"))
     require((meta.get("engine_dispatch") or {}).get("status")=="RESULT_SYNCED","NIFTY engine result not synced",meta.get("engine_dispatch"))
 
+    assess_code,assess,_=api("GET",f"/api/5dr/outcome-assessment?run_id={run.get('run_id')}")
+    summary_code,summary,_=api("GET","/api/assessment-summary?engine=5DR")
+    proof["user_outputs"]["nifty"]={
+        "request":{"request_id":request_id,"status":req.get("status"),"framework_version":req.get("framework_version"),"output_contract_version":req.get("output_contract_version"),"decision_setup":meta.get("decision_setup"),"run_provenance":prov},
+        "run":run,
+        "outcome_assessment":assess if assess_code==200 else {"status_code":assess_code},
+        "assessment_summary":summary if summary_code==200 else {"status_code":summary_code},
+    }
+
     proof["nifty"]={
         "status":"PASS",
         "request_id":request_id,
@@ -205,6 +214,8 @@ def run_stock(ticker,proof):
         zone=row.get("expected_price_zone") or {}
         require(zone.get("low") is not None and zone.get("high") is not None,f"{ticker} expected zone missing",row)
 
+    proof["user_outputs"]["stocks"][ticker]=report
+
     proof["stocks"][ticker]={
         "status":"PASS",
         "result_id":result_id,
@@ -244,6 +255,7 @@ def main():
             "12":{"status":"FUTURE_LIVE_PROOF_REQUIRED","target_date_ist":"2026-10-05"},
         },
         "stocks":{},
+        "user_outputs":{"nifty":{},"stocks":{}},
         "errors":[],
     }
     tasks=[
