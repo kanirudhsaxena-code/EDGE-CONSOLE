@@ -186,7 +186,7 @@ async function persistFiveDrAssessment(sql:any,assessment:JsonRecord):Promise<vo
 
 async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refreshed:boolean;source?:string;detail?:string}>{
   try{
-    // First trust a complete assessment already refreshed inside the governed 5DR DB.
+    // First trust a complete assessment already refreshed inside the Console DB.
     const latest=await sql`select created_at,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
     if(latest.length&&isObject(latest[0].metrics)&&fiveDrAssessmentMetricsComplete(latest[0].metrics)){
       const createdAt=String(latest[0].created_at??'');
@@ -196,38 +196,56 @@ async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refresh
       }
     }
 
-    // The production Console already owns the authoritative 5DR DATABASE_URL.
-    // Rebuild the exact canonical assessment locally from that DB before any
-    // network/state-branch fallback. This removes GitHub dispatch/cron from the
-    // critical execution path without changing assessment methodology.
-    const local=await buildFiveDrAssessmentFromDatabase(sql);
-    if(local.ok){
-      const assessment=local.assessment as JsonRecord;
-      if(
-        assessment.engine==='5DR'&&
-        isNonEmptyString(assessment.forecast_id)&&
-        isNonEmptyString(assessment.assessed_at)&&
-        isObject(assessment.metrics)&&
-        fiveDrAssessmentMetricsComplete(assessment.metrics)
-      ){
-        await persistFiveDrAssessment(sql,assessment);
-        return {ok:true,refreshed:true,source:'LOCAL_CANONICAL_DB_REBUILD'};
+    // Rebuild locally only when this database actually carries the governed
+    // 5DR canonical lifecycle schema. Console persistence and 5DR canonical
+    // persistence are separate databases in production, so schema absence is
+    // an expected fallback condition rather than a fatal execution error.
+    let localDetail='local 5DR canonical schema is unavailable';
+    try{
+      const schemaRows=await sql`
+        select to_regclass('public.canonical_selections') as canonical_selections,
+               to_regclass('public.forecasts') as forecasts,
+               to_regclass('public.outcome_checkpoints') as outcome_checkpoints
+      `;
+      const schema=schemaRows[0]??{};
+      const localSchemaReady=Boolean(schema.canonical_selections&&schema.forecasts&&schema.outcome_checkpoints);
+      if(localSchemaReady){
+        const local=await buildFiveDrAssessmentFromDatabase(sql);
+        if(local.ok){
+          const assessment=local.assessment as JsonRecord;
+          if(
+            assessment.engine==='5DR'&&
+            isNonEmptyString(assessment.forecast_id)&&
+            isNonEmptyString(assessment.assessed_at)&&
+            isObject(assessment.metrics)&&
+            fiveDrAssessmentMetricsComplete(assessment.metrics)
+          ){
+            await persistFiveDrAssessment(sql,assessment);
+            return {ok:true,refreshed:true,source:'LOCAL_CANONICAL_DB_REBUILD'};
+          }
+          localDetail='local 5DR canonical assessment payload is incomplete';
+        }else{
+          localDetail=`local 5DR canonical assessment rebuild unavailable (${local.detail})`;
+        }
       }
+    }catch(error){
+      localDetail=`local 5DR canonical assessment rebuild failed: ${error instanceof Error?error.message:String(error)}`;
     }
 
-    // Compatibility fallback only: consume the immutable 5DR handoff if it is
-    // itself fresh and complete. A stale handoff is never treated as fresh.
+    // Authoritative cross-database fallback: 5DR-V2 publishes a complete
+    // immutable handoff three times per hour. Accept it only inside the same
+    // two-hour freshness window and only with an exact complete ledger.
     const response=await fetch(FIVE_DR_ASSESSMENT_HANDOFF_URL,{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
-    if(!response.ok)return {ok:false,refreshed:false,detail:`local assessment rebuild unavailable (${local.ok?'invalid local payload':local.detail}); handoff fetch failed: HTTP ${response.status}`};
+    if(!response.ok)return {ok:false,refreshed:false,detail:`${localDetail}; handoff fetch failed: HTTP ${response.status}`};
     const handoff:unknown=await response.json();
-    if(!isObject(handoff)||handoff.schema_version!=='5DR_ASSESSMENT_HANDOFF_V1')return {ok:false,refreshed:false,detail:'assessment handoff schema mismatch'};
+    if(!isObject(handoff)||handoff.schema_version!=='5DR_ASSESSMENT_HANDOFF_V1')return {ok:false,refreshed:false,detail:`${localDetail}; assessment handoff schema mismatch`};
     const generatedAt=String(handoff.generated_at??'');
-    if(!generatedAt||Number.isNaN(Date.parse(generatedAt)))return {ok:false,refreshed:false,detail:'assessment handoff generated_at is invalid'};
+    if(!generatedAt||Number.isNaN(Date.parse(generatedAt)))return {ok:false,refreshed:false,detail:`${localDetail}; assessment handoff generated_at is invalid`};
     const handoffAge=Date.now()-Date.parse(generatedAt);
-    if(handoffAge < -5*60_000||handoffAge > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:false,refreshed:false,detail:`local assessment rebuild unavailable (${local.ok?'invalid local payload':local.detail}); assessment handoff is stale`};
+    if(handoffAge < -5*60_000||handoffAge > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:false,refreshed:false,detail:`${localDetail}; assessment handoff is stale`};
     const assessment=isObject(handoff.assessment)?handoff.assessment as JsonRecord:null;
-    if(!assessment||assessment.engine!=='5DR'||!isNonEmptyString(assessment.forecast_id)||!isNonEmptyString(assessment.assessed_at)||!isObject(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff payload is invalid'};
-    if(!fiveDrAssessmentMetricsComplete(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff snapshot or recommendation ledger is incomplete'};
+    if(!assessment||assessment.engine!=='5DR'||!isNonEmptyString(assessment.forecast_id)||!isNonEmptyString(assessment.assessed_at)||!isObject(assessment.metrics))return {ok:false,refreshed:false,detail:`${localDetail}; assessment handoff payload is invalid`};
+    if(!fiveDrAssessmentMetricsComplete(assessment.metrics))return {ok:false,refreshed:false,detail:`${localDetail}; assessment handoff snapshot or recommendation ledger is incomplete`};
     await persistFiveDrAssessment(sql,assessment);
     return {ok:true,refreshed:true,source:'IMMUTABLE_HANDOFF_FALLBACK'};
   }catch(error){
