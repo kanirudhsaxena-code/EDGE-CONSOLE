@@ -6,6 +6,7 @@ import { componentVerificationStatus, validateEdgeStocksResult } from './edge-st
 import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { buildFiveDrAssessmentFromDatabase } from './five-dr-assessment-builder';
 
 type Env = AccessIdentityEnv & {
   ASSETS: Fetcher;
@@ -164,44 +165,71 @@ function fiveDrAssessmentMetricsComplete(value:unknown):boolean{
     && ledger.length===expectedCount;
 }
 
-async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refreshed:boolean;detail?:string}>{
+async function persistFiveDrAssessment(sql:any,assessment:JsonRecord):Promise<void>{
+  const sourceId=String(assessment.forecast_id);
+  const assessedAt=String(assessment.assessed_at);
+  await sql`
+    insert into assessment_rollups (engine,source_id,assessed_at,headline,score,metrics)
+    values (
+      '5DR',${sourceId},${assessedAt}::timestamptz,
+      ${isNonEmptyString(assessment.outcome)?String(assessment.outcome):null},
+      ${typeof assessment.score==='number'?assessment.score:null},
+      ${JSON.stringify(assessment.metrics)}::jsonb
+    )
+    on conflict (engine,source_id,assessed_at) do update
+    set headline=excluded.headline,
+        score=excluded.score,
+        metrics=excluded.metrics,
+        created_at=now()
+  `;
+}
+
+async function refreshFiveDrAssessmentState(sql:any):Promise<{ok:boolean;refreshed:boolean;source?:string;detail?:string}>{
   try{
+    // First trust a complete assessment already refreshed inside the governed 5DR DB.
+    const latest=await sql`select created_at,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
+    if(latest.length&&isObject(latest[0].metrics)&&fiveDrAssessmentMetricsComplete(latest[0].metrics)){
+      const createdAt=String(latest[0].created_at??'');
+      const age=createdAt&&!Number.isNaN(Date.parse(createdAt))?Date.now()-Date.parse(createdAt):Number.POSITIVE_INFINITY;
+      if(age>=-5*60_000&&age<=FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS){
+        return {ok:true,refreshed:false,source:'ASSESSMENT_ROLLUP'};
+      }
+    }
+
+    // The production Console already owns the authoritative 5DR DATABASE_URL.
+    // Rebuild the exact canonical assessment locally from that DB before any
+    // network/state-branch fallback. This removes GitHub dispatch/cron from the
+    // critical execution path without changing assessment methodology.
+    const local=await buildFiveDrAssessmentFromDatabase(sql);
+    if(local.ok){
+      const assessment=local.assessment as JsonRecord;
+      if(
+        assessment.engine==='5DR'&&
+        isNonEmptyString(assessment.forecast_id)&&
+        isNonEmptyString(assessment.assessed_at)&&
+        isObject(assessment.metrics)&&
+        fiveDrAssessmentMetricsComplete(assessment.metrics)
+      ){
+        await persistFiveDrAssessment(sql,assessment);
+        return {ok:true,refreshed:true,source:'LOCAL_CANONICAL_DB_REBUILD'};
+      }
+    }
+
+    // Compatibility fallback only: consume the immutable 5DR handoff if it is
+    // itself fresh and complete. A stale handoff is never treated as fresh.
     const response=await fetch(FIVE_DR_ASSESSMENT_HANDOFF_URL,{headers:{'Accept':'application/json','Cache-Control':'no-cache'}});
-    if(!response.ok)return {ok:false,refreshed:false,detail:'assessment handoff fetch failed: HTTP '+response.status};
+    if(!response.ok)return {ok:false,refreshed:false,detail:`local assessment rebuild unavailable (${local.ok?'invalid local payload':local.detail}); handoff fetch failed: HTTP ${response.status}`};
     const handoff:unknown=await response.json();
     if(!isObject(handoff)||handoff.schema_version!=='5DR_ASSESSMENT_HANDOFF_V1')return {ok:false,refreshed:false,detail:'assessment handoff schema mismatch'};
     const generatedAt=String(handoff.generated_at??'');
     if(!generatedAt||Number.isNaN(Date.parse(generatedAt)))return {ok:false,refreshed:false,detail:'assessment handoff generated_at is invalid'};
     const handoffAge=Date.now()-Date.parse(generatedAt);
-    if(handoffAge < -5*60_000||handoffAge > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:false,refreshed:false,detail:'assessment handoff is stale'};
+    if(handoffAge < -5*60_000||handoffAge > FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:false,refreshed:false,detail:`local assessment rebuild unavailable (${local.ok?'invalid local payload':local.detail}); assessment handoff is stale`};
     const assessment=isObject(handoff.assessment)?handoff.assessment as JsonRecord:null;
     if(!assessment||assessment.engine!=='5DR'||!isNonEmptyString(assessment.forecast_id)||!isNonEmptyString(assessment.assessed_at)||!isObject(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff payload is invalid'};
     if(!fiveDrAssessmentMetricsComplete(assessment.metrics))return {ok:false,refreshed:false,detail:'assessment handoff snapshot or recommendation ledger is incomplete'};
-
-    const latest=await sql`select created_at,metrics from assessment_rollups where engine='5DR' order by created_at desc,id desc limit 1`;
-    if(latest.length&&isObject(latest[0].metrics)&&fiveDrAssessmentMetricsComplete(latest[0].metrics)){
-      const createdAt=String(latest[0].created_at??'');
-      const age=createdAt&&!Number.isNaN(Date.parse(createdAt))?Date.now()-Date.parse(createdAt):Number.POSITIVE_INFINITY;
-      if(age>=-5*60_000&&age<=FIVE_DR_ASSESSMENT_SNAPSHOT_MAX_AGE_MS)return {ok:true,refreshed:false};
-    }
-
-    const sourceId=String(assessment.forecast_id);
-    const assessedAt=String(assessment.assessed_at);
-    await sql`
-      insert into assessment_rollups (engine,source_id,assessed_at,headline,score,metrics)
-      values (
-        '5DR',${sourceId},${assessedAt}::timestamptz,
-        ${isNonEmptyString(assessment.outcome)?String(assessment.outcome):null},
-        ${typeof assessment.score==='number'?assessment.score:null},
-        ${JSON.stringify(assessment.metrics)}::jsonb
-      )
-      on conflict (engine,source_id,assessed_at) do update
-      set headline=excluded.headline,
-          score=excluded.score,
-          metrics=excluded.metrics,
-          created_at=now()
-    `;
-    return {ok:true,refreshed:true};
+    await persistFiveDrAssessment(sql,assessment);
+    return {ok:true,refreshed:true,source:'IMMUTABLE_HANDOFF_FALLBACK'};
   }catch(error){
     return {ok:false,refreshed:false,detail:error instanceof Error?error.message:String(error)};
   }
