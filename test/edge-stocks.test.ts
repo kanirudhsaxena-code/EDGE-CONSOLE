@@ -30,6 +30,16 @@ const valid = {
     table_3:'CURRENT_STOCK_OUTCOME',
     table_4:'DRILLDOWN'
   },
+  run_readiness:{
+    data_acquisition:'PASS',
+    data_freshness:'PASS',
+    deep_research_executed_this_cycle:'PASS',
+    final_evidence_manifest:'PASS',
+    computation:'PASS',
+    persistence:'PASS',
+    research_coverage:{status:'PASS',verified:5,required:5,display:'5/5',verified_categories:['BUSINESS_FUNDAMENTALS','INSTITUTIONAL_BEHAVIOUR','NEWS_EVENTS_CATALYSTS','VALUATION','EVENT_SHOCK'],missing_categories:[]},
+    reconciliation:{status:'PASS',outcome:'FULLY_VERIFIED',excluded_components:[],conflicted_components:[]}
+  },
   master_assessment:{
     recommendations:6,unique_stocks:4,open_recommendations:6,closed_recommendations:0,
     official_scorable_recommendations:0,
@@ -124,4 +134,22 @@ test('standard output requires exact visible D:D+4 regime and evidence semantics
   const errors=validateEdgeStocksResult(bad);
   assert.ok(errors.some(x=>x.includes('regime_context is mandatory')));
   assert.ok(errors.some(x=>x.includes('evidence_basis is mandatory')));
+});
+
+
+test('publication fails when readiness is not 5/5',()=>{
+  const bad=structuredClone(valid);
+  bad.run_readiness.research_coverage.verified=4;
+  bad.run_readiness.research_coverage.display='4/5';
+  bad.run_readiness.research_coverage.missing_categories=['VALUATION'];
+  assert.ok(validateEdgeStocksResult(bad).some(x=>x.includes('complete 5/5')));
+});
+
+test('publication fails when deep research or reconciliation is not complete',()=>{
+  const bad=structuredClone(valid);
+  bad.run_readiness.deep_research_executed_this_cycle='FAIL';
+  bad.run_readiness.reconciliation.status='BLOCKED';
+  const errors=validateEdgeStocksResult(bad);
+  assert.ok(errors.some(x=>x.includes('deep_research_executed_this_cycle must be PASS')));
+  assert.ok(errors.some(x=>x.includes('reconciliation.status must be PASS')));
 });
