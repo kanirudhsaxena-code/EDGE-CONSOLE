@@ -76,25 +76,28 @@ try{
     if(expectedId){
       await page.waitForFunction(id=>document.querySelector('#stocksSummary')?.textContent?.includes(id),expectedId,{timeout:60000});
     }
-    if(String(process.env.REQUIRE_G5_PARITY||'').toLowerCase()==='true'){
-      await page.waitForSelector('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row="D+4"]',{timeout:60000});
-      const renderedRows=await page.evaluate(()=>{
-        const nodes=[...document.querySelectorAll('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row]')];
-        if(nodes.length!==5)throw new Error('EDGE Stocks Console must render exactly five D:D+4 rows');
-        return nodes.map(node=>({
-          session_label:node.getAttribute('data-edge-forecast-row')||'',
-          trading_date:node.getAttribute('data-edge-trading-date')||'',
-          direction:node.getAttribute('data-edge-direction')||'',
-          zone_low:node.getAttribute('data-edge-zone-low')||'',
-          zone_high:node.getAttribute('data-edge-zone-high')||'',
-          bull:node.getAttribute('data-edge-bull')||'',
-          base:node.getAttribute('data-edge-base')||'',
-          bear:node.getAttribute('data-edge-bear')||'',
-          text:node.innerText||''
-        }));
-      });
-      fs.writeFileSync('/tmp/chat-five-session-rendered.json',JSON.stringify(renderedRows,null,2)+'\n','utf8');
-    }
+    // G5 presentation closure: every standard EDGE Stocks capture must wait for
+    // the exact persisted D:D+4 path. This is no longer an optional parity mode.
+    await page.waitForSelector('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row="D+4"]',{timeout:60000});
+    const renderedRows=await page.evaluate(()=>{
+      const nodes=[...document.querySelectorAll('#stocksSummary [data-edge-five-session-path="D:D+4"] [data-edge-forecast-row]')];
+      if(nodes.length!==5)throw new Error('EDGE Stocks Console must render exactly five D:D+4 rows');
+      return nodes.map(node=>({
+        session_label:node.getAttribute('data-edge-forecast-row')||'',
+        trading_date:node.getAttribute('data-edge-trading-date')||'',
+        direction:node.getAttribute('data-edge-direction')||'',
+        zone_low:node.getAttribute('data-edge-zone-low')||'',
+        zone_high:node.getAttribute('data-edge-zone-high')||'',
+        bull:node.getAttribute('data-edge-bull')||'',
+        base:node.getAttribute('data-edge-base')||'',
+        bear:node.getAttribute('data-edge-bear')||'',
+        regime_context:node.getAttribute('data-edge-regime-context')||'',
+        evidence_basis:node.getAttribute('data-edge-evidence-basis')||'',
+        verification_state:node.getAttribute('data-edge-verification-state')||'',
+        text:node.innerText||''
+      }));
+    });
+    fs.writeFileSync('/tmp/chat-five-session-rendered.json',JSON.stringify(renderedRows,null,2)+'\n','utf8');
     const parts=await page.evaluate(()=>{
       const eyebrow=document.querySelector('#selectedModuleEyebrow')?.textContent?.trim()||'';
       const title=document.querySelector('#selectedModuleTitle')?.textContent?.trim()||'';
