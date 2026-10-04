@@ -84,9 +84,20 @@ export async function recoverBlocked5drAcquisition(
     ...sync.evidence,
     received_at: recoveredAt,
   };
+  const recoveredProvenance = isObject(sync.evidence)
+    ? {
+        trigger_type: sync.evidence.trigger_type ?? null,
+        evidence_mode: sync.evidence.evidence_mode ?? null,
+        market_session_as_of: sync.evidence.market_session_as_of ?? null,
+        research_as_of: sync.evidence.research_as_of ?? null,
+        target_session: sync.evidence.target_session ?? null,
+        benchmark_role: sync.evidence.benchmark_role ?? null,
+      }
+    : metadata.run_provenance;
   const next = {
     ...metadata,
     automated_market_evidence: envelope,
+    run_provenance: recoveredProvenance,
     freshness_at: isObject(sync.evidence) ? sync.evidence.captured_at ?? null : null,
     adapter_stage: 'AUTOMATED_MARKET_DATA_READY',
     acquisition_sync: {
