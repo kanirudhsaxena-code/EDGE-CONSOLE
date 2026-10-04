@@ -44,6 +44,7 @@ test('NIFTY manifest enumerates all eight mandatory deep-research dimensions',()
     'EVENT_SHOCK'
   ]);
   const institutional=SYSTEM_RESEARCH_SOURCES.filter(s=>s.dimensions.includes('INSTITUTIONAL_FLOWS'));
+  assert.ok(institutional.some(s=>s.id==='NSE_FII_DII_API'));
   assert.ok(institutional.some(s=>s.id==='NSE_FII_DII_ACTIVITY'));
   assert.ok(institutional.every(s=>s.authority==='OFFICIAL_MARKET'));
 });
@@ -51,7 +52,7 @@ test('NIFTY manifest enumerates all eight mandatory deep-research dimensions',()
 test('research manifest fails closed when any mandatory dimension has no retrieved source',async()=>{
   const fetcher=async(url:RequestInfo|URL)=>{
     const u=String(url);
-    if(u.includes('/reports/fii-dii'))return new Response('blocked',{status:503});
+    if(u.includes('/api/fiidiiTradeReact')||u.includes('/reports/fii-dii'))return new Response('blocked',{status:503});
     return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
   };
   const result=await acquireSystemResearch(fetcher as typeof fetch);
@@ -62,10 +63,14 @@ test('research manifest fails closed when any mandatory dimension has no retriev
 test('research manifest passes only when every dimension has attributable retrieved evidence',async()=>{
   const fetcher=async(url:RequestInfo|URL)=>{
     const u=String(url);
-    if(u.includes('/reports/fii-dii'))return new Response(
-      '<html>DII 03-Oct-2026 13,209.23 11,599.76 1,609.47 FII/FPI 03-Oct-2026 11,634.11 11,769.68 -135.57</html>',
-      {status:200,headers:{'content-type':'text/html'}}
+    if(u.includes('/api/fiidiiTradeReact'))return new Response(
+      JSON.stringify([
+        {category:'DII',date:'03-Oct-2026',buyValue:'13,209.23',sellValue:'11,599.76',netValue:'1,609.47'},
+        {category:'FII/FPI',date:'03-Oct-2026',buyValue:'11,634.11',sellValue:'11,769.68',netValue:'-135.57'}
+      ]),
+      {status:200,headers:{'content-type':'application/json'}}
     );
+    if(u.includes('/reports/fii-dii'))return new Response('<html>official report shell</html>',{status:200,headers:{'content-type':'text/html'}});
     if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
     return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
   };
@@ -82,6 +87,7 @@ test('research manifest passes only when every dimension has attributable retrie
 test('institutional-flow manifest requires parsed FII and DII values, not HTTP 200 alone',async()=>{
   const fetcher=async(url:RequestInfo|URL)=>{
     const u=String(url);
+    if(u.includes('/api/fiidiiTradeReact'))return new Response('[]',{status:200,headers:{'content-type':'application/json'}});
     if(u.includes('/reports/fii-dii'))return new Response('<html>FII/FPI and DII report shell without values</html>',{status:200,headers:{'content-type':'text/html'}});
     if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
     return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
@@ -91,19 +97,24 @@ test('institutional-flow manifest requires parsed FII and DII values, not HTTP 2
   assert.ok(result.missing_dimensions.includes('INSTITUTIONAL_FLOWS'));
 });
 
-test('institutional-flow parser admits explicit current FII and DII net-flow facts',async()=>{
+test('institutional-flow parser admits explicit current FII and DII net-flow facts from the official NSE API',async()=>{
   const fetcher=async(url:RequestInfo|URL)=>{
     const u=String(url);
-    if(u.includes('/reports/fii-dii'))return new Response(
-      '<html>DII 03-Oct-2026 13,209.23 11,599.76 1,609.47 FII/FPI 03-Oct-2026 11,634.11 11,769.68 -135.57</html>',
-      {status:200,headers:{'content-type':'text/html'}}
+    if(u.includes('/api/fiidiiTradeReact'))return new Response(
+      JSON.stringify([
+        {category:'DII',date:'03-Oct-2026',buyValue:'13,209.23',sellValue:'11,599.76',netValue:'1,609.47'},
+        {category:'FII/FPI',date:'03-Oct-2026',buyValue:'11,634.11',sellValue:'11,769.68',netValue:'-135.57'}
+      ]),
+      {status:200,headers:{'content-type':'application/json'}}
     );
+    if(u.includes('/reports/fii-dii'))return new Response('<html>report shell without injected rows</html>',{status:200,headers:{'content-type':'text/html'}});
     if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
     return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
   };
   const result=await acquireSystemResearch(fetcher as typeof fetch);
   assert.equal(result.by_dimension.INSTITUTIONAL_FLOWS.ready_for_interpretation,true);
-  const row=result.snapshots.find(s=>s.source_id==='NSE_FII_DII_ACTIVITY');
+  assert.ok(result.by_dimension.INSTITUTIONAL_FLOWS.source_ids.includes('NSE_FII_DII_API'));
+  const row=result.snapshots.find(s=>s.source_id==='NSE_FII_DII_API');
   assert.deepEqual(row?.facts?.dii,{date:'03-Oct-2026',buy_crore:13209.23,sell_crore:11599.76,net_crore:1609.47});
   assert.deepEqual(row?.facts?.fii_fpi,{date:'03-Oct-2026',buy_crore:11634.11,sell_crore:11769.68,net_crore:-135.57});
 });
