@@ -88,6 +88,20 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
       if(gift)facts.gift_nifty={last:Number(gift.LASTPRICE),percent_change:Number(gift.PERCHANGE),day_change:Number(gift.DAYCHANGE),expiry:gift.EXPIRYDATE,timestamp:gift.TIMESTMP};
       return Object.keys(facts).length?facts:undefined;
     }
+    if(source.id==='NSE_FII_DII_ACTIVITY'){
+      const rows=[...excerpt.matchAll(/\b(DII|FII\/FPI)\s+(\d{1,2}-[A-Za-z]{3}-20\d{2})\s+([\d,.]+)\s+([\d,.]+)\s+(-?[\d,.]+)/g)];
+      const parse=(v:string)=>Number(v.replace(/,/g,''));
+      const facts:Record<string,unknown>={};
+      for(const row of rows){
+        const key=row[1]==='DII'?'dii':'fii_fpi';
+        if(facts[key])continue;
+        const buy=parse(row[3]),sell=parse(row[4]),net=parse(row[5]);
+        if([buy,sell,net].every(Number.isFinite)){
+          facts[key]={date:row[2],buy_crore:buy,sell_crore:sell,net_crore:net};
+        }
+      }
+      return facts.dii&&facts.fii_fpi?facts:undefined;
+    }
     if(source.id==='EIA_CRUDE_SPOT'){
       const wti=excerpt.match(/WTI\s*-\s*Cushing, Oklahoma\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
       const brent=excerpt.match(/Brent\s*-\s*Europe\s+([\d.\s]+?)(?=\s+\d{4}-\d{4})/i);
@@ -224,7 +238,13 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
   }
   const by_dimension={} as Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
   for(const dimension of REQUIRED_NIFTY_RESEARCH_DIMENSIONS){
-    const retrievedRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.dimensions.includes(dimension));
+    const retrievedRows=snapshots.filter(item=>{
+      if(item.status!=='RETRIEVED'||!item.dimensions.includes(dimension))return false;
+      if(dimension==='INSTITUTIONAL_FLOWS'){
+        return item.source_id==='NSE_FII_DII_ACTIVITY'&&!!item.facts&&!!item.facts.dii&&!!item.facts.fii_fpi;
+      }
+      return true;
+    });
     by_dimension[dimension]={
       retrieved:retrievedRows.length,
       ready_for_interpretation:retrievedRows.length>0,
