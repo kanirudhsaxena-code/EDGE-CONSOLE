@@ -1,30 +1,14 @@
 {
   "acceptance_date_ist": "2026-10-04",
-  "errors": [],
-  "generated_at": "2026-10-03T23:21:42.770231Z",
-  "nifty": {
-    "framework_version": "5DR_V2_1",
-    "g1_market_evidence": "PASS",
-    "g2_system_research": "PASS",
-    "g3_intelligence_reconciliation": "PASS",
-    "g4_normalized_dispatch": "PASS",
-    "g5_result_sync_publish": "PASS",
-    "output_contract_version": "5DR_V2_1_2",
-    "provenance": {
-      "benchmark_role": "NONE",
-      "evidence_mode": "CLOSED_SESSION",
-      "market_session_as_of": "2026-10-04",
-      "research_as_of": "2026-10-03T23:17:32.171608+00:00",
-      "target_session": null,
-      "trigger_type": "USER"
-    },
-    "published": true,
-    "request_id": "5drreq_670b2c8b-49a5-41d2-a94e-6e3b1494c556",
-    "run_id": "5drrun_7d773cfd-6971-42f0-9682-dda93652f1a4",
-    "status": "PASS"
-  },
+  "errors": [
+    {
+      "error": "AssertionError: NIFTY Sunday evidence_mode is not CLOSED_SESSION :: {\"trigger_type\": \"USER\", \"evidence_mode\": null, \"benchmark_role\": \"NONE\", \"research_as_of\": null, \"target_session\": null, \"market_session_as_of\": null}",
+      "task": "nifty"
+    }
+  ],
+  "generated_at": "2026-10-04T07:04:56.962528Z",
   "point_9_smoke": {
-    "checked_at": "2026-10-03T23:16:29.088670Z",
+    "checked_at": "2026-10-04T06:55:23.355019Z",
     "dispatch": "READY",
     "health": "READY",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V1",
@@ -32,10 +16,10 @@
   },
   "points": {
     "10": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "11": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "12": {
       "status": "FUTURE_LIVE_PROOF_REQUIRED",
@@ -46,7 +30,7 @@
       "status": "PASS"
     },
     "9": {
-      "status": "PASS"
+      "status": "FAIL"
     }
   },
   "schema": "MDOS_G5_1_CLOSURE_PROOF_V1",
@@ -54,7 +38,7 @@
     "CUPID": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "817c202b6efe122cd93cfc5a1f7f6b775ab48a721a559222e808b4e976557cfa",
+      "forecast_path_hash": "f49220e8b0d088ef69484c9344765c3df44635a6756ad3f17a108b30cffa5e31",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -71,7 +55,7 @@
         "trigger_type": "USER"
       },
       "research_bundle_id": "g51-closure-cupid-20261004",
-      "result_id": "EDGE-CUPID-20261003-232009-AUTO",
+      "result_id": "EDGE-CUPID-20261004-070320-AUTO",
       "session_labels": [
         "D",
         "D+1",
@@ -84,7 +68,7 @@
     "LTF": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "92e9ccca56b3fa6a2b70552ac7c9d0397c96cbd99517ed364656885f298d6183",
+      "forecast_path_hash": "42b76909b74a477707c969f5bd2d3f26d76afe1d9f73d338bcd41bd62c4f153d",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -101,7 +85,7 @@
         "trigger_type": "USER"
       },
       "research_bundle_id": "g51-closure-ltf-20261004",
-      "result_id": "EDGE-LTF-20261003-231916-AUTO",
+      "result_id": "EDGE-LTF-20261004-070228-AUTO",
       "session_labels": [
         "D",
         "D+1",
@@ -114,7 +98,7 @@
     "RELIANCE": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "9b86fc2d8b759212f314a2370bf32901c6d1025e6c8745fec0852802ee145a49",
+      "forecast_path_hash": "bc0d1a6d7afb3b46a5d682c8cbc599ac80c3bd84b7a00bce8d6bfcfafaadc7f3",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -131,7 +115,7 @@
         "trigger_type": "USER"
       },
       "research_bundle_id": "g51-closure-reliance-20261004",
-      "result_id": "EDGE-RELIANCE-20261003-232102-AUTO",
+      "result_id": "EDGE-RELIANCE-20261004-070416-AUTO",
       "session_labels": [
         "D",
         "D+1",

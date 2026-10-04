@@ -5,18 +5,23 @@
       "basis": "authoritative 5DR assessment handoff refresh repaired and consumed by completed NIFTY execution"
     },
     "9": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "10": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "11": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "12": {
       "status": "FUTURE_LIVE_PROOF_REQUIRED",
       "target_date_ist": "2026-10-05"
     }
   },
-  "errors": []
+  "errors": [
+    {
+      "task": "nifty",
+      "error": "AssertionError: NIFTY Sunday evidence_mode is not CLOSED_SESSION :: {\"trigger_type\": \"USER\", \"evidence_mode\": null, \"benchmark_role\": \"NONE\", \"research_as_of\": null, \"target_session\": null, \"market_session_as_of\": null}"
+    }
+  ]
 }
