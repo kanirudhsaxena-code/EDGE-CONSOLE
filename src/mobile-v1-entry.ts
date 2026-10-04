@@ -376,8 +376,65 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   const screenshotReady=screenshotIntelligence.status==='VISION_READY';
   if(!automated.length&&!screenshotReady)return json({error:'system research requires ready automated market evidence or screenshot fallback evidence',automated_status:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence.status??null:null,vision_status:screenshotIntelligence.status??null},409);
   const acquisition=await acquireSystemResearch();
-  const allReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
-  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',...acquisition};
+  const categoryReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
+  const retrievedIds=new Set(
+    acquisition.snapshots
+      .filter(item=>item.status==='RETRIEVED')
+      .map(item=>item.source_id)
+  );
+  const hasAny=(...ids:string[])=>ids.some(id=>retrievedIds.has(id));
+  const researchDimensions={
+    GLOBAL_MARKET_REGIME:{
+      ready:hasAny('CME_SP500_FUTURES'),
+      source_ids:['CME_SP500_FUTURES']
+    },
+    MACRO_RATES_FX:{
+      ready:hasAny('FED_MONETARY_POLICY','FED_LATEST_FOMC_STATEMENT')
+        && hasAny('RBI_HOME','RBI_CURRENT_RATES'),
+      source_ids:['FED_MONETARY_POLICY','FED_LATEST_FOMC_STATEMENT','RBI_HOME','RBI_CURRENT_RATES']
+    },
+    COMMODITIES_CROSS_ASSET:{
+      ready:hasAny('EIA_CRUDE_SPOT'),
+      source_ids:['EIA_CRUDE_SPOT']
+    },
+    INSTITUTIONAL_FLOWS:{
+      ready:hasAny('NSE_FII_DII_ACTIVITY'),
+      source_ids:['NSE_FII_DII_ACTIVITY']
+    },
+    BREADTH_SECTOR_LEADERSHIP:{
+      ready:hasAny('NSE_ALL_INDICES'),
+      source_ids:['NSE_ALL_INDICES']
+    },
+    DERIVATIVES_VOLATILITY:{
+      ready:hasAny('NSE_NIFTY_OPTION_CHAIN','NSE_OPTION_CHAIN_PAGE')
+        && hasAny('NSE_ALL_INDICES'),
+      source_ids:['NSE_NIFTY_OPTION_CHAIN','NSE_OPTION_CHAIN_PAGE','NSE_ALL_INDICES']
+    },
+    NEWS_CATALYSTS:{
+      ready:hasAny('FED_FOMC_CALENDAR','FED_LATEST_FOMC_STATEMENT')
+        && hasAny('RBI_HOME'),
+      source_ids:['FED_FOMC_CALENDAR','FED_LATEST_FOMC_STATEMENT','RBI_HOME']
+    },
+    EVENT_SHOCK:{
+      ready:hasAny('FED_MONETARY_POLICY','FED_LATEST_FOMC_STATEMENT')
+        && hasAny('RBI_HOME','RBI_CURRENT_RATES')
+        && hasAny('EIA_CRUDE_SPOT'),
+      source_ids:['FED_MONETARY_POLICY','FED_LATEST_FOMC_STATEMENT','RBI_HOME','RBI_CURRENT_RATES','EIA_CRUDE_SPOT']
+    }
+  };
+  const missingResearchDimensions=Object.entries(researchDimensions)
+    .filter(([,value])=>!value.ready)
+    .map(([key])=>key);
+  const researchManifest={
+    status:missingResearchDimensions.length?'INCOMPLETE':'COMPLETE',
+    verified_dimensions:Object.keys(researchDimensions).length-missingResearchDimensions.length,
+    required_dimensions:Object.keys(researchDimensions).length,
+    display:(Object.keys(researchDimensions).length-missingResearchDimensions.length)+'/'+Object.keys(researchDimensions).length,
+    dimensions:researchDimensions,
+    missing_dimensions:missingResearchDimensions,
+  };
+  const allReady=categoryReady&&missingResearchDimensions.length===0;
+  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',research_manifest:researchManifest,...acquisition};
   const nextStage=allReady?'RESEARCH_RETRIEVED':String(metadata.adapter_stage??'');
   await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record,adapter_stage:nextStage})}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ok:allReady,request_id:requestId,adapter_stage:nextStage,system_research:record,next_step:allReady?'RECONCILE_INTELLIGENCE':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
