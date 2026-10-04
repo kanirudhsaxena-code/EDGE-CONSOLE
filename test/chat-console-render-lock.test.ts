@@ -76,3 +76,10 @@ test('EDGE Stocks Chat capture always requires complete D:D+4 parity and visible
   assert.match(workflow,/Evidence:/);
   assert.match(workflow,/if module=='EDGE_STOCKS':/);
 });
+
+
+test('stock Chat parity compares regime evidence and verification fields to governed source',()=>{
+  assert.match(workflow,/r\.get\('regime_context'\)==str\(s\.get\('regime_context'\) or ''\)/);
+  assert.match(workflow,/r\.get\('evidence_basis'\)==str\(s\.get\('evidence_basis'\) or ''\)/);
+  assert.match(workflow,/r\.get\('verification_state'\)==str\(s\.get\('verification_state'\) or ''\)/);
+});
