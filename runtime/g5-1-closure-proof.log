@@ -5,18 +5,27 @@
       "basis": "authoritative 5DR assessment handoff refresh repaired and consumed by completed NIFTY execution"
     },
     "9": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "10": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "11": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "12": {
       "status": "FUTURE_LIVE_PROOF_REQUIRED",
       "target_date_ist": "2026-10-05"
     }
   },
-  "errors": []
+  "errors": [
+    {
+      "task": "nifty",
+      "error": "AssertionError: NIFTY production run did not complete inside closure window"
+    },
+    {
+      "task": "LTF",
+      "error": "AssertionError: LTF did not complete inside closure window"
+    }
+  ]
 }
