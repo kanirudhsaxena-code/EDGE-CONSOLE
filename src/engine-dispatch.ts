@@ -29,7 +29,7 @@ export type EngineDispatchHealth={
   ok:boolean;
   status:'READY'|'CONFIGURATION_BLOCKED'|'PERMISSION_BLOCKED'|'WORKFLOW_NOT_FOUND'|'UNAVAILABLE';
   repository:string;
-  workflows:{acquisition:string;execution:string};
+  workflows:{acquisition:string;execution:string;assessment:string};
   detail?:string;
 };
 
@@ -40,12 +40,19 @@ export async function check5drWorkflowAccess(
   const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
   const acquisition=env.FIVEDR_ACQUIRE_WORKFLOW?.trim()||DEFAULT_ACQUIRE_WORKFLOW;
   const execution=env.FIVEDR_WORKFLOW?.trim()||DEFAULT_WORKFLOW;
+  const assessment=env.FIVEDR_ASSESSMENT_WORKFLOW?.trim()||DEFAULT_ASSESSMENT_WORKFLOW;
+  const assessmentRepository=env.FIVEDR_ASSESSMENT_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
   const token=env.GITHUB_ACTIONS_TOKEN?.trim();
-  const workflows={acquisition,execution};
+  const workflows={acquisition,execution,assessment};
   if(!token)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflows,detail:'5DR workflow dispatch credential is not configured'};
   try{
-    for(const workflow of [acquisition,execution]){
-      const response=await fetcher(`https://api.github.com/repos/${repository}/actions/workflows/${encodeURIComponent(workflow)}`,{
+    const required=[
+      {repository,workflow:acquisition},
+      {repository,workflow:execution},
+      {repository:assessmentRepository,workflow:assessment}
+    ];
+    for(const item of required){
+      const response=await fetcher(`https://api.github.com/repos/${item.repository}/actions/workflows/${encodeURIComponent(item.workflow)}`,{
         method:'GET',
         headers:{
           'accept':'application/vnd.github+json',
