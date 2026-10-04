@@ -46,7 +46,7 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
 
   {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
   {id:'NSE_OPTION_CHAIN_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/option-chain',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
-  {id:'NSE_DERIVATIVES_SNAPSHOT_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY','INSTITUTIONAL_FLOWS'],url:'https://www.nseindia.com/market-data/analysis-and-tools-derivatives-market-snapshot',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_DERIVATIVES_SNAPSHOT_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/market-data/analysis-and-tools-derivatives-market-snapshot',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
   {id:'NSE_DERIVATIVES_WATCH_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/market-data/equity-derivatives-watch',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'}
 ] as const;
 
