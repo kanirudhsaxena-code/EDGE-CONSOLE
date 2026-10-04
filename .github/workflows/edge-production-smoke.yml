@@ -172,16 +172,18 @@ jobs:
           assert data['trading_enabled'] is False, data
           PY
 
-      - name: Validate TCS Efficacy V2 report contract
+      - name: Validate current compliant Efficacy V2 report contract
         run: |
           set -euo pipefail
-          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/report?ticker=TCS' \
-            -o /tmp/report.json
+          # Reuse the side-effect-free current LTF report fetched above. Historical
+          # pre-semantic-persistence fixtures (for example legacy TCS) are expected
+          # to fail closed under the 4-Oct G5.1 presentation authority.
+          cp /tmp/ltf-report.json /tmp/report.json
           python - <<'PY'
           import json, math
           d=json.load(open('/tmp/report.json'))
           r=d['report']
+          assert r['ticker']=='LTF', r
           assert r['contract_version']=='EDGE_STOCKS_V1_3', r
           assert r['presentation_contract']=='EFFICACY_V2', r
           pres=r['presentation']
@@ -192,9 +194,24 @@ jobs:
           m=r['master_assessment']
           assert 'official_scorable_recommendations' in m, m
           assert 'provisional_forecast_accuracy_pct' in m, m
-          probs=r['current_stock_outcome']['probabilities']
+          outcome=r['current_stock_outcome']
+          probs=outcome['probabilities']
           total=sum(float(probs[k]) for k in ('bull','base','bear'))
           assert math.isclose(total,100.0,abs_tol=0.01), total
+          assert outcome['forecast_horizon']=='D:D+4', outcome
+          sessions=outcome['forecast_sessions']
+          expected=['D','D+1','D+2','D+3','D+4']
+          assert len(sessions)==5 and [x['session_label'] for x in sessions]==expected, sessions
+          for row in sessions:
+              assert row.get('trading_date'), row
+              assert row.get('direction'), row
+              assert row.get('regime_context'), row
+              assert row.get('evidence_basis'), row
+              assert row.get('verification_state'), row
+              p=row.get('probabilities') or {}
+              assert math.isclose(sum(float(p[k]) for k in ('bull','base','bear')),100.0,abs_tol=0.01), row
+              zone=row.get('expected_zone') or {}
+              assert zone.get('low') is not None and zone.get('high') is not None, row
           assert r['drilldown'], r
           for row in r['drilldown']:
               if row['verification_status']=='VERIFIED':
@@ -202,6 +219,7 @@ jobs:
                   assert text, row
                   assert 'no additional interpretation' not in text, row
                   assert 'retained in immutable audit record' not in text, row
+                  assert 'legacy_score_reconstruction' not in str(row.get('narrative_source') or '').lower(), row
           PY
 
       - name: Validate canonical V1.3 renderer asset
