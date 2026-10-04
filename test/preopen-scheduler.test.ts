@@ -60,3 +60,20 @@ test('Monday pre-open guarantees the three governed EDGE Stocks targets',()=>{
   assert.match(scheduler,/for\(const ticker of REQUIRED_PREOPEN_STOCK_TICKERS\)/);
   assert.match(scheduler,/command:`EDGE \$\{ticker\}`/);
 });
+
+
+test('08:50 PREP starts fresh NIFTY acquisition/research and same-cycle stock research boundary',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(scheduler,/prep_only:true/);
+  assert.match(scheduler,/cf-preopen-prep-/);
+  assert.match(scheduler,/PREOPEN_PREP_STARTED/);
+  assert.match(scheduler,/research_not_before/);
+  assert.match(scheduler,/research_refresh_required/);
+  assert.match(scheduler,/T03:20:00\.000Z/);
+});
+
+test('09:10 stock canonical attempts are bound to the same 08:50 research lifecycle',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(scheduler,/canonical_requested_at:now\.toISOString\(\)/);
+  assert.match(scheduler,/research_not_before:researchNotBefore/);
+});
