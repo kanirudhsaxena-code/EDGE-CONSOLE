@@ -70,6 +70,33 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
     requiredNumber(d, 'effective_conviction', 0, 1, errors, 'current_stock_outcome');
     if (!isNonEmptyString(d.definitive_forecast)) errors.push('current_stock_outcome.definitive_forecast is mandatory');
     if (!isNonEmptyString(d.forecast_horizon)) errors.push('current_stock_outcome.forecast_horizon is mandatory');
+    if (options.requireForecastPath !== false) {
+      if (d.forecast_horizon !== 'D:D+4') errors.push('current_stock_outcome.forecast_horizon must be D:D+4');
+      const expected=['D','D+1','D+2','D+3','D+4'];
+      if (!Array.isArray(d.forecast_sessions) || d.forecast_sessions.length !== 5) {
+        errors.push('current_stock_outcome.forecast_sessions must contain exactly D through D+4');
+      } else {
+        d.forecast_sessions.forEach((session,index)=>{
+          if (!isObject(session)) { errors.push(`current_stock_outcome.forecast_sessions[${index}] must be an object`); return; }
+          const row=session as JsonRecord;
+          if (row.session_label !== expected[index]) errors.push(`current_stock_outcome.forecast_sessions[${index}].session_label must be ${expected[index]}`);
+          if (!isNonEmptyString(row.trading_date)) errors.push(`current_stock_outcome.forecast_sessions[${index}].trading_date is mandatory`);
+          if (!isNonEmptyString(row.direction)) errors.push(`current_stock_outcome.forecast_sessions[${index}].direction is mandatory`);
+          if (!isNonEmptyString(row.regime_context)) errors.push(`current_stock_outcome.forecast_sessions[${index}].regime_context is mandatory`);
+          if (!isNonEmptyString(row.evidence_basis)) errors.push(`current_stock_outcome.forecast_sessions[${index}].evidence_basis is mandatory`);
+          if (!isNonEmptyString(row.verification_state)) errors.push(`current_stock_outcome.forecast_sessions[${index}].verification_state is mandatory`);
+          if (!isObject(row.expected_zone)) errors.push(`current_stock_outcome.forecast_sessions[${index}].expected_zone is mandatory`);
+          if (!isObject(row.probabilities)) errors.push(`current_stock_outcome.forecast_sessions[${index}].probabilities is mandatory`);
+          else {
+            const p=row.probabilities as JsonRecord;
+            for (const key of ['bull','base','bear']) requiredNumber(p,key,0,100,errors,`current_stock_outcome.forecast_sessions[${index}].probabilities`);
+            if (typeof p.bull==='number' && typeof p.base==='number' && typeof p.bear==='number' && Math.abs(p.bull+p.base+p.bear-100)>0.01) {
+              errors.push(`current_stock_outcome.forecast_sessions[${index}].probabilities must sum to 100 within 0.01`);
+            }
+          }
+        });
+      }
+    }
     if (!isNonEmptyString(d.primary_action)) errors.push('current_stock_outcome.primary_action is mandatory');
     if (!isNonEmptyString(d.decision_ladder)) errors.push('current_stock_outcome.decision_ladder is mandatory');
     if (!isObject(d.market_trust)) errors.push('current_stock_outcome.market_trust is mandatory');
