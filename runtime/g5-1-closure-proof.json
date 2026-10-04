@@ -1,7 +1,7 @@
 {
   "acceptance_date_ist": "2026-10-04",
   "errors": [],
-  "generated_at": "2026-10-04T13:56:49.852187Z",
+  "generated_at": "2026-10-04T14:04:42.611998Z",
   "nifty": {
     "framework_version": "5DR_V2_1",
     "g1_market_evidence": "PASS",
@@ -14,17 +14,17 @@
       "benchmark_role": "NONE",
       "evidence_mode": "CLOSED_SESSION",
       "market_session_as_of": "2026-10-04",
-      "research_as_of": "2026-10-04T13:52:45.431360+00:00",
+      "research_as_of": "2026-10-04T14:00:51.401830+00:00",
       "target_session": null,
       "trigger_type": "USER"
     },
     "published": true,
-    "request_id": "5drreq_6ea3198b-715f-413f-b706-ac379ca1407d",
-    "run_id": "5drrun_7e6169d2-0300-41cd-a4e9-ca3d1f854fee",
+    "request_id": "5drreq_19eaf1eb-a8ea-4e6f-ab51-25d09dd06915",
+    "run_id": "5drrun_bed398ae-a158-4b2b-aed3-ae9ab76e468a",
     "status": "PASS"
   },
   "point_9_smoke": {
-    "checked_at": "2026-10-04T13:51:49.167259Z",
+    "checked_at": "2026-10-04T13:59:49.780078Z",
     "dispatch": "READY",
     "health": "READY",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V1",
@@ -54,7 +54,7 @@
     "CUPID": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "bb7789712921228a1401428db1fc380c0a093bfbef48593fdcf6bfc596a383a6",
+      "forecast_path_hash": "87c1da6f3219b452a754fc3023ccb37d17e59be6a8956bd423fd5251400d8dc5",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -66,12 +66,12 @@
         "candidate_type": "USER_CANONICAL_SNAPSHOT",
         "evidence_mode": "CLOSED_SESSION",
         "market_session_as_of": "2026-10-01T00:00:00.000Z",
-        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "research_as_of": "2026-10-04T13:58:13.000Z",
         "target_session": "2026-10-05T00:00:00.000Z",
         "trigger_type": "USER"
       },
-      "research_bundle_id": "g51-closure-cupid-20261004",
-      "result_id": "EDGE-CUPID-20261004-135515-AUTO",
+      "research_bundle_id": "g51-closure-cupid-20261004-135813z",
+      "result_id": "EDGE-CUPID-20261004-140319-AUTO",
       "session_labels": [
         "D",
         "D+1",
@@ -84,7 +84,7 @@
     "LTF": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "0050d588e55021aea2a7187a8097dbf6733a54928051bdea20d68e509ffc064b",
+      "forecast_path_hash": "c5f446e70c6b7388e2435236ae32f4f2695f669553635668d9c17a8fdf929662",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -96,12 +96,12 @@
         "candidate_type": "USER_CANONICAL_SNAPSHOT",
         "evidence_mode": "CLOSED_SESSION",
         "market_session_as_of": "2026-10-01T00:00:00.000Z",
-        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "research_as_of": "2026-10-04T13:58:13.000Z",
         "target_session": "2026-10-05T00:00:00.000Z",
         "trigger_type": "USER"
       },
-      "research_bundle_id": "g51-closure-ltf-20261004",
-      "result_id": "EDGE-LTF-20261004-135430-AUTO",
+      "research_bundle_id": "g51-closure-ltf-20261004-135813z",
+      "result_id": "EDGE-LTF-20261004-140227-AUTO",
       "session_labels": [
         "D",
         "D+1",
@@ -114,7 +114,7 @@
     "RELIANCE": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "dd511a5c4c3e9f2a283a8aee8e2fcda2dca8898e3032091ae41294539927b4ba",
+      "forecast_path_hash": "675f054a2e413a5def9db7b71c3da04903538401a94e556265711869c28e0c5d",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -126,12 +126,12 @@
         "candidate_type": "USER_CANONICAL_SNAPSHOT",
         "evidence_mode": "CLOSED_SESSION",
         "market_session_as_of": "2026-10-01T00:00:00.000Z",
-        "research_as_of": "2026-10-03T22:53:00.000Z",
+        "research_as_of": "2026-10-04T13:58:13.000Z",
         "target_session": "2026-10-05T00:00:00.000Z",
         "trigger_type": "USER"
       },
-      "research_bundle_id": "g51-closure-reliance-20261004",
-      "result_id": "EDGE-RELIANCE-20261004-135607-AUTO",
+      "research_bundle_id": "g51-closure-reliance-20261004-135813z",
+      "result_id": "EDGE-RELIANCE-20261004-140410-AUTO",
       "session_labels": [
         "D",
         "D+1",
