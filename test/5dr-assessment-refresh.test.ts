@@ -62,15 +62,21 @@ test('assessment refresh production binding uses authoritative 5DR repository di
 });
 
 
-test('stale assessment is rebuilt from the authoritative 5DR database before remote handoff fallback',()=>{
+test('assessment refresh probes local schema and falls back to authoritative immutable handoff when Console DB is separate',()=>{
   const start=router.indexOf('async function refreshFiveDrAssessmentState');
   const end=router.indexOf('async function fiveDrExecutionContext',start);
   const block=router.slice(start,end);
+  const schemaProbe=block.indexOf("to_regclass('public.canonical_selections')");
   const local=block.indexOf('buildFiveDrAssessmentFromDatabase(sql)');
   const remote=block.indexOf('FIVE_DR_ASSESSMENT_HANDOFF_URL');
-  assert.ok(local>0,'local assessment rebuild must be present');
-  assert.ok(remote>local,'remote immutable handoff may only be a fallback after local DB rebuild');
+  assert.ok(schemaProbe>0,'local schema probe must be present');
+  assert.ok(local>schemaProbe,'local assessment rebuild may run only after canonical schema verification');
+  assert.ok(remote>local,'remote immutable handoff remains the governed cross-database fallback');
+  assert.match(block,/local 5DR canonical schema is unavailable/);
+  assert.match(block,/catch\(error\)/);
   assert.match(block,/source:'LOCAL_CANONICAL_DB_REBUILD'/);
+  assert.match(block,/source:'IMMUTABLE_HANDOFF_FALLBACK'/);
+  assert.match(block,/fiveDrAssessmentMetricsComplete\(assessment\.metrics\)/);
   assert.match(block,/persistFiveDrAssessment\(sql,assessment\)/);
 });
 
