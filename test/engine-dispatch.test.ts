@@ -47,9 +47,10 @@ test('5DR workflow health is ready only when both governed workflows are accessi
   const result=await check5drWorkflowAccess({GITHUB_ACTIONS_TOKEN:'secret-value'},fetcher as typeof fetch);
   assert.equal(result.ok,true);
   assert.equal(result.status,'READY');
-  assert.equal(urls.length,2);
-  assert.match(urls[0],/console-acquire\.yml$/);
-  assert.match(urls[1],/console-execute\.yml$/);
+  assert.equal(urls.length,3);
+  assert.match(urls[0],/5DR-V2\/actions\/workflows\/console-acquire\.yml$/);
+  assert.match(urls[1],/5DR-V2\/actions\/workflows\/console-execute\.yml$/);
+  assert.match(urls[2],/5DR-V2\/actions\/workflows\/assessment-refresh\.yml$/);
 });
 
 test('5DR workflow health reports repository permission blocker without leaking provider body',async()=>{
@@ -121,4 +122,23 @@ test('dispatches dedicated pre-open acquisition workflow',async()=>{
   assert.match(seenUrl,/5dr-console-preopen-acquire-proxy\.yml\/dispatches$/);
   const body=JSON.parse(String(seenInit?.body));
   assert.deepEqual(body,{ref:'main',inputs:{request_id:'5drreq_test',console_url:'https://edge-console.example.test'}});
+});
+
+
+test('5DR workflow health checks assessment permission in its configured authoritative repository',async()=>{
+  const urls:string[]=[];
+  const fetcher=async(url:RequestInfo|URL)=>{urls.push(String(url));return new Response('{}',{status:200,headers:{'content-type':'application/json'}});};
+  const result=await check5drWorkflowAccess({
+    GITHUB_ACTIONS_TOKEN:'secret-value',
+    FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    FIVEDR_ACQUIRE_WORKFLOW:'5dr-console-acquire-proxy.yml',
+    FIVEDR_WORKFLOW:'5dr-console-execute-proxy.yml',
+    FIVEDR_ASSESSMENT_REPOSITORY:'kanirudhsaxena-code/5DR-V2',
+    FIVEDR_ASSESSMENT_WORKFLOW:'assessment-refresh.yml'
+  },fetcher as typeof fetch);
+  assert.equal(result.ok,true);
+  assert.equal(urls.length,3);
+  assert.match(urls[0],/EDGE---V1\/actions\/workflows\/5dr-console-acquire-proxy\.yml$/);
+  assert.match(urls[1],/EDGE---V1\/actions\/workflows\/5dr-console-execute-proxy\.yml$/);
+  assert.match(urls[2],/5DR-V2\/actions\/workflows\/assessment-refresh\.yml$/);
 });
