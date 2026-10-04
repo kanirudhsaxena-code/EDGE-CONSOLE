@@ -43,6 +43,31 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
     if (presentation.table_4 !== 'DRILLDOWN') errors.push('presentation.table_4 must be DRILLDOWN');
   }
 
+  const readiness=body.run_readiness;
+  if (!isObject(readiness)) errors.push('run_readiness is mandatory');
+  else {
+    for (const key of ['data_acquisition','data_freshness','deep_research_executed_this_cycle','final_evidence_manifest','computation','persistence']) {
+      if (readiness[key] !== 'PASS') errors.push(`run_readiness.${key} must be PASS`);
+    }
+    const coverage=readiness.research_coverage;
+    if (!isObject(coverage)) errors.push('run_readiness.research_coverage is mandatory');
+    else {
+      if (coverage.status !== 'PASS') errors.push('run_readiness.research_coverage.status must be PASS');
+      if (coverage.required !== 5 || coverage.verified !== 5 || coverage.display !== '5/5') {
+        errors.push('run_readiness.research_coverage must be complete 5/5');
+      }
+      if (!Array.isArray(coverage.missing_categories) || coverage.missing_categories.length !== 0) {
+        errors.push('run_readiness.research_coverage.missing_categories must be empty');
+      }
+    }
+    const reconciliation=readiness.reconciliation;
+    if (!isObject(reconciliation)) errors.push('run_readiness.reconciliation is mandatory');
+    else {
+      if (reconciliation.status !== 'PASS') errors.push('run_readiness.reconciliation.status must be PASS');
+      if (!isNonEmptyString(reconciliation.outcome)) errors.push('run_readiness.reconciliation.outcome is mandatory');
+    }
+  }
+
   const master = body.master_assessment;
   if (!isObject(master)) errors.push('master_assessment is mandatory');
   else {
