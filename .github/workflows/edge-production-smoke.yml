@@ -112,7 +112,7 @@ jobs:
           python - <<'PY'
           import json
           d=json.load(open('/tmp/no-research.json'))
-          assert d.get('code')=='EDGE_RESEARCH_BUNDLE_REQUIRED', d
+          assert d.get('code')=='EDGE_NEW_RUN_RESEARCH_REQUIRED', d
           assert d.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1', d
           PY
 
