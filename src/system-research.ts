@@ -24,6 +24,8 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
   {id:'NSE_ALL_INDICES',category:'MARKET_TRUST',url:'https://www.nseindia.com/api/allIndices',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
   {id:'NSE_INDEX_PERFORMANCE_PAGE',category:'MARKET_TRUST',url:'https://www.nseindia.com/market-data/index-performances',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
   {id:'NSE_LIVE_MARKET_PAGE',category:'MARKET_TRUST',url:'https://www.nseindia.com/market-data/live-t0-market',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_FII_DII_ACTIVITY',category:'MARKET_TRUST',url:'https://www.nseindia.com/reports/fii-dii',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'CME_SP500_FUTURES',category:'MARKET_TRUST',url:'https://www.cmegroup.com/markets/equities/sp/e-mini-sandp500.quotes.html',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
 
   {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
