@@ -8,7 +8,7 @@ const renderer=fs.readFileSync('public/edge-live.js','utf8');
 
 test('5DR Console persists acquisition provenance independently from canonical attempt metadata',()=>{
   assert.match(mobile,/run_provenance:/);
-  assert.match(mobile,/trigger_type:canonicalAttempt\?'SCHEDULED':'USER'/);
+  assert.match(mobile,/trigger_type:prepOnly\?'SCHEDULED_PREP':canonicalAttempt\?'SCHEDULED':'USER'/);
   assert.match(mobile,/automatedRunProvenance\(body\)/);
   assert.match(router,/run_provenance: isObject\(metadata\.run_provenance\)/);
 });
