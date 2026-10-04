@@ -4,15 +4,11 @@
     {
       "error": "AssertionError: NIFTY production run did not complete inside closure window",
       "task": "nifty"
-    },
-    {
-      "error": "AssertionError: LTF did not complete inside closure window",
-      "task": "LTF"
     }
   ],
-  "generated_at": "2026-10-04T16:35:47.066119Z",
+  "generated_at": "2026-10-04T16:55:08.833560Z",
   "point_9_smoke": {
-    "checked_at": "2026-10-04T16:19:39.053525Z",
+    "checked_at": "2026-10-04T16:43:46.268226Z",
     "dispatch": "READY",
     "health": "READY",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V1",
@@ -42,7 +38,7 @@
     "CUPID": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "8bb3904fede1384a41d2a06974bd83af7f3fe67c1196505350b398a857b02930",
+      "forecast_path_hash": "a7d18e46e54f028f3ae772f6e77cae31d75182956bbd14d7f2d4aade59fa7634",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -59,7 +55,37 @@
         "trigger_type": "USER"
       },
       "research_bundle_id": "g51-closure-cupid-20261004-161642z",
-      "result_id": "EDGE-CUPID-20261004-163419-AUTO",
+      "result_id": "EDGE-CUPID-20261004-165349-AUTO",
+      "session_labels": [
+        "D",
+        "D+1",
+        "D+2",
+        "D+3",
+        "D+4"
+      ],
+      "status": "PASS"
+    },
+    "LTF": {
+      "contract_version": "EDGE_STOCKS_V1_3",
+      "forecast_horizon": "D:D+4",
+      "forecast_path_hash": "03f6ce5a8362d547c9ae1622eb8f4a976767d5d556becc00f7da7c25bdebad99",
+      "g1_fresh_research": "PASS",
+      "g2_bundle_validation": "PASS",
+      "g3_frozen_compute": "PASS",
+      "g4_governance_persistence": "PASS",
+      "g5_immutable_D_D4_presentation": "PASS",
+      "presentation_contract": "EFFICACY_V2",
+      "provenance": {
+        "benchmark_role": "NONE",
+        "candidate_type": "USER_CANONICAL_SNAPSHOT",
+        "evidence_mode": "CLOSED_SESSION",
+        "market_session_as_of": "2026-10-01T00:00:00.000Z",
+        "research_as_of": "2026-10-04T16:42:30.000Z",
+        "target_session": "2026-10-05T00:00:00.000Z",
+        "trigger_type": "USER"
+      },
+      "research_bundle_id": "g51-closure-ltf-20261004-164230z",
+      "result_id": "EDGE-LTF-20261004-165258-AUTO",
       "session_labels": [
         "D",
         "D+1",
@@ -72,7 +98,7 @@
     "RELIANCE": {
       "contract_version": "EDGE_STOCKS_V1_3",
       "forecast_horizon": "D:D+4",
-      "forecast_path_hash": "2af80b714ef571a19ca595dea60934de3238f112c7de272c8a2e5c67801d266f",
+      "forecast_path_hash": "d120b989ee8f65d7d87a3ad198287642b7ba3cb37c4385f6b5b0430b91b6fa33",
       "g1_fresh_research": "PASS",
       "g2_bundle_validation": "PASS",
       "g3_frozen_compute": "PASS",
@@ -89,7 +115,7 @@
         "trigger_type": "USER"
       },
       "research_bundle_id": "g51-closure-reliance-20261004-161642z",
-      "result_id": "EDGE-RELIANCE-20261004-163509-AUTO",
+      "result_id": "EDGE-RELIANCE-20261004-165432-AUTO",
       "session_labels": [
         "D",
         "D+1",

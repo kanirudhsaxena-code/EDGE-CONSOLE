@@ -22,10 +22,6 @@
     {
       "task": "nifty",
       "error": "AssertionError: NIFTY production run did not complete inside closure window"
-    },
-    {
-      "task": "LTF",
-      "error": "AssertionError: LTF did not complete inside closure window"
     }
   ]
 }
