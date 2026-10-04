@@ -376,8 +376,15 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   const screenshotReady=screenshotIntelligence.status==='VISION_READY';
   if(!automated.length&&!screenshotReady)return json({error:'system research requires ready automated market evidence or screenshot fallback evidence',automated_status:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence.status??null:null,vision_status:screenshotIntelligence.status??null},409);
   const acquisition=await acquireSystemResearch();
-  const allReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
-  const record={status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',retrieved_at:new Date().toISOString(),market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',...acquisition};
+  const categoryReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
+  const allReady=categoryReady&&acquisition.research_manifest_complete;
+  const record={
+    status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',
+    retrieved_at:new Date().toISOString(),
+    market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',
+    research_manifest:'NIFTY_G5_1_V1',
+    ...acquisition
+  };
   const nextStage=allReady?'RESEARCH_RETRIEVED':String(metadata.adapter_stage??'');
   await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record,adapter_stage:nextStage})}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ok:allReady,request_id:requestId,adapter_stage:nextStage,system_research:record,next_step:allReady?'RECONCILE_INTELLIGENCE':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);

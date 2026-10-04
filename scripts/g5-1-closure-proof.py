@@ -122,7 +122,22 @@ def run_nifty(proof):
     require(prov.get("benchmark_role")=="NONE","NIFTY Sunday run incorrectly claims benchmark role",prov)
     require((meta.get("invocation") or {}).get("canonical_attempt") is False,"NIFTY Sunday user run became canonical attempt",meta.get("invocation"))
     require((meta.get("automated_market_evidence") or {}).get("status")=="AUTOMATED_MARKET_DATA_READY","NIFTY market evidence not ready",meta.get("automated_market_evidence"))
-    require((meta.get("system_research_acquisition") or {}).get("status")=="RESEARCH_RETRIEVED","NIFTY system research not retrieved",meta.get("system_research_acquisition"))
+    research=meta.get("system_research_acquisition") or {}
+    require(research.get("status")=="RESEARCH_RETRIEVED","NIFTY system research not retrieved",research)
+    require(research.get("research_manifest")=="NIFTY_G5_1_V1","NIFTY research manifest version missing",research)
+    require(research.get("research_manifest_complete") is True,"NIFTY mandatory research manifest incomplete",research)
+    require((research.get("missing_dimensions") or [])==[],"NIFTY research manifest has missing dimensions",research)
+    required_dimensions={
+        "GLOBAL_MARKET_REGIME","MACRO_RATES_FX","COMMODITIES_CROSS_ASSET",
+        "INSTITUTIONAL_FLOWS","BREADTH_SECTOR_LEADERSHIP","DERIVATIVES_VOLATILITY",
+        "NEWS_CATALYSTS","EVENT_SHOCK"
+    }
+    by_dimension=research.get("by_dimension") or {}
+    require(required_dimensions.issubset(set(by_dimension)), "NIFTY research dimensions absent", by_dimension)
+    for dimension in sorted(required_dimensions):
+        row=by_dimension.get(dimension) or {}
+        require(row.get("ready_for_interpretation") is True and int(row.get("retrieved") or 0)>0,
+                f"NIFTY research dimension {dimension} is not independently retrieved",row)
     require((meta.get("intelligence_reconciliation") or {}).get("status")=="NORMALIZED_AND_DISPATCHED","NIFTY intelligence handoff not dispatched",meta.get("intelligence_reconciliation"))
     require((meta.get("engine_dispatch") or {}).get("status")=="RESULT_SYNCED","NIFTY engine result not synced",meta.get("engine_dispatch"))
 
@@ -143,6 +158,7 @@ def run_nifty(proof):
         },
         "g1_market_evidence":"PASS",
         "g2_system_research":"PASS",
+        "g2a_research_manifest_8_8":"PASS",
         "g3_intelligence_reconciliation":"PASS",
         "g4_normalized_dispatch":"PASS",
         "g5_result_sync_publish":"PASS",
@@ -165,6 +181,29 @@ def run_stock(ticker,proof):
             f"{ticker} dispatch failed",{"code":code,"body":start,"stderr":err})
     status_path=str(start.get("next") or "")
     require(status_path,f"{ticker} status URL missing",start)
+    research_bundle_id=str(start.get("research_bundle_id") or "")
+    require(research_bundle_id,f"{ticker} stored research bundle id missing",start)
+    rcode,research_envelope,_=api("GET",f"/api/edge-stocks/research-bundles/{research_bundle_id}")
+    require(rcode==200 and isinstance(research_envelope.get("research_bundle"),dict),
+            f"{ticker} stored research bundle readback failed",research_envelope)
+    stored=research_envelope["research_bundle"]
+    require(str(stored.get("status") or "")=="READY",f"{ticker} stored research is not READY",stored)
+    payload=stored.get("payload") or {}
+    claims=payload.get("claims") or []
+    required_categories={
+        "BUSINESS_FUNDAMENTALS","INSTITUTIONAL_BEHAVIOUR",
+        "NEWS_EVENTS_CATALYSTS","VALUATION","EVENT_SHOCK"
+    }
+    verified={
+        str(c.get("evidence_category") or "")
+        for c in claims
+        if isinstance(c,dict)
+        and str(c.get("verification_status") or "")=="VERIFIED"
+        and c.get("independent_validation") is True
+    }
+    require(required_categories.issubset(verified),
+            f"{ticker} stored research coverage is not 5/5",
+            {"required":sorted(required_categories),"verified":sorted(verified),"bundle_id":research_bundle_id})
 
     terminal=None
     for _ in range(60):
@@ -208,7 +247,8 @@ def run_stock(ticker,proof):
     proof["stocks"][ticker]={
         "status":"PASS",
         "result_id":result_id,
-        "research_bundle_id":start.get("research_bundle_id"),
+        "research_bundle_id":research_bundle_id,
+        "research_coverage":"5/5",
         "contract_version":report.get("contract_version"),
         "presentation_contract":report.get("presentation_contract"),
         "forecast_horizon":"D:D+4",
