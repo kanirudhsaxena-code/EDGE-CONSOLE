@@ -1,8 +1,20 @@
 export type SystemResearchCategory='MARKET_TRUST'|'EVENT_SHOCK'|'EXECUTION_RISK';
-export type ResearchSource={id:string;category:SystemResearchCategory;url:string;authority:'PRIMARY'|'OFFICIAL_MARKET';accept:string};
+export const REQUIRED_NIFTY_RESEARCH_DIMENSIONS=[
+  'GLOBAL_MARKET_REGIME',
+  'MACRO_RATES_FX',
+  'COMMODITIES_CROSS_ASSET',
+  'INSTITUTIONAL_FLOWS',
+  'BREADTH_SECTOR_LEADERSHIP',
+  'DERIVATIVES_VOLATILITY',
+  'NEWS_CATALYSTS',
+  'EVENT_SHOCK'
+] as const;
+export type NiftyResearchDimension=typeof REQUIRED_NIFTY_RESEARCH_DIMENSIONS[number];
+export type ResearchSource={id:string;category:SystemResearchCategory;dimensions:readonly NiftyResearchDimension[];url:string;authority:'PRIMARY'|'OFFICIAL_MARKET';accept:string};
 export type ResearchSnapshot={
   source_id:string;
   category:SystemResearchCategory;
+  dimensions:readonly NiftyResearchDimension[];
   source_ref:string;
   authority:'PRIMARY'|'OFFICIAL_MARKET';
   retrieved_at:string;
@@ -20,21 +32,22 @@ export type ResearchSnapshot={
 // datacentre/API traffic. A successful fetch means only "retrieved for interpretation";
 // it never means the market state is neutral or verified.
 export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
-  {id:'NSE_MARKET_STATUS',category:'MARKET_TRUST',url:'https://www.nseindia.com/api/marketStatus',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
-  {id:'NSE_ALL_INDICES',category:'MARKET_TRUST',url:'https://www.nseindia.com/api/allIndices',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
-  {id:'NSE_INDEX_PERFORMANCE_PAGE',category:'MARKET_TRUST',url:'https://www.nseindia.com/market-data/index-performances',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
-  {id:'NSE_LIVE_MARKET_PAGE',category:'MARKET_TRUST',url:'https://www.nseindia.com/market-data/live-t0-market',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_MARKET_STATUS',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','MACRO_RATES_FX','NEWS_CATALYSTS'],url:'https://www.nseindia.com/api/marketStatus',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
+  {id:'NSE_ALL_INDICES',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP','DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/api/allIndices',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
+  {id:'NSE_INDEX_PERFORMANCE_PAGE',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP'],url:'https://www.nseindia.com/market-data/index-performances',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_LIVE_MARKET_PAGE',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP'],url:'https://www.nseindia.com/market-data/live-t0-market',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_FII_DII_ACTIVITY',category:'MARKET_TRUST',dimensions:['INSTITUTIONAL_FLOWS'],url:'https://www.nseindia.com/reports/fii-dii',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
 
-  {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'RBI_HOME',category:'EVENT_SHOCK',url:'https://www.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',url:'https://m.rbi.org.in/Scripts/NotificationUser.aspx?Id=10001&Mode=0',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'EIA_CRUDE_SPOT',category:'EVENT_SHOCK',url:'https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'RBI_HOME',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://m.rbi.org.in/Scripts/NotificationUser.aspx?Id=10001&Mode=0',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'EIA_CRUDE_SPOT',category:'EVENT_SHOCK',dimensions:['COMMODITIES_CROSS_ASSET','EVENT_SHOCK'],url:'https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
 
-  {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
-  {id:'NSE_OPTION_CHAIN_PAGE',category:'EXECUTION_RISK',url:'https://www.nseindia.com/option-chain',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
-  {id:'NSE_DERIVATIVES_SNAPSHOT_PAGE',category:'EXECUTION_RISK',url:'https://www.nseindia.com/market-data/analysis-and-tools-derivatives-market-snapshot',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
-  {id:'NSE_DERIVATIVES_WATCH_PAGE',category:'EXECUTION_RISK',url:'https://www.nseindia.com/market-data/equity-derivatives-watch',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'}
+  {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
+  {id:'NSE_OPTION_CHAIN_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/option-chain',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_DERIVATIVES_SNAPSHOT_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY','INSTITUTIONAL_FLOWS'],url:'https://www.nseindia.com/market-data/analysis-and-tools-derivatives-market-snapshot',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_DERIVATIVES_WATCH_PAGE',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/market-data/equity-derivatives-watch',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'}
 ] as const;
 
 const MAX_SOURCE_BYTES=512*1024;
@@ -171,21 +184,27 @@ export async function acquireResearchSource(source:ResearchSource,fetcher:typeof
       'referer':source.url.includes('nseindia.com')?'https://www.nseindia.com/':'https://www.google.com/'
     },redirect:'follow'});
     const content_type=response.headers.get('content-type')||undefined;
-    if(!response.ok)return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:`SOURCE_HTTP_${response.status}`};
+    if(!response.ok)return {source_id:source.id,category:source.category,dimensions:source.dimensions,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:`SOURCE_HTTP_${response.status}`};
     const body=await boundedText(response);
-    if(!body.trim())return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY'};
+    if(!body.trim())return {source_id:source.id,category:source.category,dimensions:source.dimensions,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY'};
     const excerpt=cleanExcerpt(body);
-    if(!excerpt)return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY_AFTER_CLEANING'};
+    if(!excerpt)return {source_id:source.id,category:source.category,dimensions:source.dimensions,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',http_status:response.status,content_type,limitation:'SOURCE_EMPTY_AFTER_CLEANING'};
     const facts=extractFacts(source,body,excerpt);
-    return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'RETRIEVED',http_status:response.status,content_type,sha256:await digest(body),excerpt,facts};
+    return {source_id:source.id,category:source.category,dimensions:source.dimensions,source_ref:source.url,authority:source.authority,retrieved_at,status:'RETRIEVED',http_status:response.status,content_type,sha256:await digest(body),excerpt,facts};
   }catch(error){
     const message=error instanceof Error?error.message:'';
     const reason=message==='SOURCE_TOO_LARGE'?'SOURCE_TOO_LARGE':message.toLowerCase().includes('abort')?'SOURCE_TIMEOUT':'SOURCE_FETCH_FAILED';
-    return {source_id:source.id,category:source.category,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',limitation:reason};
+    return {source_id:source.id,category:source.category,dimensions:source.dimensions,source_ref:source.url,authority:source.authority,retrieved_at,status:'UNAVAILABLE',limitation:reason};
   }
 }
 
-export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<{snapshots:ResearchSnapshot[];by_category:Record<SystemResearchCategory,{retrieved:number;unavailable:number;ready_for_interpretation:boolean}>}>{
+export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<{
+  snapshots:ResearchSnapshot[];
+  by_category:Record<SystemResearchCategory,{retrieved:number;unavailable:number;ready_for_interpretation:boolean}>;
+  by_dimension:Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
+  research_manifest_complete:boolean;
+  missing_dimensions:NiftyResearchDimension[];
+}>{
   const snapshots=await Promise.all(SYSTEM_RESEARCH_SOURCES.map(source=>acquireResearchSource(source,fetcher)));
   const fedLanding=snapshots.find(s=>s.source_id==='FED_MONETARY_POLICY'&&s.status==='RETRIEVED');
   const release=fedLanding?.excerpt?.match(/FOMC Statement:[\s\S]{0,160}?Released\s+([A-Za-z]+)\s+(\d{1,2}),\s+(20\d{2})/i);
@@ -193,7 +212,7 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
     const monthMap:Record<string,string>={January:'01',February:'02',March:'03',April:'04',May:'05',June:'06',July:'07',August:'08',September:'09',October:'10',November:'11',December:'12'};
     const mm=monthMap[release[1]],dd=release[2].padStart(2,'0'),yyyy=release[3];
     if(mm){
-      const latest:ResearchSource={id:'FED_LATEST_FOMC_STATEMENT',category:'EVENT_SHOCK',url:`https://www.federalreserve.gov/newsevents/pressreleases/monetary${yyyy}${mm}${dd}a.htm`,authority:'PRIMARY',accept:'text/html,*/*;q=0.5'};
+      const latest:ResearchSource={id:'FED_LATEST_FOMC_STATEMENT',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:`https://www.federalreserve.gov/newsevents/pressreleases/monetary${yyyy}${mm}${dd}a.htm`,authority:'PRIMARY',accept:'text/html,*/*;q=0.5'};
       snapshots.push(await acquireResearchSource(latest,fetcher));
     }
   }
@@ -203,5 +222,21 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
     const group=snapshots.filter(item=>item.category===category);const retrieved=group.filter(item=>item.status==='RETRIEVED').length;
     by_category[category]={retrieved,unavailable:group.length-retrieved,ready_for_interpretation:retrieved>0};
   }
-  return {snapshots,by_category};
+  const by_dimension={} as Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
+  for(const dimension of REQUIRED_NIFTY_RESEARCH_DIMENSIONS){
+    const retrievedRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.dimensions.includes(dimension));
+    by_dimension[dimension]={
+      retrieved:retrievedRows.length,
+      ready_for_interpretation:retrievedRows.length>0,
+      source_ids:retrievedRows.map(item=>item.source_id)
+    };
+  }
+  const missing_dimensions=REQUIRED_NIFTY_RESEARCH_DIMENSIONS.filter(d=>!by_dimension[d].ready_for_interpretation);
+  return {
+    snapshots,
+    by_category,
+    by_dimension,
+    research_manifest_complete:missing_dimensions.length===0,
+    missing_dimensions
+  };
 }
