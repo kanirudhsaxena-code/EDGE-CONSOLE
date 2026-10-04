@@ -73,3 +73,33 @@ test('research manifest passes only when every dimension has attributable retrie
     assert.ok(result.by_dimension[dimension].source_ids.length>0);
   }
 });
+
+
+test('institutional-flow manifest requires parsed FII and DII values, not HTTP 200 alone',async()=>{
+  const fetcher=async(url:RequestInfo|URL)=>{
+    const u=String(url);
+    if(u.includes('/reports/fii-dii'))return new Response('<html>FII/FPI and DII report shell without values</html>',{status:200,headers:{'content-type':'text/html'}});
+    if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
+    return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
+  };
+  const result=await acquireSystemResearch(fetcher as typeof fetch);
+  assert.equal(result.by_dimension.INSTITUTIONAL_FLOWS.ready_for_interpretation,false);
+  assert.ok(result.missing_dimensions.includes('INSTITUTIONAL_FLOWS'));
+});
+
+test('institutional-flow parser admits explicit current FII and DII net-flow facts',async()=>{
+  const fetcher=async(url:RequestInfo|URL)=>{
+    const u=String(url);
+    if(u.includes('/reports/fii-dii'))return new Response(
+      '<html>DII 03-Oct-2026 13,209.23 11,599.76 1,609.47 FII/FPI 03-Oct-2026 11,634.11 11,769.68 -135.57</html>',
+      {status:200,headers:{'content-type':'text/html'}}
+    );
+    if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
+    return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
+  };
+  const result=await acquireSystemResearch(fetcher as typeof fetch);
+  assert.equal(result.by_dimension.INSTITUTIONAL_FLOWS.ready_for_interpretation,true);
+  const row=result.snapshots.find(s=>s.source_id==='NSE_FII_DII_ACTIVITY');
+  assert.deepEqual(row?.facts?.dii,{date:'03-Oct-2026',buy_crore:13209.23,sell_crore:11599.76,net_crore:1609.47});
+  assert.deepEqual(row?.facts?.fii_fpi,{date:'03-Oct-2026',buy_crore:11634.11,sell_crore:11769.68,net_crore:-135.57});
+});
