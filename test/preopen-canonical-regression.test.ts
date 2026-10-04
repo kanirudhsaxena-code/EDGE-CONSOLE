@@ -28,7 +28,8 @@ function assertProtectedSchedule(workflow:string){
 test('protected NIFTY pre-open canonical contract remains fixed',()=>{
   assertProtectedSchedule(nifty);
   assert.match(nifty,/EDGE NIFTY Pre-open Canonical Attempts/);
-  assert.match(nifty,/PREP_/);
+  assert.match(nifty,/PREOPEN_PREP_STARTED/);
+  assert.match(nifty,/"prep_only":True/);
   assert.match(nifty,/\/api\/5dr\/automated-runs/);
   assert.match(nifty,/force_new":True/);
   assert.match(nifty,/PREOPEN_RUN_COMPLETED/);
