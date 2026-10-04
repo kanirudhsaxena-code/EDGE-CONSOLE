@@ -189,7 +189,7 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
       headers:{'content-type':'application/json'},
       body:JSON.stringify({
         command:`EDGE ${ticker}`,
-        force_new:false,
+        force_new:true,
         canonical_attempt:true,
         canonical_attempt_slot:clock.slot,
         canonical_requested_at:now.toISOString(),
