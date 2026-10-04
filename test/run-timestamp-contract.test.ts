@@ -2,16 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-test('EDGE invoke loads an existing governed autonomous result from today before requiring a new research bundle',()=>{
+test('EDGE non-fresh retrieval may load today result, while a new run requires new research',()=>{
   const source=readFileSync('src/router.ts','utf8');
   const today=source.indexOf('const existingToday = await todaysAutonomousRecommendation(env, ticker)');
-  const required=source.indexOf("Fresh ChatGPT research bundle is mandatory before EDGE dispatch");
+  const required=source.indexOf("EDGE_NEW_RUN_RESEARCH_REQUIRED");
   assert.ok(today>0);
   assert.ok(required>today);
   assert.ok(source.includes("const forceNew = body.force_new === true"));
   assert.ok(source.includes("if (existingToday && !forceNew && !isObject(body.research_bundle))"));
   assert.ok(source.includes("status: 'ALREADY_PUBLISHED_TODAY'"));
   assert.ok(source.includes('run_timestamp: existingToday.runTimestamp'));
+  assert.ok(source.includes('A distinct new EDGE run requires a newly executed governed research bundle'));
 });
 
 test('Console buttons explicitly request fresh runs and reject output reuse',()=>{
