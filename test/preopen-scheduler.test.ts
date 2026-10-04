@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import { classifyPreopenTick } from '../src/preopen-scheduler';
+import { classifyPreopenTick, REQUIRED_PREOPEN_STOCK_TICKERS } from '../src/preopen-scheduler';
 
 const ist=(iso:string)=>new Date(iso);
 
@@ -50,4 +50,13 @@ test('NIFTY pre-open retries recover the same daily request instead of duplicati
   assert.match(mobile,/PREOPEN_ACQUISITION_RETRY/);
   assert.match(mobile,/preopen_retry_count/);
   assert.match(mobile,/dispatch5drPreopenAcquisition\(env,String\(row\.request_id\)/);
+});
+
+
+test('Monday pre-open guarantees the three governed EDGE Stocks targets',()=>{
+  assert.deepEqual([...REQUIRED_PREOPEN_STOCK_TICKERS],['LTF','CUPID','RELIANCE']);
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(scheduler,/required_preopen_target:true/);
+  assert.match(scheduler,/for\(const ticker of REQUIRED_PREOPEN_STOCK_TICKERS\)/);
+  assert.match(scheduler,/command:`EDGE \$\{ticker\}`/);
 });

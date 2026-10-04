@@ -56,7 +56,18 @@ const report = {
   current_stock_outcome:{
     des:-30,market_trust:{score:92,band:'VERY HIGH',subscores:{evidence_quality:95,freshness:100,completeness:90,directional_agreement:80,market_confirmation:95},weights:{evidence_quality:30,freshness:20,completeness:15,directional_agreement:20,market_confirmation:15}},directional_agreement:80,effective_conviction:.276,
     probabilities:{bull:5,base:60,bear:35},definitive_forecast:'BASE_RANGE',expected_price_zone:{low:3000,high:3200},
-    forecast_horizon:'D:D+4',risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
+    forecast_horizon:'D:D+4',
+    forecast_sessions:['2026-09-18','2026-09-21','2026-09-22','2026-09-23','2026-09-24'].map((trading_date,index)=>({
+      session_label:index===0?'D':`D+${index}`,
+      trading_date,
+      direction:'BASE',
+      probabilities:{bull:5,base:60,bear:35},
+      expected_zone:{low:3000,high:3200},
+      regime_context:'TRANSITION',
+      evidence_basis:'Verified governed G5 stock/sector regime and volatility inputs.',
+      verification_state:'VERIFIED'
+    })),
+    risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
     decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B',subscores:{forecast_edge:55,market_trust:92,structure_pattern_quality:60,pv_pvpo_confirmation:55,catalyst_asymmetry:50,execution_quality:60},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
   },
   drilldown:[

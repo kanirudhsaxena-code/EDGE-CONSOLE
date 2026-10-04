@@ -48,7 +48,17 @@ const valid = {
     execution:{instrument:'NONE',execution_quality_score:70},
     probabilities:{bull:4.02,base:73.663,bear:22.317},
     definitive_forecast:'BASE_RANGE',
-    forecast_horizon:'D+5',
+    forecast_horizon:'D:D+4',
+    forecast_sessions:['2026-09-18','2026-09-21','2026-09-22','2026-09-23','2026-09-24'].map((trading_date,index)=>({
+      session_label:index===0?'D':`D+${index}`,
+      trading_date,
+      direction:'BASE',
+      probabilities:{bull:4.02,base:73.663,bear:22.317},
+      expected_zone:{low:2162.5,high:2240.86},
+      regime_context:'TRANSITION',
+      evidence_basis:'Verified governed G5 stock/sector regime and volatility inputs.',
+      verification_state:'VERIFIED'
+    })),
     primary_action:'NO TRADE; NO OPTION TRADE.',
     decision_ladder:'INVESTIGATION'
   },
@@ -104,4 +114,14 @@ test('component verification status fails unknown states closed',()=>{
   assert.equal(componentVerificationStatus('AVAILABLE','HIGH'),'VERIFIED');
   assert.equal(componentVerificationStatus('AVAILABLE',null),'NOT_VERIFIED');
   assert.equal(componentVerificationStatus('NOT_AVAILABLE','HIGH'),'NOT_AVAILABLE');
+});
+
+
+test('standard output requires exact visible D:D+4 regime and evidence semantics',()=>{
+  const bad=structuredClone(valid);
+  delete bad.current_stock_outcome.forecast_sessions[2].regime_context;
+  delete bad.current_stock_outcome.forecast_sessions[2].evidence_basis;
+  const errors=validateEdgeStocksResult(bad);
+  assert.ok(errors.some(x=>x.includes('regime_context is mandatory')));
+  assert.ok(errors.some(x=>x.includes('evidence_basis is mandatory')));
 });

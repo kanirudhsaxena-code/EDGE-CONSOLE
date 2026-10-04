@@ -52,7 +52,7 @@ jobs:
           print('CAPTURE_MODULE='+shlex.quote(module))
           print('CAPTURE_ONLY='+('true' if capture_only else 'false'))
           print('RESUME_EXISTING='+('true' if resume_existing else 'false'))
-          print('REQUIRE_G5_PARITY='+('true' if bool(d.get('require_g5_parity')) else 'false'))
+          print('REQUIRE_G5_PARITY='+('true' if module=='EDGE_STOCKS' else 'false'))
           if capture_only:
               if module=='EDGE_NIFTY':
                   rid=str(d.get('request_id') or '').strip(); assert rid,d
@@ -194,7 +194,7 @@ jobs:
           echo "EDGE_CHAT_PRESENTATION_BEGIN"; cat /tmp/chat-presentation.txt; echo "EDGE_CHAT_PRESENTATION_END"
 
       - name: Fetch governed EDGE Stocks parity source
-        if: env.CAPTURE_MODULE == 'EDGE_STOCKS' && env.REQUIRE_G5_PARITY == 'true'
+        if: env.CAPTURE_MODULE == 'EDGE_STOCKS'
         shell: bash
         run: |
           set -euo pipefail
@@ -214,11 +214,10 @@ jobs:
           if module=='EDGE_NIFTY':
               required=['EDGE NIFTY','TABLE 1 · 5DR ASSESSMENT & EFFICACY','TABLE 2 · CURRENT 5DR RUN','Today’s Market View','5-day forecast','WHAT WE SAW','WHAT IT MEANS','WHY IT MATTERS NOW','What could change the view?','Future performance scorecard','Advanced details']
           else:
-              required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN']
-              if os.environ.get('REQUIRE_G5_PARITY','').lower()=='true':
-                  required += ['CANONICAL FORECAST PATH','Five governed sessions · D through D+4','EXACTLY 5']
+              required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN',
+                        'CANONICAL FORECAST PATH','Five governed sessions · D through D+4','EXACTLY 5','Regime:','Evidence:']
           missing=[x for x in required if x not in text]; assert not missing, {'missing_console_sections':missing}
-          if module=='EDGE_STOCKS' and os.environ.get('REQUIRE_G5_PARITY','').lower()=='true':
+          if module=='EDGE_STOCKS':
               rendered_path='/tmp/chat-five-session-rendered.json'
               source_path='/tmp/chat-five-session-source.json'
               assert os.path.exists(rendered_path), {'missing_rendered_rows':rendered_path}

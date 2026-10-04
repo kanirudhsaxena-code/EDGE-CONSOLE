@@ -34,3 +34,11 @@ This control changes presentation only. It does not modify analytical methodolog
 CI requirement: any change that breaks the Console DOM capture selectors or mandatory section validation must fail before merge.
 
 Capture-only validation is supported for existing canonical runs, so presentation tests do not need to create duplicate forecasts.
+
+## G5 visible-path closure — 4 Oct 2026
+
+For EDGE Stocks, the governed chat runner must wait for the complete five-session D:D+4 Console DOM before capture succeeds. The parity requirement is mandatory on every standard stock run and may not be disabled by request metadata.
+
+The captured presentation must include all five rows with trading date, direction, Bull/Base/Bear probabilities, expected zone, regime context, evidence basis and verification state, and must parity-check them against the governed API read model.
+
+A VERIFIED drill-down row with missing persisted key outcome or interpretation is a presentation failure. ChatGPT must not substitute score-derived prose.

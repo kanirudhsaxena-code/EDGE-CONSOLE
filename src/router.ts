@@ -903,9 +903,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const drilldown = componentRows.map((row: Record<string, unknown>) => {
     const verification = componentVerificationStatus(row.availability_status, row.evidence_quality);
     const notes = parseNotes(row.notes);
-    const reconstructed = verification === 'VERIFIED' && !isNonEmptyString(notes.interpretation);
-    const keyOutcome = notes.key_outcome ?? (reconstructed ? scoreLabel(row.raw_score) : (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED')));
-    const interpretation = notes.interpretation ?? (verification === 'VERIFIED' ? legacyInterpretation(row.component,row.raw_score) : 'Evidence not verified; no interpretation inferred.');
+    const persistedKeyOutcome = isNonEmptyString(notes.key_outcome) ? String(notes.key_outcome).trim() : '';
+    const persistedInterpretation = isNonEmptyString(notes.interpretation) ? String(notes.interpretation).trim() : '';
+    // G5.1 presentation closure: VERIFIED semantics must come from persisted governed
+    // evidence. Do not reconstruct or infer a narrative from the numeric score.
+    const keyOutcome = verification === 'VERIFIED'
+      ? persistedKeyOutcome
+      : (persistedKeyOutcome || (row.conflict_flag ? 'MATERIAL CONFLICT' : String(row.availability_status ?? 'NOT_VERIFIED')));
+    const interpretation = verification === 'VERIFIED'
+      ? persistedInterpretation
+      : (persistedInterpretation || 'Evidence not verified; no interpretation inferred.');
     return {
       component: String(row.component),
       score_or_level: row.raw_score ?? 'N/A',
@@ -920,7 +927,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       key_outcome: keyOutcome,
       finding: plainFinding(row.component,row.raw_score,verification,notes),
       interpretation,
-      narrative_source: reconstructed ? 'LEGACY_SCORE_RECONSTRUCTION' : 'PERSISTED_EVIDENCE_NARRATIVE',
+      narrative_source: verification === 'VERIFIED' ? 'PERSISTED_EVIDENCE_NARRATIVE' : 'UNVERIFIED_EVIDENCE_STATE',
     };
   });
 
@@ -1231,11 +1238,10 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     drilldown
   };
 
-  // Lane-1 continuity firewall: until the genuine G5 D:D+4 producer is promoted,
-  // the live V1.3 report remains usable with the frozen aggregate forecast.
-  // G5 acceptance stays strict everywhere else and must explicitly prove the
-  // immutable five-row path before this compatibility flag is removed.
-  const errors = validateEdgeStocksResult(payload, { requireForecastPath: forecastPath !== null });
+  // G5.1 presentation closure: the genuine D:D+4 producer is promoted.
+  // A standard production report without the immutable five-row path is incomplete
+  // and must fail closed rather than falling back to the aggregate forecast.
+  const errors = validateEdgeStocksResult(payload, { requireForecastPath: true });
   if (errors.length) return json({ error: 'EDGE Stocks V1.3 semantic contract validation failed', details: errors, ticker: symbol }, 409);
   return json({ report: payload });
 }

@@ -66,3 +66,13 @@ test('Chat stock UAT preflights independently verified Event-Shock research befo
   assert.match(workflow,/evidence_category.*EVENT_SHOCK/);
   assert.match(workflow,/CHATGPT_WEB.*EXA/);
 });
+
+
+test('EDGE Stocks Chat capture always requires complete D:D+4 parity and visible regime/evidence',()=>{
+  assert.match(capture,/waitForSelector\('#stocksSummary \[data-edge-five-session-path="D:D\+4"\] \[data-edge-forecast-row="D\+4"\]'/);
+  assert.match(workflow,/CANONICAL FORECAST PATH/);
+  assert.match(workflow,/Five governed sessions · D through D\+4/);
+  assert.match(workflow,/Regime:/);
+  assert.match(workflow,/Evidence:/);
+  assert.match(workflow,/if module=='EDGE_STOCKS':/);
+});
