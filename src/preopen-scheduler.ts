@@ -13,6 +13,8 @@ type PreopenEnv=EngineDispatchEnv&{
 
 export type PreopenTick='PREP'|'AUCTION'|'OUTSIDE';
 
+export const REQUIRED_PREOPEN_STOCK_TICKERS=['LTF','CUPID','RELIANCE'] as const;
+
 function istClock(now:Date):{weekday:string;date:string;hour:number;minute:number;slot:string}{
   const parts=Object.fromEntries(
     new Intl.DateTimeFormat('en-US',{
@@ -54,9 +56,17 @@ async function stockTargets(env:PreopenEnv):Promise<JsonRecord[]>{
     return [];
   }
   const body=await responseJson(response);
-  return Array.isArray(body.canonical_targets)
+  const discovered=Array.isArray(body.canonical_targets)
     ?body.canonical_targets.filter((x):x is JsonRecord=>!!x&&typeof x==='object'&&!Array.isArray(x))
     :[];
+  const byTicker=new Map(discovered.map(row=>[String(row.ticker??'').trim().toUpperCase(),row]));
+  // G5.1 Monday acceptance requires these three governed stock targets regardless
+  // of whether the open-call discovery view happens to omit one at prep time.
+  // Preserve any additional governed targets while guaranteeing the required set.
+  for(const ticker of REQUIRED_PREOPEN_STOCK_TICKERS){
+    if(!byTicker.has(ticker))byTicker.set(ticker,{ticker,forecast_horizon:'D:D+4',latest_research_fresh_at:null,required_preopen_target:true});
+  }
+  return [...byTicker.values()].filter(row=>String(row.ticker??'').trim().length>0);
 }
 
 async function prep(env:PreopenEnv,now:Date):Promise<void>{
