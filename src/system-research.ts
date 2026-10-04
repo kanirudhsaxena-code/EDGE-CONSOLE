@@ -36,6 +36,7 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
   {id:'NSE_ALL_INDICES',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP','DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/api/allIndices',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
   {id:'NSE_INDEX_PERFORMANCE_PAGE',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP'],url:'https://www.nseindia.com/market-data/index-performances',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
   {id:'NSE_LIVE_MARKET_PAGE',category:'MARKET_TRUST',dimensions:['GLOBAL_MARKET_REGIME','BREADTH_SECTOR_LEADERSHIP'],url:'https://www.nseindia.com/market-data/live-t0-market',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
+  {id:'NSE_FII_DII_API',category:'MARKET_TRUST',dimensions:['INSTITUTIONAL_FLOWS'],url:'https://www.nseindia.com/api/fiidiiTradeReact',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
   {id:'NSE_FII_DII_ACTIVITY',category:'MARKET_TRUST',dimensions:['INSTITUTIONAL_FLOWS'],url:'https://www.nseindia.com/reports/fii-dii',authority:'OFFICIAL_MARKET',accept:'text/html,*/*;q=0.5'},
 
   {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
@@ -88,6 +89,24 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
       if(gift)facts.gift_nifty={last:Number(gift.LASTPRICE),percent_change:Number(gift.PERCHANGE),day_change:Number(gift.DAYCHANGE),expiry:gift.EXPIRYDATE,timestamp:gift.TIMESTMP};
       return Object.keys(facts).length?facts:undefined;
     }
+    if(source.id==='NSE_FII_DII_API'){
+      const parsed=JSON.parse(body);
+      const rows=Array.isArray(parsed)?parsed:Array.isArray(parsed?.data)?parsed.data:[];
+      const parse=(v:unknown)=>Number(String(v??'').replace(/,/g,'').trim());
+      const facts:Record<string,unknown>={};
+      for(const row of rows){
+        if(!row||typeof row!=='object')continue;
+        const category=String((row as any).category??'').trim().toUpperCase();
+        const key=category==='DII'?'dii':category==='FII/FPI'||category==='FII'?'fii_fpi':null;
+        if(!key||facts[key])continue;
+        const buy=parse((row as any).buyValue??(row as any).buyvalue??(row as any).buy);
+        const sell=parse((row as any).sellValue??(row as any).sellvalue??(row as any).sell);
+        const net=parse((row as any).netValue??(row as any).netvalue??(row as any).net);
+        const date=String((row as any).date??'').trim();
+        if(date&&[buy,sell,net].every(Number.isFinite))facts[key]={date,buy_crore:buy,sell_crore:sell,net_crore:net};
+      }
+      return facts.dii&&facts.fii_fpi?facts:undefined;
+    }
     if(source.id==='NSE_FII_DII_ACTIVITY'){
       const rows=[...excerpt.matchAll(/\b(DII|FII\/FPI)\s+(\d{1,2}-[A-Za-z]{3}-20\d{2})\s+([\d,.]+)\s+([\d,.]+)\s+(-?[\d,.]+)/g)];
       const parse=(v:string)=>Number(v.replace(/,/g,''));
@@ -96,9 +115,7 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
         const key=row[1]==='DII'?'dii':'fii_fpi';
         if(facts[key])continue;
         const buy=parse(row[3]),sell=parse(row[4]),net=parse(row[5]);
-        if([buy,sell,net].every(Number.isFinite)){
-          facts[key]={date:row[2],buy_crore:buy,sell_crore:sell,net_crore:net};
-        }
+        if([buy,sell,net].every(Number.isFinite))facts[key]={date:row[2],buy_crore:buy,sell_crore:sell,net_crore:net};
       }
       return facts.dii&&facts.fii_fpi?facts:undefined;
     }
@@ -241,7 +258,7 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
     const retrievedRows=snapshots.filter(item=>{
       if(item.status!=='RETRIEVED'||!item.dimensions.includes(dimension))return false;
       if(dimension==='INSTITUTIONAL_FLOWS'){
-        return item.source_id==='NSE_FII_DII_ACTIVITY'&&!!item.facts&&!!item.facts.dii&&!!item.facts.fii_fpi;
+        return item.authority==='OFFICIAL_MARKET'&&item.source_id.startsWith('NSE_FII_DII_')&&!!item.facts&&!!item.facts.dii&&!!item.facts.fii_fpi;
       }
       return true;
     });
