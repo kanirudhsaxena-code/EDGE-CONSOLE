@@ -1,0 +1,9 @@
+{
+  "module": "EDGE_NIFTY",
+  "client_invocation_id": "g51-postfix-nifty-20261004",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  }
+}
