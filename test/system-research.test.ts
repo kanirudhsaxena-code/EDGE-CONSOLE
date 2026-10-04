@@ -62,6 +62,10 @@ test('research manifest fails closed when any mandatory dimension has no retriev
 test('research manifest passes only when every dimension has attributable retrieved evidence',async()=>{
   const fetcher=async(url:RequestInfo|URL)=>{
     const u=String(url);
+    if(u.includes('/reports/fii-dii'))return new Response(
+      '<html>DII 03-Oct-2026 13,209.23 11,599.76 1,609.47 FII/FPI 03-Oct-2026 11,634.11 11,769.68 -135.57</html>',
+      {status:200,headers:{'content-type':'text/html'}}
+    );
     if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
     return new Response('<html>current official evidence</html>',{status:200,headers:{'content-type':'text/html'}});
   };
