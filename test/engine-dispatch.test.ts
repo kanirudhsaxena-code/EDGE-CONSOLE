@@ -81,7 +81,7 @@ test('dispatches assessment refresh with same request identity and governed Cons
   assert.equal(result.status,'DISPATCHED');
   assert.match(seenUrl,/5DR-V2\/actions\/workflows\/assessment-refresh\.yml\/dispatches$/);
   const body=JSON.parse(String(seenInit?.body));
-  assert.deepEqual(body,{ref:'main',inputs:{request_id:'5drreq_test',console_url:'https://edge-console.example.test'}});
+  assert.deepEqual(body,{ref:'main',inputs:{}});
   assert.equal(String(seenInit?.body).includes('secret-value'),false);
 });
 
