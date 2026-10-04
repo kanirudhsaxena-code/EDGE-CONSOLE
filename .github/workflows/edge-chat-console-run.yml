@@ -245,6 +245,10 @@ jobs:
                   assert float(r.get('bull'))==float(probs.get('bull')), {'label':label,'rendered':r,'source':s}
                   assert float(r.get('base'))==float(probs.get('base')), {'label':label,'rendered':r,'source':s}
                   assert float(r.get('bear'))==float(probs.get('bear')), {'label':label,'rendered':r,'source':s}
+                  assert r.get('regime_context')==str(s.get('regime_context') or ''), {'label':label,'field':'regime_context','rendered':r,'source':s}
+                  assert r.get('evidence_basis')==str(s.get('evidence_basis') or ''), {'label':label,'field':'evidence_basis','rendered':r,'source':s}
+                  assert r.get('verification_state')==str(s.get('verification_state') or ''), {'label':label,'field':'verification_state','rendered':r,'source':s}
+                  assert r.get('regime_context') and r.get('evidence_basis') and r.get('verification_state'), {'label':label,'rendered':r}
                   assert abs(float(r.get('bull'))+float(r.get('base'))+float(r.get('bear'))-100.0)<=0.01, r
                   assert r.get('session_label')!='D+5',r
               expected_id=os.environ.get('EXPECTED_RESULT_ID','').strip()
