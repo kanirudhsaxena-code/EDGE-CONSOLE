@@ -832,15 +832,16 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       .map((claim:Record<string,unknown>)=>String(claim.evidence_category||'').toUpperCase())
   )];
   const researchCoverageComplete=mandatoryResearchCategories.every(category=>verifiedResearchCategories.includes(category));
+  const researchComponentKey=(value:unknown):string=>String(value||'').toUpperCase().replace(/[^A-Z0-9]+/g,'_');
   const reconciledResearchRows=componentRows.filter((row:Record<string,unknown>)=>
-    mandatoryResearchCategories.includes(componentKey(row.component))
+    mandatoryResearchCategories.includes(researchComponentKey(row.component))
   );
   const excludedResearchComponents=reconciledResearchRows
     .filter((row:Record<string,unknown>)=>componentVerificationStatus(row.availability_status,row.evidence_quality)!=='VERIFIED')
-    .map((row:Record<string,unknown>)=>componentKey(row.component));
+    .map((row:Record<string,unknown>)=>researchComponentKey(row.component));
   const conflictedResearchComponents=reconciledResearchRows
     .filter((row:Record<string,unknown>)=>row.conflict_flag===true)
-    .map((row:Record<string,unknown>)=>componentKey(row.component));
+    .map((row:Record<string,unknown>)=>researchComponentKey(row.component));
 
   const des = numberOrNull(active.des);
   const marketTrust = numberOrNull(active.resolved_market_trust_score);
