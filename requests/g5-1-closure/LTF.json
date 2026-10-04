@@ -4,11 +4,11 @@
   "require_g5_parity": true,
   "research_bundle": {
     "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
-    "bundle_id": "g51-closure-ltf-20261004-161642z",
+    "bundle_id": "g51-closure-ltf-20261004-164230z",
     "ticker": "LTF",
     "command": "EDGE LTF",
-    "created_at": "2026-10-04T16:16:42Z",
-    "research_fresh_at": "2026-10-04T16:16:42Z",
+    "created_at": "2026-10-04T16:42:30Z",
+    "research_fresh_at": "2026-10-04T16:42:30Z",
     "research_authority": "CHATGPT",
     "retrieval_providers": [
       "CHATGPT_WEB"
@@ -20,7 +20,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://www.kotakneo.com/news/stocks/l-and-t-finance-q2-fy27-retail-disbursements-rise-27-percent/",
         "title": "L&T Finance Q2 FY27 retail disbursements rise 27%, retail loan book grows 29%",
-        "retrieved_at": "2026-10-04T16:16:42Z"
+        "retrieved_at": "2026-10-04T16:42:30Z"
       },
       {
         "source_id": "ltf-src-q1",
@@ -28,7 +28,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://www.business-standard.com/markets/capital-market-news/l-t-finance-q1-pat-climbs-29-yoy-to-rs-902-cr-126071100326_1.html",
         "title": "L&T Finance Q1 FY27 PAT climbs 29% YoY",
-        "retrieved_at": "2026-10-04T16:16:42Z"
+        "retrieved_at": "2026-10-04T16:42:30Z"
       },
       {
         "source_id": "ltf-src-hold",
@@ -36,7 +36,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://trendlyne.com/equity/share-holding/777/LTF/latest/l-t-finance-ltd/",
         "title": "L&T Finance latest shareholding pattern",
-        "retrieved_at": "2026-10-04T16:16:42Z"
+        "retrieved_at": "2026-10-04T16:42:30Z"
       },
       {
         "source_id": "ltf-src-val",
@@ -44,7 +44,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://www.valueresearchonline.com/stocks/45631/lt-finance-ltd/",
         "title": "L&T Finance valuation and peer metrics",
-        "retrieved_at": "2026-10-04T16:16:42Z"
+        "retrieved_at": "2026-10-04T16:42:30Z"
       },
       {
         "source_id": "ltf-src-risk",
@@ -52,7 +52,7 @@
         "authority": "REPUTABLE_SECONDARY",
         "url": "https://www.business-standard.com/amp/finance/news/irdai-s-fee-cap-proposal-rattles-distributors-insurance-stocks-tumble-126092401536_1.html",
         "title": "IRDAI fee-cap proposal and L&T Finance exposure",
-        "retrieved_at": "2026-10-04T16:16:42Z"
+        "retrieved_at": "2026-10-04T16:42:30Z"
       }
     ],
     "claims": [
@@ -109,9 +109,9 @@
       {
         "claim_id": "ltf-event",
         "evidence_category": "EVENT_SHOCK",
-        "statement": "The IRDAI fee-cap proposal is a live regulatory risk to insurance-distribution economics, but it is still a proposal rather than a finalized prohibition; it is treated as a moderate negative event-risk signal, not an extreme shock.",
+        "statement": "IRDAI's commission-cap and expense-limit changes remain a consultation proposal open for feedback through 25 October 2026. The proposal is a material negative NEWS/CATALYST for L&T Finance because of its insurance-distribution exposure, but it is not yet a realized binary/high-impact EVENT SHOCK; Event Shock is therefore independently verified NEUTRAL while the separate News/Catalysts dimension remains NEGATIVE.",
         "materiality": "MODERATE",
-        "direction": "NEGATIVE",
+        "direction": "NEUTRAL",
         "source_ids": [
           "ltf-src-risk"
         ],
@@ -122,7 +122,8 @@
     "limitations": [
       "Research was freshly executed for this distinct G5.1 acceptance run; no prior bundle was merely retimestamped or reused.",
       "VERIFIED_NEUTRAL is used only where current evidence was actively checked and no material directional signal was established.",
-      "Valuation conclusions are contextual and do not replace the frozen provider score; independent research validates, conflicts with or excludes provider interpretation under governed reconciliation."
+      "Valuation conclusions are contextual and do not replace the frozen provider score; independent research validates, conflicts with or excludes provider interpretation under governed reconciliation.",
+      "All five research-sensitive dimensions were re-retrieved/reviewed for the 4-Oct-2026 evening corrective rerun. Event Shock is deliberately separated from the negative IRDAI News/Catalyst because the consultation remains a proposal, not a realized shock."
     ]
   }
 }
