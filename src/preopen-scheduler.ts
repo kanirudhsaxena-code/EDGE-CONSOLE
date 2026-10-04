@@ -71,6 +71,7 @@ async function stockTargets(env:PreopenEnv):Promise<JsonRecord[]>{
 
 async function prep(env:PreopenEnv,now:Date):Promise<void>{
   const clock=istClock(now);
+  const researchNotBefore=new Date(`${clock.date}T03:20:00.000Z`).toISOString();
   const [targets,assessment]=await Promise.all([
     stockTargets(env),
     dispatch5drAssessmentRefresh(
@@ -80,17 +81,41 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
       fetch
     )
   ]);
-  const cutoff=now.getTime()-90*60_000;
+
+  const niftyPrepRequest=new Request('https://edge-console.internal/api/5dr/automated-runs',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      force_new:true,
+      prep_only:true,
+      client_invocation_id:`cf-preopen-prep-${clock.date}`,
+      assessment:{objective:'BOTH',risk_posture:'CONSERVATIVE',capital_priority:'CAPITAL_PROTECTION'}
+    })
+  });
+  const niftyPrepResponse=await createAutomatedRun(niftyPrepRequest,env as never);
+  const niftyPrepBody=await responseJson(niftyPrepResponse);
+
   const readiness=targets.map(target=>{
     const ticker=String(target.ticker??'').toUpperCase();
     const freshAt=typeof target.latest_research_fresh_at==='string'?Date.parse(target.latest_research_fresh_at):NaN;
-    return {ticker,research_ready:Number.isFinite(freshAt)&&freshAt>=cutoff,latest_research_fresh_at:target.latest_research_fresh_at??null};
+    return {
+      ticker,
+      research_ready:Number.isFinite(freshAt)&&freshAt>=Date.parse(researchNotBefore),
+      research_refresh_required:!(Number.isFinite(freshAt)&&freshAt>=Date.parse(researchNotBefore)),
+      latest_research_fresh_at:target.latest_research_fresh_at??null,
+      research_not_before:researchNotBefore
+    };
   });
   console.log(JSON.stringify({
-    status:'PREOPEN_PREP_CHECK',
+    status:'PREOPEN_PREP_STARTED',
     date:clock.date,
     slot:clock.slot,
+    research_not_before:researchNotBefore,
     assessment_refresh_dispatched:assessment.ok,
+    nifty_prep_http_status:niftyPrepResponse.status,
+    nifty_prep_request_id:(niftyPrepBody.request as JsonRecord|undefined)?.request_id??niftyPrepBody.request_id??null,
+    nifty_prep_state:niftyPrepBody.status??(niftyPrepBody.request as JsonRecord|undefined)?.status??null,
+    nifty_prep_next_step:niftyPrepBody.next_step??null,
     stock_research_readiness:readiness,
     canonical_created:false,
     trading_enabled:false
@@ -154,6 +179,7 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
     trading_enabled:false
   }));
 
+  const researchNotBefore=new Date(`${clock.date}T03:20:00.000Z`).toISOString();
   const targets=await stockTargets(env);
   for(const target of targets){
     const ticker=String(target.ticker??'').trim().toUpperCase();
@@ -166,7 +192,8 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
         force_new:false,
         canonical_attempt:true,
         canonical_attempt_slot:clock.slot,
-        canonical_requested_at:now.toISOString()
+        canonical_requested_at:now.toISOString(),
+        research_not_before:researchNotBefore
       })
     });
     const response=await router.fetch(request,env as never);
