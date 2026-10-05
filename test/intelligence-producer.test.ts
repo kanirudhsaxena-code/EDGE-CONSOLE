@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {INTELLIGENCE_FALLBACK_MODEL,INTELLIGENCE_MODEL,normalizeIntelligenceJudgment,produceIntelligence,validateIntelligenceJudgment,type IntelligenceJudgment} from '../src/intelligence-producer';
+import {INTELLIGENCE_DETERMINISTIC_FALLBACK_MODEL,INTELLIGENCE_FALLBACK_MODEL,INTELLIGENCE_MODEL,normalizeIntelligenceJudgment,produceIntelligence,validateIntelligenceJudgment,type IntelligenceJudgment} from '../src/intelligence-producer';
 
 const judgment:IntelligenceJudgment={
   verification:'VERIFIED',source_refs:['evidence:1','https://www.nseindia.com/api/marketStatus'],regime:'TREND',
@@ -102,4 +102,83 @@ test('remains fail closed if primary and fallback inference are both unavailable
   assert.equal(result.judgment,null);
   assert.equal(result.normalized,null);
   assert.ok(result.errors[0].includes('all governed intelligence inference models unavailable'));
+});
+
+
+test('quota exhaustion uses deterministic degraded reconciliation only from supplied structured evidence',async()=>{
+  const refs={
+    price:'upstox-bundle://x#price-technicals',
+    derivatives:'upstox-bundle://x#derivatives-oi',
+    trust:'upstox-bundle://x#market-trust',
+    execution:'upstox-bundle://x#execution-risk',
+    event:'https://www.rbi.org.in/'
+  };
+  const tf=(state:string,low:number,high:number)=>({
+    trend_structure:{state},
+    range_event:{prior_range_low:low,prior_range_high:high,close_state:'CLOSE_INSIDE_PRIOR_RANGE'},
+    volume_confirmation:{relative_to_median:null}
+  });
+  const packet={
+    market_observations:[
+      {category:'PRICE_TECHNICALS',source_ref:refs.price,structured_data:{
+        nifty:{spot:{last_price:22555.75,change_pct_vs_previous_close:0.6}},
+        chart:{timeframes:{
+          '15m':tf('UPTREND_STRUCTURE',22397.1,22569.4),
+          '30m':tf('MIXED_OR_TRANSITION_STRUCTURE',22217.3,22621.8),
+          '1h':tf('MIXED_OR_TRANSITION_STRUCTURE',22217.3,22809.35),
+          '1d':tf('DOWNTREND_STRUCTURE',22569.65,24025.4),
+        }}
+      },findings:[{label:'Current Price',value:22555.75}]},
+      {category:'DERIVATIVES_OI',source_ref:refs.derivatives,structured_data:{
+        nifty_futures:{basis_pct_of_spot:0.30},
+        derivative_analytics:{pcr:{pcr:0.91}}
+      }},
+      {category:'MARKET_TRUST',source_ref:refs.trust,structured_data:{
+        heavyweights:{instruments:{a:{change_pct_vs_previous_close:1.2},b:{change_pct_vs_previous_close:-0.3}}},
+        sectors:{instruments:{a:{change_pct_vs_previous_close:0.4},b:{change_pct_vs_previous_close:0.2}}},
+        fii_dii_cash:{fii:{buy_amount:100,sell_amount:200},dii:{buy_amount:300,sell_amount:100}},
+        global_risk:{instruments:{a:{change_pct_vs_previous_close:0.5},b:{change_pct_vs_previous_close:0.3}}}
+      }},
+      {category:'EXECUTION_RISK',source_ref:refs.execution,structured_data:{
+        selected_expiry:'2026-10-06',
+        sample_strikes:[
+          {CE:{bid_ask_spread_pct_mid:0.7,iv:16,theta:-30},PE:{bid_ask_spread_pct_mid:0.8,iv:17,theta:-31}},
+          {CE:{bid_ask_spread_pct_mid:0.9,iv:16,theta:-30},PE:{bid_ask_spread_pct_mid:1.0,iv:17,theta:-31}},
+          {CE:{bid_ask_spread_pct_mid:0.6,iv:16,theta:-30},PE:{bid_ask_spread_pct_mid:0.7,iv:17,theta:-31}}
+        ]
+      }}
+    ],
+    research:[
+      {category:'EVENT_SHOCK',status:'RETRIEVED',source_ref:refs.event,facts:{
+        wti_usd_per_barrel:{change_from_first:3.2},
+        brent_usd_per_barrel:{change_from_first:2.8}
+      }}
+    ]
+  };
+  const ai={run:async()=>{throw new Error('4006: you have used up your daily free allocation of 10,000 neurons')}};
+  const result=await produceIntelligence(ai,packet,new Set(Object.values(refs)));
+  assert.equal(result.model,INTELLIGENCE_DETERMINISTIC_FALLBACK_MODEL);
+  assert.equal(result.errors.length,0);
+  assert.equal(result.judgment?.verification,'DEGRADED');
+  assert.equal(result.judgment?.data_adequate,false);
+  assert.equal(result.judgment?.expected_rr,0);
+  assert.deepEqual(new Set(result.judgment?.source_refs),new Set(Object.values(refs)));
+  assert.equal(result.judgment?.horizon_slots['D+1'].direction,'BULLISH');
+  assert.equal(result.judgment?.horizon_slots['D+4'].direction,'BEARISH');
+  assert.ok(result.normalized);
+  assert.equal(result.normalized?.event_kill_switch,false);
+});
+
+test('deterministic quota fallback remains fail closed if a required evidence family is absent',async()=>{
+  const ai={run:async()=>{throw new Error('4006: daily free allocation exhausted')}};
+  const packet={market_observations:[
+    {category:'PRICE_TECHNICALS',source_ref:'price',structured_data:{}},
+    {category:'DERIVATIVES_OI',source_ref:'derivatives',structured_data:{}},
+    {category:'MARKET_TRUST',source_ref:'trust',structured_data:{}},
+    {category:'EXECUTION_RISK',source_ref:'execution',structured_data:{}}
+  ],research:[]};
+  const result=await produceIntelligence(ai,packet,new Set(['price','derivatives','trust','execution']));
+  assert.equal(result.judgment,null);
+  assert.equal(result.normalized,null);
+  assert.ok(result.errors[0].includes('intelligence inference unavailable'));
 });
