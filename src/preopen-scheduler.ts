@@ -52,7 +52,6 @@ function istClock(now:Date):{weekday:string;date:string;hour:number;minute:numbe
 
 export function classifyPreopenTick(now:Date):PreopenTick{
   const c=istClock(now);
-  if(!['Mon','Tue','Wed','Thu','Fri'].includes(c.weekday))return 'OUTSIDE';
   if(c.hour===8&&c.minute===50)return 'PREP';
   if(c.hour===9&&c.minute>=5&&c.minute<=9)return 'RESEARCH';
   if(c.hour===9&&c.minute>=10&&c.minute<=14)return 'AUCTION';
