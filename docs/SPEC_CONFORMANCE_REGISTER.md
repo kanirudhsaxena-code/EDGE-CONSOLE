@@ -39,6 +39,8 @@ Rule: code, persistence, API, Console and ChatGPT may not redefine a frozen mast
 | X-04 | Cross-channel | EDGE Stocks Chat capture cannot complete until exact D:D+4 parity including regime/evidence/verification is present | governed chat runner | complete five-session DOM | chat render-lock + parity CI | ENFORCED |
 | X-02 | Governance | Missing required fields fail closed; UI does not invent values | validators/release gates | Not available / legacy incomplete | contract tests | ENFORCED |
 | X-03 | Governance | Visual design changes cannot redefine analytical contract | contract precedes renderer | existing cards/typography retained | conformance tests | ENFORCED |
+| X-05 | Governance | Weekday cron is only a wake-up mechanism; PREP/RESEARCH/AUCTION may execute only on a governed NSE TRADING_DAY | versioned NSE session calendar + Cloudflare pre-open scheduler | non-trading sessions emit bounded no-op state | preopen scheduler/calendar regression tests | ENFORCED |
+| X-06 | Governance | G5.1 live pre-open proof runs automatically at 09:20 IST on weekdays; trading sessions must prove NIFTY + LTF/CUPID/RELIANCE, while weekends/NSE trading holidays record NON_TRADING_DAY and exit successfully; missing calendar coverage fails closed | persisted pre-open proof + governed calendar | dedicated state branch/artifact | proof schedule + session-state regression tests | ENFORCED |
 
 ## Release rule
 
@@ -52,4 +54,6 @@ A production merge is blocked if any mandatory row above regresses from ENFORCED
 4. Shadow EDGE Stocks report against an existing canonical record.
 5. Console DOM conformance on desktop/mobile dimensions.
 6. ChatGPT capture must match the live Console hierarchy and content.
-7. Only then production merge/cutover.
+7. Production pre-open automation must be session-aware: weekday wake-ups execute only on governed NSE trading days; known non-trading days are clean no-ops and unsupported calendar coverage fails closed.
+8. The 09:20 IST G5.1 proof must PASS on a trading day or record NON_TRADING_DAY on an exchange holiday/weekend before full live-window closure is claimed.
+9. Only then production merge/cutover.
