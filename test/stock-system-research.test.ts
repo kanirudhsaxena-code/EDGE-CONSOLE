@@ -172,3 +172,61 @@ test('EVENT_SHOCK cannot be labelled POSITIVE and remains fail-closed after boun
   );
   assert.equal(aiCalls,2);
 });
+
+
+test('Workers AI quota exhaustion falls back to source-grounded governed research',async()=>{
+  let aiCalls=0;
+  const env:any={AI:{run:async()=>{
+    aiCalls++;
+    throw new Error('4006: you have used up your daily free allocation of 10,000 neurons');
+  }}};
+  const fetcher:any=async(url:string)=>{
+    if(url.includes('ltfinance.com/news-room'))return html('Official newsroom announcement: quarterly results and business updates.');
+    if(url.includes('ltfinance.com/investors'))return html('Investor reporting: revenue grew and margins improved in the reported period.');
+    if(url.includes('screener.in'))return html('Market Cap ₹100 Cr. Stock P/E 20.0. Promoter holding 66%. Consolidated sales and profit snapshot.');
+    if(url.includes('nseindia.com'))return html('NSE issuer page and shareholding information.');
+    if(url.includes('news.google.com'))return html('Recent company results and expansion announcement; no material adverse event reported in this bounded feed.');
+    return new Response('',{status:404});
+  };
+  const result=await produceStockSystemResearch(env,{
+    ticker:'LTF',
+    lifecycle_id:'EDGE-LC-2026-10-05-LTF-AI-CAPACITY',
+    market_snapshot_id:'EDGE-MKT-LTF-20261005-110000-capacity1234',
+    data_captured_at:'2026-10-05T11:00:00.000Z',
+    market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+  },fetcher);
+
+  assert.equal(aiCalls,2);
+  assert.equal(result.model,'DETERMINISTIC_SOURCE_GROUNDED_V1');
+  assert.equal(result.bundle.claims.length,5);
+  assert.ok(result.bundle.claims.every(claim=>claim.verification_status==='VERIFIED'&&claim.independent_validation===true));
+  assert.equal(result.bundle.claims.find(x=>x.evidence_category==='EVENT_SHOCK')?.direction,'NEUTRAL');
+  assert.ok(result.bundle.limitations.some(x=>x.includes('Workers AI capacity was unavailable')));
+});
+
+test('deterministic fallback remains fail-closed when category source coverage is missing',async()=>{
+  let aiCalls=0;
+  const env:any={AI:{run:async()=>{
+    aiCalls++;
+    throw new Error('4006: daily free allocation exhausted');
+  }}};
+  const fetcher:any=async(url:string)=>{
+    if(url.includes('ltfinance.com/news-room'))return html('Official newsroom announcement and results.');
+    if(url.includes('ltfinance.com/investors'))return html('Official investor financial reporting and revenue.');
+    if(url.includes('nseindia.com'))return html('NSE issuer page.');
+    if(url.includes('news.google.com'))return html('Recent company news feed.');
+    if(url.includes('screener.in'))return new Response('',{status:503});
+    return new Response('',{status:404});
+  };
+  await assert.rejects(
+    produceStockSystemResearch(env,{
+      ticker:'LTF',
+      lifecycle_id:'EDGE-LC-2026-10-05-LTF-AI-CAPACITY-NO-VALUATION',
+      market_snapshot_id:'EDGE-MKT-LTF-20261005-111000-novaluation1',
+      data_captured_at:'2026-10-05T11:10:00.000Z',
+      market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+    },fetcher),
+    /STOCK_RESEARCH_DETERMINISTIC_COVERAGE_INSUFFICIENT:VALUATION/
+  );
+  assert.equal(aiCalls,2);
+});
