@@ -10,23 +10,14 @@
       "status": "PASS"
     },
     "stocks_3_of_3": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "four_asset_user_output": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "live_preopen_window": {
       "status": "SEPARATE_WINDOW_PROOF_REQUIRED"
     }
   },
-  "errors": [
-    {
-      "task": "CUPID",
-      "error": "AssertionError: CUPID active calls output missing current ticker :: [{\"ticker\": \"DMART\", \"recommendation_id\": \"EDGE-DMART-20260920-061903-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 3687.35, \"high\": 3812.45}, \"call_timestamp\": \"2026-09-20T06:19:03.475Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 3749.9, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 3.997, \"base\": 74.468, \"bear\": 21.535}}, {\"ticker\": \"JIOFIN\", \"recommendation_id\": \"EDGE-JIOFIN-20260918-180236-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 225.26, \"high\": 233.34}, \"call_timestamp\": \"2026-09-18T18:02:36.455Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 229.3, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.607, \"base\": 59.82, \"bear\": 38.573}}, {\"ticker\": \"LTF\", \"recommendation_id\": \"EDGE-LTF-20260928-043317-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 273.1, \"high\": 290.92}, \"call_timestamp\": \"2026-09-28T04:33:17.309Z\", \"expiry_trading_date\": \"2026-10-06T00:00:00.000Z\", \"current_price\": 280.7, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.011, \"base\": 53.478, \"bear\": 45.51}}, {\"ticker\": \"RELIANCE\", \"recommendation_id\": \"EDGE-RELIANCE-20260920-061622-AUTO\", \"definitive_forecast\": \"BEARISH\", \"definitive_recommendation\": \"AVOID; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 1206.1, \"high\": 1246.7}, \"call_timestamp\": \"2026-09-20T06:16:22.731Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 1226.4, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.102, \"base\": 37.208, \"bear\": 61.691}}, {\"ticker\": \"SKYGOLD\", \"recommendation_id\": \"EDGE-SKYGOLD-20260920-062214-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 763.5, \"high\": 815.925}, \"call_timestamp\": \"2026-09-20T06:22:14.890Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 783.7, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 33.309, \"base\": 65.122, \"bear\": 1.57}}, {\"ticker\": \"TCS\", \"recommendation_id\": \"EDGE-TCS-20260918"
-    },
-    {
-      "task": "RELIANCE",
-      "error": "AssertionError: RELIANCE lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"RELIANCE\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-RELIANCE-USER-e05ae19e-cca5-491c-bdc7-b39d4085cd0a\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_INVALID_SOURCE_REF\", \"trading_enabled\": false}"
-    }
-  ]
+  "errors": []
 }
