@@ -33,11 +33,8 @@ test('normal lifecycle status provides the bounded identities required for exact
   assert.match(router,/report_url:/);
 });
 
-test('standard Active Calls includes a fresh open user snapshot without changing benchmark membership',()=>{
-  assert.match(router,/l\.status as lifecycle_status/);
-  assert.match(router,/USER_CANONICAL_SNAPSHOT/);
-  assert.match(router,/const visibleActiveRows=\[\.\.\.allActiveRows\]/);
-  assert.match(router,/visibleActiveRows\.push\(active\)/);
-  assert.match(router,/active_calls: visibleActiveRows\.map/);
-  assert.match(router,/row\.call_timestamp \?\? row\.run_timestamp/);
+test('live closure proof preserves canonical Active Calls while validating the latest user outcome separately',()=>{
+  assert.doesNotMatch(proof,/active calls output missing current ticker/);
+  assert.match(proof,/user-anytime result leaked into canonical Active Calls/);
+  assert.match(proof,/active_calls_scope":"CANONICAL_ONLY"/);
 });
