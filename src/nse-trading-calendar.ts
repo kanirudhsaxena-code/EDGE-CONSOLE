@@ -33,7 +33,7 @@ export type NseCalendarEnv={EDGE_DATABASE_URL?:string};
 const coveredYears=new Set<number>(calendar.coverage_years.map(Number));
 const tradingHolidays=new Set<string>(calendar.trading_holidays.map(String));
 const EXACT_PROOF_MAX_AGE_HOURS=36;
-const YEAR_CACHE_MAX_AGE_HOURS=24*8;
+const YEAR_CACHE_MAX_AGE_HOURS=120;
 
 function parseIsoDate(dateIso:string):{year:number;month:number;day:number}|null{
   const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(dateIso);
