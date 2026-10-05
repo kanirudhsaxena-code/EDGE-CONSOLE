@@ -45,10 +45,11 @@ const decodeBase64Utf8=(value:string):string=>{
 export async function sync5drAcquisitionResult(
   env:EngineDispatchEnv,
   requestId:string,
-  fetcher:typeof fetch=fetch
+  fetcher:typeof fetch=fetch,
+  workflowOverride?:string
 ):Promise<AcquisitionResultSync>{
   const repository=env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
-  const workflow=env.FIVEDR_ACQUIRE_WORKFLOW?.trim()||DEFAULT_ACQUIRE_WORKFLOW;
+  const workflow=workflowOverride?.trim()||env.FIVEDR_ACQUIRE_WORKFLOW?.trim()||DEFAULT_ACQUIRE_WORKFLOW;
   const token=env.GITHUB_ACTIONS_TOKEN?.trim();
   if(!token||!requestId.trim())return {ok:false,status:'UNAVAILABLE',repository,workflow,detail:'GitHub Actions acquisition synchronization is not configured'};
 
