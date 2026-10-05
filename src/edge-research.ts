@@ -134,8 +134,9 @@ export function validateEdgeResearchBundle(body:unknown,now=new Date()):string[]
     if(raw.verification_status==='CONFLICTED'&&!isNonEmptyString(raw.conflict_note))errors.push(`claims[${i}] CONFLICTED claim requires conflict_note`);
 
     if(verified&&Array.isArray(raw.source_ids)){
+      const claimSourceIds=raw.source_ids.map((x:unknown)=>String(x));
       const used=(Array.isArray(body.sources)?body.sources:[]).filter((source:unknown)=>
-        isObject(source)&&raw.source_ids.map(x=>String(x)).includes(String(source.source_id))
+        isObject(source)&&claimSourceIds.includes(String(source.source_id))
       );
       const independent=used.some((source:unknown)=>isObject(source)&&independentProvider(source.provider));
       const providerOnly=used.length>0&&used.every((source:unknown)=>isObject(source)&&source.provider==='UPSTOX');
