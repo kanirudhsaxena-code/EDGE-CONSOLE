@@ -607,6 +607,9 @@ export async function progressNormalStockLifecycle(
   lifecycle_stage:string;
   lifecycle_id:string;
   run_id?:string|null;
+  market_snapshot_id?:string|null;
+  research_bundle_id?:string|null;
+  auction_snapshot_id?:string|null;
   detail?:string|null;
 }>{
   let lifecycle=await getStockLifecycle(env,lifecycleId);
@@ -660,7 +663,10 @@ export async function progressNormalStockLifecycle(
       status:'COMPLETE',
       lifecycle_stage:lifecycle.stage,
       lifecycle_id:lifecycleId,
-      run_id:lifecycle.recommendation_id??null
+      run_id:lifecycle.recommendation_id??null,
+      market_snapshot_id:lifecycle.market_snapshot_id,
+      research_bundle_id:lifecycle.research_bundle_id,
+      auction_snapshot_id:lifecycle.auction_snapshot_id
     };
   }
   if(['DATA_BLOCKED','RESEARCH_BLOCKED','COMPUTE_BLOCKED','AUCTION_BLOCKED'].includes(lifecycle.stage)){
@@ -668,6 +674,9 @@ export async function progressNormalStockLifecycle(
       status:'BLOCKED',
       lifecycle_stage:lifecycle.stage,
       lifecycle_id:lifecycleId,
+      market_snapshot_id:lifecycle.market_snapshot_id,
+      research_bundle_id:lifecycle.research_bundle_id,
+      auction_snapshot_id:lifecycle.auction_snapshot_id,
       detail:lifecycle.stage_detail
     };
   }
@@ -676,6 +685,9 @@ export async function progressNormalStockLifecycle(
     lifecycle_stage:lifecycle.stage,
     lifecycle_id:lifecycleId,
     run_id:lifecycle.recommendation_id??null,
+    market_snapshot_id:lifecycle.market_snapshot_id,
+    research_bundle_id:lifecycle.research_bundle_id,
+    auction_snapshot_id:lifecycle.auction_snapshot_id,
     detail:lifecycle.stage_detail
   };
 }
@@ -1025,6 +1037,9 @@ async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw:
         status:'COMPLETE',ticker,lifecycle_id:lifecycleId,
         lifecycle_stage:progressed.lifecycle_stage,
         run_id:progressed.run_id??null,
+        market_snapshot_id:progressed.market_snapshot_id??null,
+        research_bundle_id:progressed.research_bundle_id??null,
+        auction_snapshot_id:progressed.auction_snapshot_id??null,
         report_url:`/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
         trading_enabled:false
       });
@@ -1033,6 +1048,9 @@ async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw:
       return json({
         status:'BLOCKED',ticker,lifecycle_id:lifecycleId,
         lifecycle_stage:progressed.lifecycle_stage,
+        market_snapshot_id:progressed.market_snapshot_id??null,
+        research_bundle_id:progressed.research_bundle_id??null,
+        auction_snapshot_id:progressed.auction_snapshot_id??null,
         detail:progressed.detail??null,
         trading_enabled:false
       },409);
@@ -1040,6 +1058,9 @@ async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw:
     return json({
       status:'RUNNING',ticker,lifecycle_id:lifecycleId,
       lifecycle_stage:progressed.lifecycle_stage,
+      market_snapshot_id:progressed.market_snapshot_id??null,
+      research_bundle_id:progressed.research_bundle_id??null,
+      auction_snapshot_id:progressed.auction_snapshot_id??null,
       detail:progressed.detail??null,
       trading_enabled:false
     });
