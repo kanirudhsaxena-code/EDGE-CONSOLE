@@ -20,7 +20,12 @@ test('G5 deploys are tagged to immutable git provenance and health-checked',()=>
   assert.match(deploy,/Version \$\{versionId\} does not carry governed tag \$\{tag\}/);
   assert.match(deploy,/Verify tagged version is the active deployment/);
   assert.match(deploy,/Verify production health after tagged deploy/);
-  assert.match(deploy,/EDGE_RESEARCH_BUNDLE_V1/);
+  assert.match(deploy,/EDGE_RESEARCH_BUNDLE_V2/);
+  assert.match(deploy,/EDGE_SYSTEM/);
+  assert.match(deploy,/fresh_data_required/);
+  assert.match(deploy,/data_first_lifecycle/);
+  assert.match(deploy,/chat_scheduled_task_dependency/);
+  assert.doesNotMatch(deploy,/EDGE_RESEARCH_BUNDLE_V1/);
 });
 
 test('G5 rollback is owner-only, explicit, exact-target and dry-run by default',()=>{
