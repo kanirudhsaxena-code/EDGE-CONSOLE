@@ -1,17 +1,17 @@
-name: G5.1 Weekday Pre-open Proof
+name: G5.1 Daily Pre-open Proof
 
 on:
   workflow_dispatch:
   schedule:
-    # 09:20 IST weekdays. Production calendar authority classifies the session;
+    # 09:20 IST daily. Production calendar authority classifies the session;
     # closed/special sessions exit cleanly without fabricating missing-run errors.
-    - cron: '50 3 * * 1-5'
+    - cron: '50 3 * * *'
 
 permissions:
   contents: write
 
 concurrency:
-  group: g5-1-weekday-preopen-proof
+  group: g5-1-daily-preopen-proof
   cancel-in-progress: false
 
 jobs:
@@ -61,7 +61,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: g5-1-weekday-preopen-proof
+          name: g5-1-daily-preopen-proof
           path: |
             /tmp/g5-1-preopen-proof.json
             /tmp/g5-1-preopen-proof.log
