@@ -1107,7 +1107,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   if (!stockRows.length) return json({ error: 'Ticker not found in EDGE stock assessment', ticker: symbol }, 404);
 
   const activeRows = await sql`
-    select r.*, l.status as lifecycle_status, l.include_in_master_metrics, l.expiry_trading_date, p.current_price, p.current_return_pct, p.outcome_verdict,
+    select r.*, l.expiry_trading_date, p.current_price, p.current_return_pct, p.outcome_verdict,
            mt.evidence_quality_score, mt.freshness_score, mt.completeness_score,
            mt.directional_agreement_score, mt.market_confirmation_score,
            coalesce(mt.market_trust_score, r.market_trust_score) as resolved_market_trust_score,
@@ -1493,25 +1493,6 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   `;
   const canonical = canonicalRows.length ? canonicalRows[0] as Record<string, unknown> : null;
 
-  // Benchmark membership and user-visible active calls are separate concerns.
-  // A valid USER_CANONICAL_SNAPSHOT is intentionally excluded from master
-  // benchmark metrics, but the fresh open call must still appear in the
-  // standard ACTIVE CALLS presentation for the user who requested it.
-  const visibleActiveRows=[...allActiveRows] as Record<string, unknown>[];
-  const currentCandidateType=String(currentGovernance?.candidate_type??'');
-  const currentVisibleInAllRun=!currentCandidateType||[
-    'LEGACY_CANDIDATE','PREOPEN_CANONICAL','OVERNIGHT_FALLBACK_CANONICAL',
-    'EXCEPTION_CANONICAL','USER_CANONICAL_SNAPSHOT'
-  ].includes(currentCandidateType);
-  if(
-    currentVisibleInAllRun &&
-    String(active.lifecycle_status??'')==='OPEN' &&
-    !visibleActiveRows.some(row=>String(row.recommendation_id??'')===String(active.recommendation_id??''))
-  ){
-    visibleActiveRows.push(active);
-    visibleActiveRows.sort((a,b)=>String(a.ticker??'').localeCompare(String(b.ticker??'')));
-  }
-
   const payload = {
     contract_version: 'EDGE_STOCKS_V1_3',
     presentation_contract: 'EFFICACY_V2',
@@ -1624,13 +1605,13 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         previous_recommendation: previousRecommendation,
       }
     },
-    active_calls: visibleActiveRows.map((row: Record<string, unknown>) => ({
+    active_calls: allActiveRows.map((row: Record<string, unknown>) => ({
       ticker: String(row.ticker),
       recommendation_id: String(row.recommendation_id),
       definitive_forecast: row.definitive_forecast,
       definitive_recommendation: row.definitive_recommendation,
       expected_price_zone: { low: numberOrNull(row.expected_price_zone_low), high: numberOrNull(row.expected_price_zone_high) },
-      call_timestamp: row.call_timestamp ?? row.run_timestamp ?? null,
+      call_timestamp: row.call_timestamp ?? null,
       expiry_trading_date: row.expiry_trading_date ?? null,
       current_price: numberOrNull(row.current_price),
       current_return_pct: numberOrNull(row.current_return_pct),
