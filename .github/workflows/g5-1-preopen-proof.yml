@@ -3,8 +3,8 @@ name: G5.1 Weekday Pre-open Proof
 on:
   workflow_dispatch:
   schedule:
-    # 09:20 IST weekdays. The proof script classifies the actual NSE session;
-    # weekends/known NSE trading holidays exit cleanly as NON_TRADING_DAY.
+    # 09:20 IST weekdays. Production calendar authority classifies the session;
+    # closed/special sessions exit cleanly without fabricating missing-run errors.
     - cron: '50 3 * * 1-5'
 
 permissions:
@@ -53,7 +53,7 @@ jobs:
           if git diff --cached --quiet; then
             echo "preopen_proof_state_unchanged"
           else
-            git commit -m "Record G5.1 Monday pre-open proof [skip ci]"
+            git commit -m "Record G5.1 governed pre-open proof [skip ci]"
             git push origin HEAD:state/g5-1-preopen-proof
           fi
 
