@@ -138,13 +138,13 @@ export async function resolveGovernedNseSession(
   if(env.EDGE_DATABASE_URL){
     try{
       const sql=neon(env.EDGE_DATABASE_URL);
-      const exact=await sql\`
+      const exact=await sql`
         select session_state,preopen_eligible,market_open_at,market_close_at,
                timing_source_ref,calendar_source_ref,acquired_at
           from v_nse_session_latest
-         where session_date=cast(\${dateIso} as date)
+         where session_date=cast(${dateIso} as date)
          limit 1
-      \`;
+      `;
       if(exact.length){
         const row=exact[0] as Record<string,unknown>;
         const raw=String(row.session_state??'');
@@ -169,12 +169,12 @@ export async function resolveGovernedNseSession(
         }
       }
 
-      const years=await sql\`
+      const years=await sql`
         select trading_holidays,special_timing_dates,source_ref,acquired_at
           from v_nse_calendar_year_latest
-         where calendar_year=\${parsed.year}
+         where calendar_year=${parsed.year}
          limit 1
-      \`;
+      `;
       if(years.length){
         const row=years[0] as Record<string,unknown>;
         const acquired=isoOrNull(row.acquired_at);
