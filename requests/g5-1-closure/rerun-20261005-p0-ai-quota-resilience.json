@@ -1,0 +1,16 @@
+{
+  "requested_at": "2026-10-05T11:35:00Z",
+  "reason": "Re-run live G5.1 closure after Workers AI quota resilience deployment",
+  "console_main": "2144aa26e59feb4bfdcebe7090f51741f2c8d279",
+  "edge_engine_main": "95cccce01bbed2677a08a684e7d638286a7d8588",
+  "expected_research_mode": "AI_IF_AVAILABLE_ELSE_DETERMINISTIC_SOURCE_GROUNDED_V1",
+  "required_assets": [
+    "NIFTY",
+    "LTF",
+    "CUPID",
+    "RELIANCE"
+  ],
+  "required_stock_result": "3/3 PASS",
+  "fail_closed": true,
+  "trading_enabled": false
+}
