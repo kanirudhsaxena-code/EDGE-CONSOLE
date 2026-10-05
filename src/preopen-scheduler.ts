@@ -14,6 +14,7 @@ import {
   readMarketSnapshotPayload,
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
+import { classifyGovernedNseSession } from './nse-trading-calendar';
 
 type JsonRecord=Record<string,unknown>;
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -51,7 +52,7 @@ function istClock(now:Date):{weekday:string;date:string;hour:number;minute:numbe
 
 export function classifyPreopenTick(now:Date):PreopenTick{
   const c=istClock(now);
-  if(!['Mon','Tue','Wed','Thu','Fri'].includes(c.weekday))return 'OUTSIDE';
+  if(classifyGovernedNseSession(c.date)!=='TRADING_DAY')return 'OUTSIDE';
   if(c.hour===8&&c.minute===50)return 'PREP';
   if(c.hour===9&&c.minute>=5&&c.minute<=9)return 'RESEARCH';
   if(c.hour===9&&c.minute>=10&&c.minute<=14)return 'AUCTION';
@@ -406,9 +407,19 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
 }
 
 export async function runPreopenScheduledTick(env:PreopenEnv,now=new Date(),scheduledTime?:number):Promise<void>{
+  const clock=istClock(now);
+  const sessionState=classifyGovernedNseSession(clock.date);
   const tick=classifyPreopenTick(now);
   if(tick==='OUTSIDE'){
-    console.log(JSON.stringify({status:'PREOPEN_CRON_OUTSIDE_WINDOW',actual:now.toISOString(),scheduled_time:scheduledTime??null,trading_enabled:false}));
+    console.log(JSON.stringify({
+      status:sessionState==='TRADING_DAY'?'PREOPEN_CRON_OUTSIDE_WINDOW':'PREOPEN_CRON_NON_TRADING_SESSION',
+      session_state:sessionState,
+      session_date_ist:clock.date,
+      actual:now.toISOString(),
+      scheduled_time:scheduledTime??null,
+      canonical_created:false,
+      trading_enabled:false
+    }));
     return;
   }
   if(tick==='PREP')return prep(env,now);
