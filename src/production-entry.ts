@@ -107,7 +107,7 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
     const cron=String((controller as any).cron??'');
-    if(cron==='35 2 * * 1-5'||cron==='0 3 * * 1-5'){
+    if(cron==='35 2 * * *'||cron==='0 3 * * *'){
       ctx.waitUntil((async()=>{
         const targetDate=istDate(new Date());
         const result=await dispatchEdgeCalendarWorkflow(env.EDGE_GITHUB_TOKEN??'',{target_date:targetDate});
