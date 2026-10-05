@@ -334,6 +334,21 @@ export async function refreshPreopenPrepResearch(env:Env,targetDate:string):Prom
   const requestId=String(rows[0].request_id);
   let metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
   let stage=String(metadata.adapter_stage??'');
+  const existingDelta=isObject(metadata.preopen_delta_research)?metadata.preopen_delta_research:{};
+  if(existingDelta.status==='DELTA_RESEARCH_READY'){
+    return json({
+      ok:true,
+      status:'DELTA_RESEARCH_READY',
+      target_date:targetDate,
+      request_id:requestId,
+      adapter_stage:stage||'PREOPEN_PREP_RESEARCH_READY',
+      research_manifest_complete:true,
+      missing_dimensions:[],
+      retrieved_at:existingDelta.retrieved_at??null,
+      idempotent:true,
+      trading_enabled:false
+    },200);
+  }
 
   if(stage==='AUTOMATED_MARKET_DATA_PENDING'){
     const internal=new Request(`https://edge-console.internal/api/5dr/run-requests/${encodeURIComponent(requestId)}/resume-processing`,{
