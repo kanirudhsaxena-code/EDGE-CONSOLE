@@ -96,7 +96,7 @@ export async function markStockResearchPending(env:Env,id:string,snapshotId:stri
            updated_at=now()
      where lifecycle_id=${id}
        and market_snapshot_id=${snapshotId}
-       and stage in ('DATA_READY','RESEARCH_PENDING')
+       and stage in ('DATA_READY','RESEARCH_PENDING','RESEARCH_BLOCKED')
      returning lifecycle_id
   `;
   if(!updated.length)throw new Error('lifecycle is not DATA_READY for research');
