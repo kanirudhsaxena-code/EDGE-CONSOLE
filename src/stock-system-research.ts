@@ -591,8 +591,8 @@ Return exactly:
         inference=repaired;
       }catch(repairError){
         const repairCode=repairError instanceof Error?repairError.message:String(repairError);
-        if(!repairCode.startsWith('STOCK_RESEARCH_AI_'))throw repairError;
-        deterministicFallbackReason=('Governed AI output remained invalid after one bounded repair: '+repairCode).slice(0,500);
+        if(repairCode!=='STOCK_RESEARCH_AI_INVALID_SOURCE_REF')throw repairError;
+        deterministicFallbackReason=('Governed AI source references remained invalid after one bounded repair: '+repairCode).slice(0,500);
         deterministicFallbackCause='AI_INVALID_OUTPUT';
         validated=deterministicSourceGroundedClaims(ticker,sources);
         inference={raw:null,model:'DETERMINISTIC_SOURCE_GROUNDED_V1'};
@@ -627,7 +627,7 @@ Return exactly:
       ...(deterministicFallbackReason?[
         deterministicFallbackCause==='AI_CAPACITY'
           ?'Workers AI capacity was unavailable; governed deterministic source-grounded research fallback was used.'
-          :'Governed AI output remained invalid after one bounded repair; governed deterministic source-grounded research fallback was used.',
+          :'Governed AI source references remained invalid after one bounded repair; governed deterministic source-grounded research fallback was used.',
         'Deterministic fallback is conservative and does not infer facts beyond bounded retrieved source excerpts.',
         deterministicFallbackReason,
       ]:[]),
