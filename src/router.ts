@@ -943,6 +943,10 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     }, dispatch.status === 401 || dispatch.status === 403 ? 502 : dispatch.status);
   }
 
+  if(canonicalAttempt&&lifecycleId){
+    await markStockComputeDispatched(env,lifecycleId,'AUCTION_READY');
+  }
+
   return json({
     ok: true,
     status: 'DISPATCHED',
