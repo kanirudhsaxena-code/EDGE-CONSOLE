@@ -1,0 +1,151 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-05T04:16:28.835Z",
+    "research_fresh_at": "2026-10-05T04:16:28.835Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-q1-official-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/news-media/press-releases/ril-q1-fy2026-27-financial-and-operational-performance",
+        "title": "Reliance Industries Q1 FY2026-27 financial and operational performance",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-07-17T00:00:00+05:30",
+        "event_date": "2026-06-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "ril-press-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/news-media/press-releases",
+        "title": "Reliance Industries official press release archive",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ril-screener-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/RELIANCE/consolidated/",
+        "title": "Reliance Industries consolidated valuation, financial and shareholding snapshot",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ril-bond-reuters-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/state-bank-india-buys-nearly-40-reliances-135-billion-debt-sale-2026-09-30/",
+        "title": "Reuters on strong institutional demand for Reliance's September 2026 bond sale",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      },
+      {
+        "source_id": "ril-q1-reuters-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/billionaire-mukesh-ambanis-reliance-beats-first-quarter-profit-estimate-2026-07-17/",
+        "title": "Reuters on Reliance Q1 FY27 results and segment performance",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-07-17T00:00:00Z",
+        "event_date": "2026-07-17T00:00:00Z"
+      },
+      {
+        "source_id": "india-market-reuters-ril-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-likely-rise-oil-comes-off-bse-joins-nifty-2026-09-30/",
+        "title": "Reuters on Indian equities, high oil, global rates and foreign outflows",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-business-20261005",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Fresh review of official Q1 FY27 results and independent coverage shows resilient operating performance across O2C, telecom and retail, with O2C and Jio strength supporting the quarter despite macro volatility.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-q1-official-20261005",
+          "ril-q1-reuters-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-institutional-20261005",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Latest quarterly equity ownership is mixed: FII ownership fell to 17.19% in June 2026 from 18.67% in March while DII ownership rose to 21.10% from 20.46%. Separately, the September bond issue drew strong demand led by SBI and other institutions, confirming strong debt-market access but not equity accumulation.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-screener-20261005",
+          "ril-bond-reuters-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-catalyst-20261005",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Reliance returned to the rupee debt market with a large September bond issue that attracted strong institutional demand; this is a positive financing-access catalyst, while the official press-release archive reviewed today did not show a newer company press release after mid-August.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-bond-reuters-20261005",
+          "ril-press-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-valuation-20261005",
+        "evidence_category": "VALUATION",
+        "statement": "The freshly retrieved consolidated snapshot displayed Reliance at about 21.4x earnings and around 1.8x book value based on the shown price and book value; this is treated as neutral valuation context rather than a fair-value target.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-event-shock-20261005",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No verified Reliance-specific default, fraud, insolvency, ban or comparable acute corporate shock was found in the fresh official and independent review. However, elevated oil prices, global rate pressure and foreign outflows remain material external shock variables for the Indian market and can transmit through Reliance's energy and financing-sensitive businesses.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-press-20261005",
+          "india-market-reuters-ril-20261005",
+          "ril-q1-reuters-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The September bond demand is debt-market institutional behaviour and must not be misrepresented as equity buying.",
+      "Quarterly shareholding is historical ownership evidence rather than current-session flow.",
+      "Live price, volume, derivatives and technical evidence must be acquired independently by the governed market-data engine.",
+      "No fair-value target or production recommendation is created by this research artifact."
+    ],
+    "bundle_id": "g51-normal-reliance-20261005-0419z"
+  }
+}
