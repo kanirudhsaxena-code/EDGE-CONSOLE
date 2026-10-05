@@ -89,9 +89,12 @@ jobs:
           d=json.load(open('/tmp/deploy-health.json'))
           assert d.get('ok') is True, d
           assert d.get('edge_database_configured') is True, d
-          assert d.get('research_contract_version') == 'EDGE_RESEARCH_BUNDLE_V1', d
-          assert d.get('research_authority') == 'CHATGPT', d
+          assert d.get('research_contract_version') == 'EDGE_RESEARCH_BUNDLE_V2', d
+          assert d.get('research_authority') == 'EDGE_SYSTEM', d
+          assert d.get('fresh_data_required') is True, d
           assert d.get('fresh_web_research_required') is True, d
+          assert d.get('data_first_lifecycle') is True, d
+          assert d.get('chat_scheduled_task_dependency') is False, d
           PY
               then
                 exit 0

@@ -2,8 +2,9 @@ name: EDGE Production Smoke
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
+  workflow_run:
+    workflows: ["EDGE Console Deploy"]
+    types: [completed]
   schedule:
     - cron: '15 * * * 1-5'
 
@@ -12,6 +13,7 @@ permissions:
 
 jobs:
   validate-edge-production:
+    if: ${{ github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
@@ -94,26 +96,36 @@ jobs:
           d=json.load(open('/tmp/health.json'))
           assert d.get('ok') is True, d
           assert d.get('edge_database_configured') is True, d
-          assert d.get('research_contract_version')=='EDGE_RESEARCH_BUNDLE_V1', d
-          assert d.get('research_authority')=='CHATGPT', d
+          assert d.get('research_contract_version')=='EDGE_RESEARCH_BUNDLE_V2', d
+          assert d.get('research_authority')=='EDGE_SYSTEM', d
+          assert d.get('fresh_data_required') is True, d
           assert d.get('fresh_web_research_required') is True, d
+          assert d.get('data_first_lifecycle') is True, d
+          assert d.get('chat_scheduled_task_dependency') is False, d
           PY
 
-      - name: Prove ticker-only EDGE invocation fails closed
+      - name: Prove autonomous V2 lifecycle dependencies are reachable without starting a run
         run: |
           set -euo pipefail
-          code="$(curl --location --silent --show-error -o /tmp/no-research.json -w '%{http_code}' \
+          curl --location --fail --silent --show-error \
             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" \
             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            -H 'content-type: application/json' \
-            -X POST --data '{"command":"EDGE NOFRESH123","force_new":true}' \
-            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/invoke')"
-          test "$code" = "409"
+            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/dispatch-health' \
+            -o /tmp/v2-dispatch-health.json
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/no-research.json'))
-          assert d.get('code')=='EDGE_NEW_RUN_RESEARCH_REQUIRED', d
-          assert d.get('contract_version')=='EDGE_RESEARCH_BUNDLE_V1', d
+          d=json.load(open('/tmp/v2-dispatch-health.json'))
+          assert d.get('ok') is True, d
+          assert d.get('status')=='READY', d
+          assert d.get('production_scheduler_authority')=='CLOUDFLARE_CRON', d
+          assert d.get('chat_scheduled_task_dependency') is False, d
+          workflows=d.get('workflows') or {}
+          assert workflows.get('data',{}).get('name')=='stock-data-snapshot.yml', d
+          assert workflows.get('data',{}).get('ok') is True, d
+          assert workflows.get('compute',{}).get('name')=='autonomous-publish.yml', d
+          assert workflows.get('compute',{}).get('ok') is True, d
+          assert workflows.get('auction',{}).get('name')=='stock-auction-snapshot.yml', d
+          assert workflows.get('auction',{}).get('ok') is True, d
           PY
 
       - name: Validate live LTF report without dispatching production
@@ -157,19 +169,20 @@ jobs:
           }))
           PY
 
-      - name: Validate EDGE prompt dispatch credential
+      - name: Validate EDGE lifecycle dispatch health remains fail-closed and non-trading
         run: |
           set -euo pipefail
-          curl --location --fail --silent --show-error -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" \
-            'https://edge-console.k-anirudhsaxena.workers.dev/api/edge-stocks/dispatch-health' \
-            -o /tmp/dispatch-health.json
+          cp /tmp/v2-dispatch-health.json /tmp/dispatch-health.json
           python - <<'PY'
           import json
           data=json.load(open('/tmp/dispatch-health.json'))
           assert data['ok'] is True, data
           assert data['status']=='READY', data
           assert data['workflow']=='autonomous-publish.yml', data
+          assert data['production_scheduler_authority']=='CLOUDFLARE_CRON', data
+          assert data['chat_scheduled_task_dependency'] is False, data
           assert data['trading_enabled'] is False, data
+          assert all((data.get('workflows') or {}).get(k,{}).get('ok') is True for k in ('data','compute','auction')), data
           PY
 
       - name: Validate current compliant Efficacy V2 report contract

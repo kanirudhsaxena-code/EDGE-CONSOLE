@@ -29,9 +29,12 @@ export default {
         edge_database_configured: Boolean(env.EDGE_DATABASE_URL),
         environment: env.APP_ENV ?? null,
         prompt_dispatch_configured: Boolean(env.EDGE_GITHUB_TOKEN),
-        research_contract_version: 'EDGE_RESEARCH_BUNDLE_V1',
-        research_authority: 'CHATGPT',
-        fresh_web_research_required: true
+        research_contract_version: 'EDGE_RESEARCH_BUNDLE_V2',
+        research_authority: 'EDGE_SYSTEM',
+        fresh_data_required: true,
+        fresh_web_research_required: true,
+        data_first_lifecycle: true,
+        chat_scheduled_task_dependency: false
       });
     }
 

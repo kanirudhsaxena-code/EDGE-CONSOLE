@@ -3,7 +3,7 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
-import { checkEdgeWorkflowAccess, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
+import { checkEdgeAuctionWorkflowAccess, checkEdgeDataWorkflowAccess, checkEdgeWorkflowAccess, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 import { buildFiveDrAssessmentFromDatabase } from './five-dr-assessment-builder';
@@ -491,15 +491,30 @@ async function fiveDrAssessmentImport(request: Request, env: Env): Promise<Respo
 }
 
 async function edgeStocksDispatchHealth(env: Env): Promise<Response> {
-  const result = await checkEdgeWorkflowAccess(env.EDGE_GITHUB_TOKEN ?? '');
+  const token=env.EDGE_GITHUB_TOKEN??'';
+  const [data,compute,auction]=await Promise.all([
+    checkEdgeDataWorkflowAccess(token),
+    checkEdgeWorkflowAccess(token),
+    checkEdgeAuctionWorkflowAccess(token),
+  ]);
+  const ok=data.ok&&compute.ok&&auction.ok;
+  const blocked=[data,compute,auction].find(result=>!result.ok);
+  const statusCode=ok?200:(blocked?.status===401||blocked?.status===403?502:(blocked?.status??503));
   return json({
-    ok: result.ok,
-    status: result.ok ? 'READY' : 'BLOCKED',
-    engine: 'EDGE_STOCKS',
-    workflow: 'autonomous-publish.yml',
-    trading_enabled: false,
-    error: result.error ?? null,
-  }, result.ok ? 200 : (result.status === 401 || result.status === 403 ? 502 : result.status));
+    ok,
+    status:ok?'READY':'BLOCKED',
+    engine:'EDGE_STOCKS',
+    workflow:'autonomous-publish.yml',
+    workflows:{
+      data:{name:'stock-data-snapshot.yml',ok:data.ok,status:data.status,error:data.error??null},
+      compute:{name:'autonomous-publish.yml',ok:compute.ok,status:compute.status,error:compute.error??null},
+      auction:{name:'stock-auction-snapshot.yml',ok:auction.ok,status:auction.status,error:auction.error??null},
+    },
+    production_scheduler_authority:'CLOUDFLARE_CRON',
+    chat_scheduled_task_dependency:false,
+    trading_enabled:false,
+    error:blocked?.error??null,
+  },statusCode);
 }
 
 async function resolveEdgeTicker(env: Env, target: string): Promise<{ ticker?: string; error?: string; status?: number }> {

@@ -31,3 +31,27 @@ test('wrangler deploys the production wrapper while preserving mobile research g
   assert.match(legacyApp,/url\.pathname==='\/api\/learning-lab\/snapshot-import'/);
   assert.match(legacyApp,/url\.pathname==='\/api\/learning-lab\/candidate-import'/);
 });
+
+
+test('deployment and smoke validators are locked to V2 and run smoke after deployment',()=>{
+  const deploy=fs.readFileSync('.github/workflows/deploy.yml','utf8');
+  const smoke=fs.readFileSync('.github/workflows/edge-production-smoke.yml','utf8');
+  const worker=fs.readFileSync('src/worker.ts','utf8');
+
+  for(const source of [deploy,smoke,worker]){
+    assert.match(source,/EDGE_RESEARCH_BUNDLE_V2/);
+    assert.match(source,/EDGE_SYSTEM/);
+    assert.doesNotMatch(source,/EDGE_RESEARCH_BUNDLE_V1/);
+    assert.doesNotMatch(source,/research_authority[^\n]*CHATGPT/);
+  }
+  assert.match(deploy,/fresh_data_required/);
+  assert.match(deploy,/data_first_lifecycle/);
+  assert.match(deploy,/chat_scheduled_task_dependency/);
+  assert.match(smoke,/workflow_run:/);
+  assert.match(smoke,/EDGE Console Deploy/);
+  assert.doesNotMatch(smoke,/\n\s*push:\n/);
+  assert.doesNotMatch(smoke,/EDGE_NEW_RUN_RESEARCH_REQUIRED/);
+  assert.doesNotMatch(smoke,/EDGE NOFRESH123/);
+  assert.match(smoke,/stock-data-snapshot\.yml/);
+  assert.match(smoke,/stock-auction-snapshot\.yml/);
+});
