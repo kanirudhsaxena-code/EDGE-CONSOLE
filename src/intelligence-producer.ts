@@ -183,6 +183,290 @@ export function normalizeIntelligenceJudgment(judgment:IntelligenceJudgment):Jso
   return normalized;
 }
 
+
+export const INTELLIGENCE_DETERMINISTIC_FALLBACK_MODEL='DETERMINISTIC_DEGRADED_V1';
+
+function inferenceCapacityFailure(error:unknown):boolean{
+  const message=error instanceof Error?error.message:String(error??'');
+  return /\b4006\b|daily free allocation|quota|capacity|rate.?limit|temporar(?:y|ily) unavailable/i.test(message);
+}
+
+function numberValue(value:unknown):number|null{
+  if(finite(value))return value;
+  const parsed=Number(value);
+  return Number.isFinite(parsed)?parsed:null;
+}
+
+function recordAt(value:unknown,key:string):JsonRecord|null{
+  return isObject(value)&&isObject(value[key])?value[key] as JsonRecord:null;
+}
+
+function arrayRecords(value:unknown):JsonRecord[]{
+  return Array.isArray(value)?value.filter(isObject):[];
+}
+
+function marketObservation(packet:unknown,category:string):JsonRecord|null{
+  if(!isObject(packet))return null;
+  return arrayRecords(packet.market_observations).find(item=>item.category===category)??null;
+}
+
+function researchObservation(packet:unknown,category:string):JsonRecord|null{
+  if(!isObject(packet))return null;
+  return arrayRecords(packet.research).find(item=>item.category===category&&item.status==='RETRIEVED')??null;
+}
+
+function sourceRef(item:JsonRecord|null,allowed:Set<string>):string|null{
+  const ref=item&&typeof item.source_ref==='string'?item.source_ref:null;
+  return ref&&allowed.has(ref)?ref:null;
+}
+
+function trendRaw(state:unknown):RawScore{
+  const s=String(state??'').toUpperCase();
+  if(s.includes('UPTREND'))return 2;
+  if(s.includes('DOWNTREND'))return -2;
+  return 0;
+}
+
+function combineRaw(a:RawScore,b:RawScore):RawScore{
+  const total=a+b;
+  if(total>=3)return 2;
+  if(total>0)return 1;
+  if(total<=-3)return -2;
+  if(total<0)return -1;
+  return 0;
+}
+
+function thresholdRaw(value:number|null,soft:number,strong:number,invert=false):RawScore{
+  if(value===null)return 0;
+  let out:RawScore=0;
+  if(value>=strong)out=2;
+  else if(value>=soft)out=1;
+  else if(value<=-strong)out=-2;
+  else if(value<=-soft)out=-1;
+  return invert?(out===2?-2:out===1?-1:out===-1?1:out===-2?2:0):out;
+}
+
+function average(values:(number|null)[]):number|null{
+  const usable=values.filter((v):v is number=>v!==null&&Number.isFinite(v));
+  return usable.length?usable.reduce((a,b)=>a+b,0)/usable.length:null;
+}
+
+function instrumentChanges(value:unknown):number[]{
+  if(!isObject(value)||!isObject(value.instruments))return [];
+  return Object.values(value.instruments).filter(isObject)
+    .map(row=>numberValue(row.change_pct_vs_previous_close))
+    .filter((v):v is number=>v!==null);
+}
+
+function rangeForTimeframe(timeframes:JsonRecord,tf:string,spot:number):{low:number;high:number;state:string}|null{
+  const row=recordAt(timeframes,tf);
+  const range=row?recordAt(row,'range_event'):null;
+  const low=numberValue(range?.prior_range_low);
+  const high=numberValue(range?.prior_range_high);
+  if(low===null||high===null||low<=0||high<low)return null;
+  return {low:Math.min(low,spot),high:Math.max(high,spot),state:String(recordAt(row,'trend_structure')?.state??'MIXED_OR_TRANSITION_STRUCTURE')};
+}
+
+function scenarioForTrend(raw:RawScore):{direction:'BULLISH'|'RANGE'|'BEARISH';probabilities:{BULL:number;RANGE:number;BEAR:number}}{
+  if(raw>0)return {direction:'BULLISH',probabilities:{BULL:45,RANGE:40,BEAR:15}};
+  if(raw<0)return {direction:'BEARISH',probabilities:{BULL:15,RANGE:40,BEAR:45}};
+  return {direction:'RANGE',probabilities:{BULL:25,RANGE:50,BEAR:25}};
+}
+
+function medianNumber(values:number[]):number|null{
+  if(!values.length)return null;
+  const sorted=[...values].sort((a,b)=>a-b),mid=Math.floor(sorted.length/2);
+  return sorted.length%2?sorted[mid]:(sorted[mid-1]+sorted[mid])/2;
+}
+
+function deterministicDegradedJudgment(packet:unknown,allowedSourceRefs:Set<string>):IntelligenceJudgment|null{
+  const price=marketObservation(packet,'PRICE_TECHNICALS');
+  const derivatives=marketObservation(packet,'DERIVATIVES_OI');
+  const participation=marketObservation(packet,'MARKET_TRUST');
+  const execution=marketObservation(packet,'EXECUTION_RISK');
+  const event=researchObservation(packet,'EVENT_SHOCK');
+  const refs=[
+    sourceRef(price,allowedSourceRefs),
+    sourceRef(derivatives,allowedSourceRefs),
+    sourceRef(participation,allowedSourceRefs),
+    sourceRef(event,allowedSourceRefs),
+    sourceRef(execution,allowedSourceRefs),
+  ];
+  if(refs.some(ref=>!ref))return null;
+
+  const priceData=recordAt(price,'structured_data');
+  const chart=priceData?recordAt(priceData,'chart'):null;
+  const timeframes=chart?recordAt(chart,'timeframes'):null;
+  const nifty=priceData?recordAt(priceData,'nifty'):null;
+  const spotRow=nifty?recordAt(nifty,'spot'):null;
+  const spot=numberValue(spotRow?.last_price)
+    ??numberValue(arrayRecords(price?.findings).find(row=>row.label==='Current Price')?.value);
+  if(!timeframes||spot===null||spot<=0)return null;
+
+  const daily=recordAt(timeframes,'1d');
+  const hourly=recordAt(timeframes,'1h');
+  const dailyRaw=trendRaw(recordAt(daily,'trend_structure')?.state);
+  const hourlyRaw=trendRaw(recordAt(hourly,'trend_structure')?.state);
+  const structureRaw=combineRaw(dailyRaw,hourlyRaw);
+
+  const hourlyRange=hourly?recordAt(hourly,'range_event'):null;
+  const closeState=String(hourlyRange?.close_state??'');
+  const keyRaw:RawScore=closeState.includes('ABOVE')?1:closeState.includes('BELOW')?-1:0;
+  const relativeVolume=numberValue(recordAt(hourly,'volume_confirmation')?.relative_to_median);
+  const spotChange=numberValue(spotRow?.change_pct_vs_previous_close);
+  const volumeRaw:RawScore=relativeVolume!==null&&relativeVolume>=1.2
+    ?thresholdRaw(spotChange,0.15,0.75)
+    :0;
+  const persistenceRaw=thresholdRaw(spotChange,0.25,1.0);
+
+  const derivData=recordAt(derivatives,'structured_data');
+  const futures=derivData?recordAt(derivData,'nifty_futures'):null;
+  const analytics=derivData?recordAt(derivData,'derivative_analytics'):null;
+  const basisRaw=thresholdRaw(numberValue(futures?.basis_pct_of_spot),0.1,0.5);
+  // OI alone is never permitted to create direction; ambiguous premium/volume
+  // effects stay neutral in the deterministic fallback.
+  const pvpoRaw={price_futures_basis:basisRaw,volume_participation:0 as RawScore,premium_behaviour:0 as RawScore,oi_structure_change:0 as RawScore};
+
+  const participationData=recordAt(participation,'structured_data');
+  const heavyweightChanges=instrumentChanges(participationData?.heavyweights);
+  const sectorChanges=instrumentChanges(participationData?.sectors);
+  const heavyweightRaw=thresholdRaw(average(heavyweightChanges),0.2,0.8);
+  const sectorRaw=thresholdRaw(average(sectorChanges),0.15,0.6);
+  const cash=participationData?recordAt(participationData,'fii_dii_cash'):null;
+  const fii=cash?recordAt(cash,'fii'):null;
+  const dii=cash?recordAt(cash,'dii'):null;
+  const fiiNet=fii&&numberValue(fii.buy_amount)!==null&&numberValue(fii.sell_amount)!==null
+    ?Number(fii.buy_amount)-Number(fii.sell_amount):null;
+  const diiNet=dii&&numberValue(dii.buy_amount)!==null&&numberValue(dii.sell_amount)!==null
+    ?Number(dii.buy_amount)-Number(dii.sell_amount):null;
+  let institutionalRaw:RawScore=0;
+  if(fiiNet!==null&&diiNet!==null){
+    if(fiiNet>0&&diiNet>0)institutionalRaw=2;
+    else if(fiiNet<0&&diiNet<0)institutionalRaw=-2;
+    else institutionalRaw=thresholdRaw(fiiNet+diiNet,1000,7500);
+  }
+
+  const globalChanges=instrumentChanges(participationData?.global_risk);
+  const globalRaw=thresholdRaw(average(globalChanges),0.2,0.8);
+  let crudeMove:number|null=null;
+  if(isObject(packet)){
+    const moves:number[]=[];
+    for(const item of arrayRecords(packet.research)){
+      if(item.status!=='RETRIEVED'||!isObject(item.facts))continue;
+      for(const key of ['wti_usd_per_barrel','brent_usd_per_barrel']){
+        const fact=recordAt(item.facts,key),change=numberValue(fact?.change_from_first);
+        if(change!==null)moves.push(change);
+      }
+    }
+    crudeMove=average(moves);
+  }
+  const crudeRaw=thresholdRaw(crudeMove,2,5,true);
+
+  const sameSign=(a:number,b:number)=>a!==0&&b!==0&&Math.sign(a)===Math.sign(b);
+  const opposite=(a:number,b:number)=>a!==0&&b!==0&&Math.sign(a)!==Math.sign(b);
+  const pvpoSignal=basisRaw;
+  const participationSignal=combineRaw(heavyweightRaw,combineRaw(sectorRaw,institutionalRaw));
+  const crossEngineConsistency=sameSign(structureRaw,pvpoSignal)||sameSign(structureRaw,participationSignal)
+    ?65:opposite(structureRaw,pvpoSignal)||opposite(structureRaw,participationSignal)?35:50;
+
+  const execData=recordAt(execution,'structured_data');
+  const strikes=arrayRecords(execData?.sample_strikes);
+  const spreads:number[]=[];
+  let ivThetaRows=0;
+  for(const strike of strikes){
+    for(const side of ['CE','PE']){
+      const leg=recordAt(strike,side);
+      const spread=numberValue(leg?.bid_ask_spread_pct_mid);
+      if(spread!==null)spreads.push(spread);
+      if(numberValue(leg?.iv)!==null&&numberValue(leg?.theta)!==null)ivThetaRows++;
+    }
+  }
+  const medianSpread=medianNumber(spreads);
+  const liquidityScore=medianSpread===null?30:medianSpread<=0.5?90:medianSpread<=1?80:medianSpread<=1.5?65:medianSpread<=2.5?45:25;
+  const selectedExpiry=typeof execData?.selected_expiry==='string'&&execData.selected_expiry?true:false;
+  const hasRange=!!rangeForTimeframe(timeframes,'1h',spot);
+
+  const horizonDefs:[string,string][]=[
+    ['D+1','15m'],['D+2','30m'],['D+3','1h'],['D+4','1d'],['D+5','1d']
+  ];
+  const dailyRange=rangeForTimeframe(timeframes,'1d',spot);
+  const hourlyEvidenceRange=rangeForTimeframe(timeframes,'1h',spot);
+  if(!dailyRange&&!hourlyEvidenceRange)return null;
+  const horizon_slots={} as Record<(typeof HORIZONS)[number],JsonRecord>;
+  for(const [horizon,tf] of horizonDefs){
+    const tfRow=recordAt(timeframes,tf);
+    const trend=trendRaw(recordAt(tfRow,'trend_structure')?.state);
+    const scenario=scenarioForTrend(trend);
+    const range=rangeForTimeframe(timeframes,tf,spot)??(tf==='1d'?dailyRange:hourlyEvidenceRange)??dailyRange;
+    if(!range)return null;
+    horizon_slots[horizon as (typeof HORIZONS)[number]]={
+      direction:scenario.direction,
+      probabilities:scenario.probabilities,
+      zone_low:range.low,
+      zone_high:range.high,
+      basis:`Deterministic degraded fallback: ${tf} ${range.state}; zone uses supplied prior-range bounds plus current spot only.`,
+    };
+  }
+
+  const regime:'TREND'|'RANGE'|'TRANSITION'=
+    dailyRaw!==0&&hourlyRaw!==0&&Math.sign(dailyRaw)===Math.sign(hourlyRaw)?'TREND':
+    dailyRaw!==0&&hourlyRaw!==0&&Math.sign(dailyRaw)!==Math.sign(hourlyRaw)?'TRANSITION':'RANGE';
+
+  return {
+    verification:'DEGRADED',
+    source_refs:refs as string[],
+    regime,
+    directional_raw:{
+      PRICE_STRUCTURE:{
+        daily_1h_structure:structureRaw,
+        key_level_acceptance_rejection:keyRaw,
+        volume_confirmation:volumeRaw,
+        persistence_close:persistenceRaw,
+      },
+      PVPO:pvpoRaw,
+      PARTICIPATION:{
+        heavyweight_contribution:heavyweightRaw,
+        sector_leadership_breadth:sectorRaw,
+        institutional_cash_participation:institutionalRaw,
+      },
+      MACRO_CATALYSTS:{
+        global_risk_environment:globalRaw,
+        india_macro_rbi_inr_rates:0,
+        crude_commodities_geopolitics:crudeRaw,
+        scheduled_high_impact_catalysts:0,
+      },
+    },
+    market_trust_inputs:{
+      price_confirmation:daily&&hourly?65:45,
+      pvpo_confirmation:numberValue(futures?.basis_pct_of_spot)!==null&&numberValue(recordAt(analytics,'pcr')?.pcr)!==null?65:45,
+      participation_confirmation:heavyweightChanges.length&&sectorChanges.length&&fiiNet!==null&&diiNet!==null?65:45,
+      cross_engine_consistency:crossEngineConsistency,
+      closing_confirmation:spotChange!==null?70:45,
+      evidence_freshness_completeness:80,
+    },
+    event_shock:'MODERATE',
+    event_transmission:'TWO_SIDED',
+    convexity_warranted:false,
+    execution_inputs:{
+      rr_score:0,
+      premium_iv_theta_score:ivThetaRows>=4?60:ivThetaRows?45:25,
+      strike_expiry_fit_score:selectedExpiry&&strikes.length>=3?65:selectedExpiry?45:25,
+      liquidity_spread_score:liquidityScore,
+      entry_invalidation_score:hasRange?60:30,
+    },
+    data_adequate:false,
+    expected_rr:0,
+    horizon_slots,
+    limitations:[
+      'Workers AI inference capacity was unavailable; deterministic degraded reconciliation was used.',
+      'Fallback uses only supplied structured evidence and exact supplied source references.',
+      'Ambiguous directional components remain neutral rather than being inferred.',
+      'Event shock is conservatively MODERATE/TWO_SIDED because the fallback does not semantically infer absence of event risk.',
+      'data_adequate=false and expected_rr=0 prevent the degraded fallback from qualifying a trade on its own.',
+    ],
+  };
+}
+
 function inferenceErrorLabel(error:unknown):string{
   const raw=error instanceof Error?error.message:String(error??'unknown');
   return raw.replace(/\s+/g,' ').slice(0,240);
@@ -226,6 +510,20 @@ export async function produceIntelligence(ai:AiBinding,packet:unknown,allowedSou
     if(!validation.judgment)return {judgment:null,normalized:null,errors:validation.errors.length?validation.errors:['intelligence model returned invalid JSON'],model};
     return {judgment:validation.judgment,normalized:normalizeIntelligenceJudgment(validation.judgment),errors:[],model};
   }catch(error){
+    if(inferenceCapacityFailure(error)){
+      const fallback=deterministicDegradedJudgment(packet,allowedSourceRefs);
+      if(fallback){
+        const validation=validateIntelligenceJudgment(fallback,allowedSourceRefs);
+        if(validation.judgment){
+          return {
+            judgment:validation.judgment,
+            normalized:normalizeIntelligenceJudgment(validation.judgment),
+            errors:[],
+            model:INTELLIGENCE_DETERMINISTIC_FALLBACK_MODEL,
+          };
+        }
+      }
+    }
     return {judgment:null,normalized:null,errors:[`intelligence inference unavailable: ${inferenceErrorLabel(error)}`],model};
   }
 }
