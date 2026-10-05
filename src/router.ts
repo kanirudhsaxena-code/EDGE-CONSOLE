@@ -70,7 +70,7 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number; contractVersion?: string }> {
+export async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number; contractVersion?: string }> {
   if (!env.EDGE_DATABASE_URL) return { error: 'EDGE database is not configured', status: 503 };
   const assessment = researchBundleCanPublish(body);
   if (!assessment.ready || !isObject(body)) return { error: 'EDGE research bundle validation failed: ' + assessment.errors.join('; '), status: 422 };
