@@ -1,47 +1,33 @@
 {
   "acceptance_date_ist": "2026-10-05",
-  "acceptance_time_ist": "2026-10-05T13:31:12.825870+05:30",
+  "acceptance_time_ist": "2026-10-05T16:40:21.968465+05:30",
   "architecture": "DATA -> RESEARCH -> RECONCILE/COMPUTE -> PERSIST -> PRESENT",
   "errors": [
     {
-      "error": "AssertionError: LTF lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"LTF\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-LTF-USER-1fca34a8-b8d3-42d7-8c23-41b7d6e28ddc\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_INVALID_SOURCE_REF\", \"trading_enabled\": false}",
+      "error": "AssertionError: NIFTY production run did not complete inside acceptance window",
+      "task": "nifty"
+    },
+    {
+      "error": "AssertionError: LTF lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"LTF\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-LTF-USER-c25d3a8d-eb81-4bdb-92e9-6564dcc7dad5\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_UNAVAILABLE:@cf/google/gemma-4-26b-a4b-it:4006: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare's Workers Paid plan if you would like to continue usage. | @cf/zai-org/glm-4.7-flash:4006: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare's Workers Paid plan if you would like to continue usage.\", \"trading_enabled\": false}",
       "task": "LTF"
     },
     {
-      "error": "AssertionError: CUPID lifecycle blocked at COMPUTE_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"CUPID\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-CUPID-USER-411d7f0e-8f64-4bd3-9611-75177074574d\", \"lifecycle_stage\": \"COMPUTE_BLOCKED\", \"market_snapshot_id\": \"EDGE-MKT-CUPID-20261005-080457-f2cddbf99b4d\", \"research_bundle_id\": \"ER2-CUPID-bedf23cb749a4fe0\", \"auction_snapshot_id\": null, \"detail\": \"BLOCKED_G5_INPUTS: G5 Event-Shock Risk is not verified\", \"trading_enabled\": false}",
+      "error": "AssertionError: CUPID lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"CUPID\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-CUPID-USER-79e9787b-1416-49c1-b754-4dde7e2e817a\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_UNAVAILABLE:@cf/google/gemma-4-26b-a4b-it:4006: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare's Workers Paid plan if you would like to continue usage. | @cf/zai-org/glm-4.7-flash:4006: you have used up your daily free allocation of 10,000 neurons, please upgrade to Cloudflare's Workers Paid plan if you would like to continue usage.\", \"trading_enabled\": false}",
       "task": "CUPID"
+    },
+    {
+      "error": "AssertionError: RELIANCE lifecycle status read failed :: {\"code\": 500, \"body\": {\"_raw\": \"error code: 1101\\n\"}}",
+      "task": "RELIANCE"
     }
   ],
   "fault_boundaries": {
     "canonical_without_lifecycle": "BLOCKED_409",
-    "checked_at": "2026-10-05T08:01:16.828678Z",
+    "checked_at": "2026-10-05T11:10:23.282065Z",
     "research_only_without_bundle": "BLOCKED_422",
     "status": "PASS",
     "unknown_lifecycle": "BLOCKED_409"
   },
-  "generated_at": "2026-10-05T08:07:25.107339Z",
-  "nifty": {
-    "contract_version": "1.0",
-    "framework_version": "5DR_V2_1",
-    "g1_market_data": "PASS",
-    "g2_system_research_8_8": "PASS",
-    "g3_intelligence_reconciliation": "PASS",
-    "g4_engine_sync": "PASS",
-    "g5_persisted_output": "PASS",
-    "provenance": {
-      "benchmark_role": "NONE",
-      "evidence_mode": "LIVE_INTRADAY",
-      "market_session_as_of": "2026-10-05",
-      "research_as_of": "2026-10-05T08:02:12.821140+00:00",
-      "target_session": null,
-      "trigger_type": "USER"
-    },
-    "published": true,
-    "request_id": "5drreq_852525af-1763-4b1f-9932-565a76214804",
-    "research_dimensions_verified": "8/8",
-    "run_id": "5drrun_ec583db4-fb24-4cb7-b8bc-37418055e01e",
-    "status": "PASS"
-  },
+  "generated_at": "2026-10-05T11:22:09.560313Z",
   "points": {
     "fault_boundaries": {
       "status": "PASS"
@@ -53,7 +39,7 @@
       "status": "SEPARATE_WINDOW_PROOF_REQUIRED"
     },
     "nifty": {
-      "status": "PASS"
+      "status": "FAIL"
     },
     "production_health": {
       "status": "PASS"
@@ -63,7 +49,7 @@
     }
   },
   "production_health": {
-    "checked_at": "2026-10-05T08:01:13.494537Z",
+    "checked_at": "2026-10-05T11:10:22.517605Z",
     "research_authority": "EDGE_SYSTEM",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V2",
     "scheduler_authority": "CLOUDFLARE_CRON",
@@ -75,53 +61,5 @@
     }
   },
   "schema": "MDOS_G5_1_V2_LIVE_CLOSURE_PROOF",
-  "stocks": {
-    "RELIANCE": {
-      "forecast_horizon": "D:D+4",
-      "fresh_source_count": 4,
-      "g1_data_first": "PASS",
-      "g2_fresh_system_research": "PASS",
-      "g3_exact_lineage": "PASS",
-      "g4_compute_persistence": "PASS",
-      "g5_user_output_parity": "PASS",
-      "lifecycle_id": "EDGE-LC-2026-10-05-RELIANCE-USER-20b15d80-8c21-4c98-b792-ef2b0a2b7640",
-      "market_snapshot_id": "EDGE-MKT-RELIANCE-20261005-080609-427cabf9dba8",
-      "observed_stages": [
-        "RUN_CREATED",
-        "DATA_PENDING",
-        "COMPUTE_DISPATCHED",
-        "COMPUTE_PENDING",
-        "PERSISTED"
-      ],
-      "presentation_contract": "EFFICACY_V2",
-      "provenance": {
-        "benchmark_role": "NONE",
-        "candidate_type": "USER_CANONICAL_SNAPSHOT",
-        "evidence_mode": "LIVE_INTRADAY",
-        "market_session_as_of": "2026-10-05T00:00:00.000Z",
-        "research_as_of": "2026-10-05T08:07:01.150Z",
-        "target_session": "2026-10-05T00:00:00.000Z",
-        "trigger_type": "USER"
-      },
-      "research_authority": "EDGE_SYSTEM",
-      "research_bundle_id": "ER2-RELIANCE-7466314e199d216b",
-      "research_contract": "EDGE_RESEARCH_BUNDLE_V2",
-      "research_coverage": "5/5 VERIFIED",
-      "result_id": "EDGE-RELIANCE-20261005-080713-AUTO",
-      "session_labels": [
-        "D",
-        "D+1",
-        "D+2",
-        "D+3",
-        "D+4"
-      ],
-      "standard_tables": [
-        "EDGE_MASTER_ASSESSMENT",
-        "ACTIVE_CALLS",
-        "CURRENT_STOCK_OUTCOME",
-        "DRILLDOWN"
-      ],
-      "status": "PASS"
-    }
-  }
+  "stocks": {}
 }
