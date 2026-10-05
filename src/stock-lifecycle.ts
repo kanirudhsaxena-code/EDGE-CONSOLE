@@ -4,7 +4,7 @@ export type StockLifecycleStage=
   'RUN_CREATED'|'DATA_PENDING'|'DATA_READY'|'DATA_BLOCKED'|
   'RESEARCH_PENDING'|'RESEARCH_READY'|'RESEARCH_BLOCKED'|
   'AUCTION_PENDING'|'AUCTION_READY'|'AUCTION_BLOCKED'|
-  'RECONCILED'|'COMPUTE_PENDING'|'COMPUTED'|'COMPUTE_BLOCKED'|
+  'RECONCILED'|'COMPUTE_DISPATCHED'|'COMPUTE_PENDING'|'COMPUTED'|'COMPUTE_BLOCKED'|
   'PERSISTED'|'PRESENTED';
 
 export type StockLifecycle={
@@ -194,4 +194,28 @@ export async function markStockAuctionBlocked(env:Env,id:string,detail:string):P
        and stage='AUCTION_PENDING'
        and auction_snapshot_id is null
   `;
+}
+
+
+export async function markStockComputeDispatched(
+  env:Env,
+  id:string,
+  expectedStage:'RESEARCH_READY'|'AUCTION_READY'
+):Promise<StockLifecycle>{
+  if(!env.EDGE_DATABASE_URL)throw new Error('EDGE database is not configured');
+  const sql=neon(env.EDGE_DATABASE_URL);
+  await sql`
+    update edge_run_lifecycles
+       set stage='COMPUTE_DISPATCHED',
+           stage_detail='Governed EDGE computation workflow dispatched',
+           updated_at=now()
+     where lifecycle_id=${id}
+       and stage=${expectedStage}
+  `;
+  const row=await getStockLifecycle(env,id);
+  if(!row)throw new Error('lifecycle readback failed');
+  if(!['COMPUTE_DISPATCHED','COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(row.stage)){
+    throw new Error('lifecycle did not enter compute dispatch state');
+  }
+  return row;
 }
