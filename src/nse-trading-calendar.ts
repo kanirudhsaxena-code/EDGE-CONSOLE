@@ -32,6 +32,7 @@ export type NseCalendarEnv={EDGE_DATABASE_URL?:string};
 
 const coveredYears=new Set<number>(calendar.coverage_years.map(Number));
 const tradingHolidays=new Set<string>(calendar.trading_holidays.map(String));
+const EXACT_PROOF_MAX_AGE_HOURS=36;
 const YEAR_CACHE_MAX_AGE_HOURS=24*8;
 
 function parseIsoDate(dateIso:string):{year:number;month:number;day:number}|null{
@@ -114,7 +115,7 @@ function bootstrapResolution(dateIso:string):NseSessionResolution{
   return {
     date:dateIso,
     session_state:state,
-    preopen_eligible:state==='TRADING_DAY',
+    preopen_eligible:false,
     authority:state==='CALENDAR_COVERAGE_MISSING'?'NONE':state==='WEEKEND'?'CALENDAR_RULE':'BOOTSTRAP_STATIC',
     source_ref:state==='CALENDAR_COVERAGE_MISSING'?null:'config/nse-trading-calendar.json',
     acquired_at:null,
@@ -157,18 +158,21 @@ export async function resolveGovernedNseSession(
           raw==='TRADING_DAY'||raw==='TRADING_HOLIDAY'||raw==='WEEKEND'||raw==='SPECIAL_TIMING'
             ?raw:'CALENDAR_COVERAGE_MISSING';
         const acquired=isoOrNull(row.acquired_at);
-        return {
-          date:dateIso,
-          session_state:state,
-          preopen_eligible:row.preopen_eligible===true&&state==='TRADING_DAY',
-          authority:'EXACT_PROVIDER_SESSION',
-          source_ref:String(row.timing_source_ref??row.calendar_source_ref??'')||null,
-          acquired_at:acquired,
-          market_open_at:isoOrNull(row.market_open_at),
-          market_close_at:isoOrNull(row.market_close_at),
-          cache_age_hours:hoursBetween(now,acquired),
-          calendar_schema:'NSE_SESSION_CALENDAR_DYNAMIC_V1',
-        };
+        const age=hoursBetween(now,acquired);
+        if(age!==null&&age<=EXACT_PROOF_MAX_AGE_HOURS){
+          return {
+            date:dateIso,
+            session_state:state,
+            preopen_eligible:row.preopen_eligible===true&&state==='TRADING_DAY',
+            authority:'EXACT_PROVIDER_SESSION',
+            source_ref:String(row.timing_source_ref??row.calendar_source_ref??'')||null,
+            acquired_at:acquired,
+            market_open_at:isoOrNull(row.market_open_at),
+            market_close_at:isoOrNull(row.market_close_at),
+            cache_age_hours:age,
+            calendar_schema:'NSE_SESSION_CALENDAR_DYNAMIC_V1',
+          };
+        }
       }
 
       const years=await sql\`
@@ -258,5 +262,6 @@ export const GOVERNED_NSE_CALENDAR={
   timezone:String(calendar.timezone),
   bootstrap_coverage_years:[...coveredYears].sort(),
   authority:'Dynamic provider session proof -> verified year cache -> bootstrap static',
+  exact_proof_max_age_hours:EXACT_PROOF_MAX_AGE_HOURS,
   year_cache_max_age_hours:YEAR_CACHE_MAX_AGE_HOURS,
 } as const;
