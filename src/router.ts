@@ -705,10 +705,10 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       return json({error:'Pre-open stock lifecycle was not found',code:'EDGE_CANONICAL_LIFECYCLE_MISSING',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
     }
     const lifecycle=rows[0];
-    if(String(lifecycle.ticker).toUpperCase()!==ticker||String(lifecycle.stage)!=='RESEARCH_READY'){
+    if(String(lifecycle.ticker).toUpperCase()!==ticker||String(lifecycle.stage)!=='AUCTION_READY'){
       return json({
-        error:'Pre-open stock lifecycle is not RESEARCH_READY',
-        code:'EDGE_CANONICAL_RESEARCH_NOT_READY',
+        error:'Pre-open stock lifecycle is not AUCTION_READY',
+        code:'EDGE_CANONICAL_AUCTION_NOT_READY',
         ticker,
         lifecycle_id:lifecycleId,
         stage:String(lifecycle.stage),
