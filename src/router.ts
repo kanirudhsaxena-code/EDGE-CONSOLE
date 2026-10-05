@@ -738,6 +738,16 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     researchBundleId = saved.bundleId;
     researchContractVersion = saved.contractVersion;
 
+    if (!researchOnly) {
+      return json({
+        error:'Externally supplied research bundles are compatibility/research-only artifacts and cannot launch a new production computation. Start a fresh lifecycle so DATA is acquired first.',
+        code:'EDGE_EXTERNAL_RESEARCH_COMPUTE_PROHIBITED',
+        ticker,
+        research_bundle_id:researchBundleId,
+        trading_enabled:false
+      },409);
+    }
+
     if (researchOnly) {
       if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
       const sql = neon(env.EDGE_DATABASE_URL);
@@ -795,14 +805,34 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     }
   } else {
     if (!canonicalAttempt) {
-      return json({
-        error: 'A distinct new EDGE run must first create a DATA lifecycle and lifecycle-bound research bundle',
-        code: 'EDGE_NEW_RUN_LIFECYCLE_REQUIRED',
-        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-        ticker,
-        fresh_run_requested: forceNew,
-        trading_enabled: false,
-      }, 409);
+      try{
+        const started=await beginNormalStockLifecycle(env,ticker);
+        return json({
+          ok:started.ok,
+          status:started.status,
+          engine:'EDGE_STOCKS',
+          contract_version:'EDGE_STOCKS_V1_3',
+          research_contract_version:EDGE_RESEARCH_BUNDLE_VERSION,
+          ticker,
+          command:command.raw,
+          lifecycle_id:started.lifecycle_id,
+          fresh_run:true,
+          reused_output:false,
+          data_first:true,
+          research_executed_this_run:false,
+          trading_enabled:false,
+          error:started.error??null,
+          next:`/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&lifecycle_id=${encodeURIComponent(started.lifecycle_id)}`
+        },started.ok?202:502);
+      }catch(error){
+        return json({
+          error:'Fresh EDGE lifecycle could not start',
+          detail:error instanceof Error?error.message:String(error),
+          code:'EDGE_LIFECYCLE_START_FAILED',
+          ticker,
+          trading_enabled:false
+        },503);
+      }
     }
     if (!lifecycleId) {
       return json({
@@ -964,11 +994,38 @@ async function edgeStocksCanonicalTargets(env: Env): Promise<Response> {
   });
 }
 
-async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string): Promise<Response> {
+async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string, lifecycleIdRaw?:string|null): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const ticker = normalizeTickerCandidate(tickerRaw);
   if (!ticker) return json({ error: 'Invalid ticker' }, 422);
-  if (!isNonEmptyString(afterRaw) || Number.isNaN(Date.parse(afterRaw))) return json({ error: 'after must be a valid ISO timestamp' }, 422);
+  const lifecycleId=isNonEmptyString(lifecycleIdRaw)?String(lifecycleIdRaw):null;
+  if(lifecycleId){
+    const progressed=await progressNormalStockLifecycle(env,ticker,lifecycleId);
+    if(progressed.status==='COMPLETE'){
+      return json({
+        status:'COMPLETE',ticker,lifecycle_id:lifecycleId,
+        lifecycle_stage:progressed.lifecycle_stage,
+        run_id:progressed.run_id??null,
+        report_url:`/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+        trading_enabled:false
+      });
+    }
+    if(progressed.status==='BLOCKED'){
+      return json({
+        status:'BLOCKED',ticker,lifecycle_id:lifecycleId,
+        lifecycle_stage:progressed.lifecycle_stage,
+        detail:progressed.detail??null,
+        trading_enabled:false
+      },409);
+    }
+    return json({
+      status:'RUNNING',ticker,lifecycle_id:lifecycleId,
+      lifecycle_stage:progressed.lifecycle_stage,
+      detail:progressed.detail??null,
+      trading_enabled:false
+    });
+  }
+  if (!isNonEmptyString(afterRaw) || Number.isNaN(Date.parse(afterRaw))) return json({ error: 'after or lifecycle_id is required' }, 422);
   const after = new Date(afterRaw).toISOString();
   const sql = neon(env.EDGE_DATABASE_URL);
   const rows = await sql`
