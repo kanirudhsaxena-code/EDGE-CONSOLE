@@ -1,0 +1,140 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-10-05T04:16:28.835Z",
+    "research_fresh_at": "2026-10-05T04:16:28.835Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "cupid-notices-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited FY27 shareholder notices and September 30 Q2 business update",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "cupid-financials-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/financial-reports/",
+        "title": "Cupid Limited FY27 financial reports",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "cupid-screener-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/CUPID/consolidated/",
+        "title": "Cupid consolidated valuation, financial and shareholding snapshot",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "cupid-et-guidance-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/markets/stocks/news/cupid-shares-hit-fresh-52-week-high-as-firm-raises-fy27-revenue-profit-guidance-again-multibagger-stock-skyrockets-617-in-a-year/articleshow/134607835.cms",
+        "title": "Economic Times on Cupid's second FY27 guidance increase",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-10-01T09:48:00+05:30",
+        "event_date": "2026-09-30T00:00:00+05:30"
+      },
+      {
+        "source_id": "cupid-bt-guidance-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.businesstoday.in/markets/stocks/story/cupid-share-price-fy27-sales-net-profit-guidance-revised-upward-outlook-shared-558940-2026-10-01",
+        "title": "Business Today on Cupid FY27 guidance and Q2 momentum",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-10-01T08:53:00+05:30",
+        "event_date": "2026-09-30T00:00:00+05:30"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "cupid-business-20261005",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Fresh review of company financials and the current consolidated snapshot confirms strong FY26 and June-2026-quarter growth, with the June quarter showing materially higher sales and profit than the year-earlier period.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-financials-20261005",
+          "cupid-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-institutional-20261005",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Latest available quarterly ownership shows FII holding rising to 4.17% in June 2026 from 1.01% in March 2026 and DII holding rising to 0.34% from 0.17%, while promoter ownership also edged higher; this is positive historical ownership evidence, not current-session flow.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-catalyst-20261005",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Cupid's September 30 Q2 FY27 business update and two independent reports confirm a second upward revision of FY27 guidance to about Rs 800 crore revenue and Rs 250 crore net profit, with Q2 revenue expected above Rs 200 crore; actual audited Q2 results remain pending.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-notices-20261005",
+          "cupid-et-guidance-20261005",
+          "cupid-bt-guidance-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-valuation-20261005",
+        "evidence_category": "VALUATION",
+        "statement": "The freshly retrieved snapshot displayed a very elevated valuation at roughly 301x earnings and about 91x book value; this is a material negative valuation input but not a standalone short recommendation.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "cupid-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-event-shock-20261005",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Fresh review of company notices, financial reports and independent coverage identified no verified company-specific severe shock such as default, fraud, insolvency, ban or auditor resignation. Recent SAST, trading-window and warrant notices are not relabelled as severe Event-Shock evidence.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "cupid-notices-20261005",
+          "cupid-financials-20261005",
+          "cupid-et-guidance-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Management guidance is not audited Q2 financial results.",
+      "The stock's large historical price appreciation and high valuation increase downside sensitivity but do not by themselves determine direction.",
+      "Quarterly ownership is historical evidence and does not prove same-session institutional flow.",
+      "Live price, volume and technical evidence must be acquired independently by the governed market-data engine."
+    ]
+  }
+}
