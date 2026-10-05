@@ -3,13 +3,25 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
-import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
+import { checkEdgeWorkflowAccess, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 import { buildFiveDrAssessmentFromDatabase } from './five-dr-assessment-builder';
+import {
+  ensureStockLifecycle,
+  getStockLifecycle,
+  markStockComputeDispatched,
+  markStockDataBlocked,
+  markStockResearchBlocked,
+  markStockResearchPending,
+  readMarketSnapshotPayload,
+} from './stock-lifecycle';
+import { produceStockSystemResearch } from './stock-system-research';
 
+type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
   ASSETS: Fetcher;
+  AI:AiBinding;
   EVIDENCE_BUCKET: R2Bucket;
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
