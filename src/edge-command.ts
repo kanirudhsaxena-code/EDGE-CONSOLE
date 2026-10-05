@@ -103,3 +103,45 @@ export async function checkEdgeWorkflowAccess(token: string): Promise<EdgeDispat
   }
   return { ok: false, status: response.status, error: detail || 'GitHub workflow access check failed' };
 }
+
+
+export async function dispatchEdgeDataWorkflow(
+  token:string,
+  input:{
+    ticker:string;
+    lifecycle_id:string;
+    trigger_type:'USER'|'SCHEDULED';
+    target_session?:string|null;
+    canonical_requested_at?:string|null;
+  },
+):Promise<EdgeDispatchResult>{
+  if(!token.trim())return {ok:false,status:503,error:'EDGE dispatch credential is not configured'};
+  const response=await fetch(
+    'https://api.github.com/repos/kanirudhsaxena-code/EDGE---V1/actions/workflows/stock-data-snapshot.yml/dispatches',
+    {
+      method:'POST',
+      headers:{
+        authorization:`Bearer ${token}`,
+        accept:'application/vnd.github+json',
+        'x-github-api-version':'2022-11-28',
+        'user-agent':'EDGE-CONSOLE',
+        'content-type':'application/json',
+      },
+      body:JSON.stringify({
+        ref:'main',
+        inputs:{
+          ticker:input.ticker,
+          lifecycle_id:input.lifecycle_id,
+          trigger_type:input.trigger_type,
+          target_session:input.target_session??'',
+          canonical_requested_at:input.canonical_requested_at??'',
+        },
+      }),
+    }
+  );
+  if(response.status===204)return {ok:true,status:204};
+  let detail='';
+  try{const payload=await response.json() as {message?:string};detail=payload.message||''}
+  catch{detail=await response.text().catch(()=>'')}
+  return {ok:false,status:response.status,error:detail||'EDGE DATA workflow dispatch failed'};
+}
