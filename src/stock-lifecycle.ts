@@ -3,6 +3,7 @@ import { neon } from '@neondatabase/serverless';
 export type StockLifecycleStage=
   'RUN_CREATED'|'DATA_PENDING'|'DATA_READY'|'DATA_BLOCKED'|
   'RESEARCH_PENDING'|'RESEARCH_READY'|'RESEARCH_BLOCKED'|
+  'AUCTION_PENDING'|'AUCTION_READY'|
   'RECONCILED'|'COMPUTE_PENDING'|'COMPUTED'|'COMPUTE_BLOCKED'|
   'PERSISTED'|'PRESENTED';
 
@@ -156,4 +157,28 @@ export async function markStockDataBlocked(env:Env,id:string,detail:string):Prom
      where lifecycle_id=${id}
        and stage in ('RUN_CREATED','DATA_PENDING','DATA_BLOCKED')
   `;
+}
+
+
+export async function markStockAuctionPending(env:Env,id:string):Promise<StockLifecycle>{
+  if(!env.EDGE_DATABASE_URL)throw new Error('EDGE database is not configured');
+  const sql=neon(env.EDGE_DATABASE_URL);
+  const updated=await sql`
+    update edge_run_lifecycles
+       set stage='AUCTION_PENDING',
+           stage_detail='Governed 09:10-09:14:59 IST auction acquisition dispatched',
+           updated_at=now()
+     where lifecycle_id=${id}
+       and stage='RESEARCH_READY'
+       and auction_snapshot_id is null
+     returning lifecycle_id
+  `;
+  if(!updated.length){
+    const current=await getStockLifecycle(env,id);
+    if(current&&['AUCTION_PENDING','AUCTION_READY','COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(current.stage))return current;
+    throw new Error('lifecycle is not RESEARCH_READY for auction');
+  }
+  const row=await getStockLifecycle(env,id);
+  if(!row)throw new Error('lifecycle readback failed');
+  return row;
 }
