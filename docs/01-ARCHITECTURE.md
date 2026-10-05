@@ -43,8 +43,17 @@ Preview deployments are used before production promotion.
 
 Cloudflare/GitHub cron expressions are wake-up mechanisms, not evidence that NSE is open.
 
-- PREP, RESEARCH and AUCTION/canonical execution may proceed only when the governed NSE calendar classifies the IST date as `TRADING_DAY`.
-- Weekends and known NSE `TRADING_HOLIDAY` dates must terminate as a bounded no-op: no canonical is created and no failure is raised merely because the scheduler woke.
-- The G5.1 pre-open proof wakes at 09:20 IST on weekdays. On a trading day it must verify persisted NIFTY plus LTF/CUPID/RELIANCE pre-open evidence. On a known non-trading day it records `NON_TRADING_DAY` and succeeds without fabricating missing-run errors.
-- If the governed calendar does not cover the target year, automation fails closed with `CALENDAR_COVERAGE_MISSING`; it must never assume an uncovered weekday is a trading day.
-- Calendar policy is versioned and auditable. Updating calendar coverage is an operational governance change, not an analytical-method change.
+The production authority chain is:
+
+`Exact Upstox session timing proof -> append-only verified current-year calendar cache -> bounded checked-in bootstrap`
+
+- The EDGE provider refreshes the current-year NSE holiday/special-timing calendar automatically and persists append-only snapshots.
+- The target market date receives an exact provider timing proof. A standard `09:15 IST` NSE opening is `TRADING_DAY` and pre-open eligible; a different opening is `SPECIAL_TIMING` and the standard pre-open pipeline is skipped cleanly.
+- Cloudflare independently dispatches redundant refresh attempts before PREP, while the EDGE workflow also has midnight/pre-market scheduled refreshes. Refresh writes are idempotent and do not create canonicals.
+- PREP, RESEARCH and AUCTION/canonical execution may proceed only when dynamic session authority returns `preopen_eligible=true`.
+- `WEEKEND` and `TRADING_HOLIDAY` terminate as bounded no-ops. `SPECIAL_TIMING` terminates as a governed non-standard-session no-op. None is a missing-canonical incident merely because a scheduler woke.
+- The checked-in 2026 JSON exists only as migration/emergency bootstrap. It is not the annual operating authority and creates no manual year-rollover dependency.
+- If no exact proof, fresh persisted year cache, or explicitly bounded bootstrap coverage exists, the system fails closed as `CALENDAR_COVERAGE_MISSING`.
+- The G5.1 proof and post-deploy 5DR acceptance consume the same production `/api/market-calendar/session` authority, preventing test/runtime calendar drift.
+- D:D+4 generation is cross-year safe: when the path reaches a year not represented by the provider's current-year holiday snapshot, each candidate date is verified through exact exchange timings before inclusion.
+- Calendar/session operations are evidence-governance changes only; frozen analytical scoring, probabilities, canonical-selection mathematics and trading-disabled state remain unchanged.
