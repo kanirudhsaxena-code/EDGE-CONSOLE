@@ -49,9 +49,9 @@ The production authority chain is:
 
 - The EDGE provider refreshes the current-year NSE holiday/special-timing calendar automatically and persists append-only snapshots.
 - The target market date receives an exact provider timing proof. A standard `09:15 IST` NSE opening is `TRADING_DAY` and pre-open eligible; a different opening is `SPECIAL_TIMING` and the standard pre-open pipeline is skipped cleanly.
-- Cloudflare independently dispatches redundant refresh attempts before PREP, while the EDGE workflow also has midnight/pre-market scheduled refreshes. Refresh writes are idempotent and do not create canonicals.
-- PREP, RESEARCH and AUCTION/canonical execution may proceed only when dynamic session authority returns `preopen_eligible=true`.
-- `WEEKEND` and `TRADING_HOLIDAY` terminate as bounded no-ops. `SPECIAL_TIMING` terminates as a governed non-standard-session no-op. None is a missing-canonical incident merely because a scheduler woke.
+- Cloudflare independently dispatches redundant refresh attempts before PREP every calendar day, while the EDGE workflow also has midnight/pre-market scheduled refreshes. Refresh writes are idempotent and do not create canonicals.
+- PREP, RESEARCH and AUCTION/canonical clocks wake daily and may proceed only when dynamic session authority returns `preopen_eligible=true`. This permits an exchange-declared weekend live session with standard 09:15 timing without hard-coding weekends as closed.
+- Ordinary `WEEKEND` and `TRADING_HOLIDAY` terminate as bounded no-ops. `SPECIAL_TIMING` terminates as a governed non-standard-session no-op. None is a missing-canonical incident merely because a scheduler woke.
 - The checked-in 2026 JSON exists only as migration/emergency bootstrap. It is not the annual operating authority and creates no manual year-rollover dependency.
 - If no exact proof, fresh persisted year cache, or explicitly bounded bootstrap coverage exists, the system fails closed as `CALENDAR_COVERAGE_MISSING`.
 - The G5.1 proof and post-deploy 5DR acceptance consume the same production `/api/market-calendar/session` authority, preventing test/runtime calendar drift.
