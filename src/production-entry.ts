@@ -9,6 +9,7 @@ import { handleP0CanonicalHistoryRead } from './p0-canonical-history-read';
 import { gateCanonicalHistoryResponse } from './canonical-history-release-gate';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 import { runPreopenScheduledTick } from './preopen-scheduler';
+import { progressPendingNormalStockLifecycles } from './router';
 
 /**
  * Production entrypoint shim.
@@ -91,6 +92,14 @@ export default {
     return mobile.fetch(request, env);
   },
   async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
+    const cron=String((controller as any).cron??'');
+    if(cron==='7,22,37,52 * * * 1-5'){
+      ctx.waitUntil((async()=>{
+        const results=await progressPendingNormalStockLifecycles(env,12);
+        console.log(JSON.stringify({status:'EDGE_NORMAL_LIFECYCLE_GUARD',count:results.length,results,trading_enabled:false}));
+      })());
+      return;
+    }
     ctx.waitUntil(runPreopenScheduledTick(env, new Date(), controller.scheduledTime));
   },
 };
