@@ -15,6 +15,7 @@ export type StockLifecycle={
   stage:StockLifecycleStage;
   market_snapshot_id:string|null;
   research_bundle_id:string|null;
+  auction_snapshot_id:string|null;
   recommendation_id:string|null;
   stage_detail:string|null;
   created_at:string;
@@ -61,7 +62,7 @@ export async function getStockLifecycle(env:Env,id:string):Promise<StockLifecycl
   const sql=neon(env.EDGE_DATABASE_URL);
   const rows=await sql`
     select lifecycle_id,ticker,trigger_type,target_session,canonical_requested_at,stage,
-           market_snapshot_id,research_bundle_id,recommendation_id,stage_detail,created_at,updated_at
+           market_snapshot_id,research_bundle_id,auction_snapshot_id,recommendation_id,stage_detail,created_at,updated_at
       from edge_run_lifecycles
      where lifecycle_id=${id}
      limit 1
@@ -77,6 +78,7 @@ export async function getStockLifecycle(env:Env,id:string):Promise<StockLifecycl
     stage:String(row.stage) as StockLifecycleStage,
     market_snapshot_id:row.market_snapshot_id?String(row.market_snapshot_id):null,
     research_bundle_id:row.research_bundle_id?String(row.research_bundle_id):null,
+    auction_snapshot_id:row.auction_snapshot_id?String(row.auction_snapshot_id):null,
     recommendation_id:row.recommendation_id?String(row.recommendation_id):null,
     stage_detail:row.stage_detail?String(row.stage_detail):null,
     created_at:String(row.created_at),
@@ -142,4 +144,16 @@ export async function preopenLifecycleReadiness(env:Env,date:string,tickers:read
     if(row)out.push(row);
   }
   return out;
+}
+
+
+export async function markStockDataBlocked(env:Env,id:string,detail:string):Promise<void>{
+  if(!env.EDGE_DATABASE_URL)return;
+  const sql=neon(env.EDGE_DATABASE_URL);
+  await sql`
+    update edge_run_lifecycles
+       set stage='DATA_BLOCKED',stage_detail=${detail.slice(0,1000)},updated_at=now()
+     where lifecycle_id=${id}
+       and stage in ('RUN_CREATED','DATA_PENDING','DATA_BLOCKED')
+  `;
 }
