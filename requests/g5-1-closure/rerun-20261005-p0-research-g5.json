@@ -1,0 +1,15 @@
+{
+  "requested_at": "2026-10-05T11:10:00Z",
+  "reason": "Re-run live G5.1 production closure after P0 LTF research-source and CUPID Event-Shock fixes",
+  "console_main": "4ce84a7e2a36b05828fc5de9421d01bac2c087e4",
+  "edge_engine_main": "95cccce01bbed2677a08a684e7d638286a7d8588",
+  "required_assets": [
+    "NIFTY",
+    "LTF",
+    "CUPID",
+    "RELIANCE"
+  ],
+  "required_stock_result": "3/3 PASS",
+  "fail_closed": true,
+  "trading_enabled": false
+}
