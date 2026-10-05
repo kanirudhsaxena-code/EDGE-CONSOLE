@@ -38,3 +38,13 @@ Learning may collect observations and propose changes autonomously, but it may n
 Development -> Staging -> Production.
 
 Preview deployments are used before production promotion.
+
+## Market-session scheduling authority
+
+Cloudflare/GitHub cron expressions are wake-up mechanisms, not evidence that NSE is open.
+
+- PREP, RESEARCH and AUCTION/canonical execution may proceed only when the governed NSE calendar classifies the IST date as `TRADING_DAY`.
+- Weekends and known NSE `TRADING_HOLIDAY` dates must terminate as a bounded no-op: no canonical is created and no failure is raised merely because the scheduler woke.
+- The G5.1 pre-open proof wakes at 09:20 IST on weekdays. On a trading day it must verify persisted NIFTY plus LTF/CUPID/RELIANCE pre-open evidence. On a known non-trading day it records `NON_TRADING_DAY` and succeeds without fabricating missing-run errors.
+- If the governed calendar does not cover the target year, automation fails closed with `CALENDAR_COVERAGE_MISSING`; it must never assume an uncovered weekday is a trading day.
+- Calendar policy is versioned and auditable. Updating calendar coverage is an operational governance change, not an analytical-method change.
