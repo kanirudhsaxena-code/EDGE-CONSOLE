@@ -19,3 +19,10 @@ test('recovery still revalidates the immutable GitHub evidence before persistenc
   assert.match(recovery,/adapter_stage: 'AUTOMATED_MARKET_DATA_READY'/);
   assert.match(recovery,/recovery_mode: 'CONSOLE_GITHUB_LOG_SYNC'/);
 });
+
+
+test('blocked pre-open recovery selects the dedicated acquisition workflow',()=>{
+  assert.match(recovery,/FIVEDR_PREOPEN_ACQUIRE_WORKFLOW/);
+  assert.match(recovery,/evidence_mode === 'PREOPEN'/);
+  assert.match(recovery,/sync5drAcquisitionResult\(env, requestId, fetch, workflow\)/);
+});

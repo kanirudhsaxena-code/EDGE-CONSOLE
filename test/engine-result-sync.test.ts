@@ -46,3 +46,31 @@ test('in-progress acquisition remains resumable',async()=>{
   assert.equal(result.status,'PROCESSING');
   assert.equal(result.workflow_run_id,77);
 });
+
+
+test('pre-open acquisition override reads the dedicated governed workflow',async()=>{
+  const requestId='5drreq_preopen_test';
+  const payload={schema:'5dr-console-market-evidence-v1',request_id:requestId,status:'AUTOMATED_MARKET_DATA_READY',provider:'UPSTOX',captured_at:new Date().toISOString(),observations:[],blockers:[],trading_enabled:false,forecast_release_enabled:false,methodology_changed:false};
+  const marker=Buffer.from(JSON.stringify(payload),'utf8').toString('base64');
+  let workflowLookup='';
+  const fetcher=async(url:RequestInfo|URL)=>{
+    const s=String(url);
+    if(s.includes('/actions/workflows/')){
+      workflowLookup=s;
+      return new Response(JSON.stringify({workflow_runs:[{id:303,status:'completed',conclusion:'success',display_title:'5DR Pre-open Evidence · '+requestId}]}),{status:200});
+    }
+    if(s.includes('/actions/runs/303/jobs'))return new Response(JSON.stringify({jobs:[{id:404,name:'acquire'}]}),{status:200});
+    if(s.includes('/actions/jobs/404/logs'))return new Response('EDGE_CONSOLE_MARKET_EVIDENCE_B64::'+marker,{status:200});
+    return new Response('',{status:404});
+  };
+  const result=await sync5drAcquisitionResult({
+    GITHUB_ACTIONS_TOKEN:'secret',
+    FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    FIVEDR_ACQUIRE_WORKFLOW:'5dr-console-acquire-proxy.yml',
+    FIVEDR_PREOPEN_ACQUIRE_WORKFLOW:'5dr-console-preopen-acquire-proxy.yml'
+  },requestId,fetcher as typeof fetch,'5dr-console-preopen-acquire-proxy.yml');
+  assert.match(workflowLookup,/5dr-console-preopen-acquire-proxy\.yml/);
+  assert.equal(result.ok,true);
+  assert.equal(result.status,'SUCCEEDED');
+  assert.deepEqual(result.evidence,payload);
+});

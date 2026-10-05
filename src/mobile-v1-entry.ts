@@ -631,7 +631,18 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
   }
 
   if(stage==='AUTOMATED_MARKET_DATA_PENDING'){
-    const sync=await sync5drAcquisitionResult(env,requestId);
+    const provenance=isObject(metadata.run_provenance)?metadata.run_provenance:{};
+    const invocation=isObject(metadata.invocation)?metadata.invocation:{};
+    const preopenAcquisition=
+      provenance.evidence_mode==='PREOPEN'||
+      provenance.evidence_mode==='PREOPEN_PREP'||
+      invocation.canonical_attempt===true||
+      invocation.prep_only===true||
+      metadata.preopen_prep_only===true;
+    const acquisitionWorkflow=preopenAcquisition
+      ?env.FIVEDR_PREOPEN_ACQUIRE_WORKFLOW
+      :env.FIVEDR_ACQUIRE_WORKFLOW;
+    const sync=await sync5drAcquisitionResult(env,requestId,fetch,acquisitionWorkflow);
     if(sync.status==='PROCESSING'||sync.status==='NOT_FOUND')return json({ok:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:stage,acquisition_sync:sync,next_step:'WAIT_FOR_AUTOMATED_MARKET_DATA'},202);
     if(sync.status==='FAILED'){
       const blocked={...metadata,adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_sync:sync};
