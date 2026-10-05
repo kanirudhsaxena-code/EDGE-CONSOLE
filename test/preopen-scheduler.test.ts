@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { classifyPreopenTick, REQUIRED_PREOPEN_STOCK_TICKERS } from '../src/preopen-scheduler';
+import { classifyGovernedNseSession } from '../src/nse-trading-calendar';
 
 const ist=(iso:string)=>new Date(iso);
 
@@ -57,4 +58,24 @@ test('production entrypoint exposes the Cloudflare scheduled handler',()=>{
   const text=fs.readFileSync('src/production-entry.ts','utf8');
   assert.match(text,/async scheduled\(controller: ScheduledController/);
   assert.match(text,/runPreopenScheduledTick\(env, new Date\(\), controller\.scheduledTime\)/);
+});
+test('governed NSE session guard suppresses weekday market holidays and unsupported calendar years',()=>{
+  assert.equal(classifyGovernedNseSession('2026-10-06'),'TRADING_DAY');
+  assert.equal(classifyGovernedNseSession('2026-10-20'),'TRADING_HOLIDAY');
+  assert.equal(classifyGovernedNseSession('2026-10-03'),'WEEKEND');
+  assert.equal(classifyGovernedNseSession('2027-01-04'),'CALENDAR_COVERAGE_MISSING');
+  assert.equal(classifyPreopenTick(ist('2026-10-20T03:20:00Z')),'OUTSIDE');
+  assert.equal(classifyPreopenTick(ist('2027-01-04T03:20:00Z')),'OUTSIDE');
+});
+
+test('G5.1 proof wakes every weekday at 09:20 IST but treats NSE holidays as clean no-op',()=>{
+  const workflow=fs.readFileSync('.github/workflows/g5-1-preopen-proof.yml','utf8');
+  const proof=fs.readFileSync('scripts/g5-1-preopen-proof.py','utf8');
+  assert.match(workflow,/cron: '50 3 \* \* 1-5'/);
+  assert.doesNotMatch(workflow,/50 3 5 10/);
+  assert.match(proof,/NON_TRADING_DAY/);
+  assert.match(proof,/CALENDAR_COVERAGE_MISSING/);
+  assert.match(proof,/verification_required/);
+  assert.doesNotMatch(proof,/TARGET="2026-10-05"/);
+  assert.doesNotMatch(proof,/2026-10-01/);
 });

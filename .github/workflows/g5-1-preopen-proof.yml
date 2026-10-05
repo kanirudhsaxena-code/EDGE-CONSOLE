@@ -1,15 +1,17 @@
-name: G5.1 Monday Pre-open Proof
+name: G5.1 Weekday Pre-open Proof
 
 on:
   workflow_dispatch:
   schedule:
-    - cron: '50 3 5 10 *'
+    # 09:20 IST weekdays. The proof script classifies the actual NSE session;
+    # weekends/known NSE trading holidays exit cleanly as NON_TRADING_DAY.
+    - cron: '50 3 * * 1-5'
 
 permissions:
   contents: write
 
 concurrency:
-  group: g5-1-monday-preopen-proof
+  group: g5-1-weekday-preopen-proof
   cancel-in-progress: false
 
 jobs:
@@ -26,7 +28,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Verify persisted 2026-10-05 pre-open evidence
+      - name: Verify persisted governed pre-open evidence for current NSE session
         id: proof
         continue-on-error: true
         run: |
@@ -59,13 +61,13 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: g5-1-monday-preopen-proof
+          name: g5-1-weekday-preopen-proof
           path: |
             /tmp/g5-1-preopen-proof.json
             /tmp/g5-1-preopen-proof.log
           retention-days: 30
           if-no-files-found: error
 
-      - name: Enforce Monday live proof
+      - name: Enforce live-session proof or clean non-trading no-op
         if: always()
         run: test "${{ steps.proof.outcome }}" = "success"

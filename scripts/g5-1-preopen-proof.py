@@ -1,12 +1,21 @@
 #!/usr/bin/env python3
-"""Persisted live-session proof for the 2026-10-05 G5.1 pre-open acceptance."""
+"""Persisted live-session proof for the governed G5.1 NSE pre-open acceptance.
+
+The GitHub workflow wakes at 09:20 IST on weekdays. This script independently
+classifies the target date against the governed NSE calendar:
+- TRADING_DAY: require the complete persisted pre-open proof.
+- WEEKEND/TRADING_HOLIDAY: emit NON_TRADING_DAY and exit successfully.
+- CALENDAR_COVERAGE_MISSING: fail closed as a configuration error.
+
+A weekday wake-up is never treated as proof that the exchange is open.
+"""
 from __future__ import annotations
 
 import json
 import os
 import subprocess
 import sys
-from datetime import datetime, time, timezone
+from datetime import date, datetime, time, timedelta, timezone
 from pathlib import Path
 from zoneinfo import ZoneInfo
 from urllib.parse import quote
@@ -15,11 +24,48 @@ BASE=os.environ.get("CONSOLE_URL","https://edge-console.k-anirudhsaxena.workers.
 CLIENT_ID=os.environ.get("CF_ACCESS_CLIENT_ID","")
 CLIENT_SECRET=os.environ.get("CF_ACCESS_CLIENT_SECRET","")
 IST=ZoneInfo("Asia/Kolkata")
-TARGET="2026-10-05"
+ROOT=Path(__file__).resolve().parents[1]
+CALENDAR_PATH=ROOT/"config"/"nse-trading-calendar.json"
+
+
+def load_calendar():
+    payload=json.loads(CALENDAR_PATH.read_text(encoding="utf-8"))
+    years={int(x) for x in payload.get("coverage_years",[])}
+    holidays={date.fromisoformat(str(x)) for x in payload.get("trading_holidays",[])}
+    if not years:
+        raise RuntimeError("governed NSE calendar has no coverage years")
+    return payload,years,holidays
+
+
+CALENDAR,COVERAGE_YEARS,TRADING_HOLIDAYS=load_calendar()
+TARGET=os.environ.get("TARGET_DATE_IST") or datetime.now(IST).date().isoformat()
+TARGET_DATE=date.fromisoformat(TARGET)
 
 
 def now_iso():
     return datetime.now(timezone.utc).isoformat().replace("+00:00","Z")
+
+
+def classify_session(day: date):
+    if day.weekday() >= 5:
+        return "WEEKEND"
+    if day.year not in COVERAGE_YEARS:
+        return "CALENDAR_COVERAGE_MISSING"
+    if day in TRADING_HOLIDAYS:
+        return "TRADING_HOLIDAY"
+    return "TRADING_DAY"
+
+
+def previous_trading_day(day: date):
+    cursor=day
+    for _ in range(40):
+        cursor-=timedelta(days=1)
+        state=classify_session(cursor)
+        if state=="CALENDAR_COVERAGE_MISSING":
+            raise RuntimeError(f"governed NSE calendar does not cover {cursor.year}")
+        if state=="TRADING_DAY":
+            return cursor
+    raise RuntimeError("previous NSE trading day could not be resolved")
 
 
 def api(path):
@@ -56,22 +102,69 @@ def in_preopen(value,cutoff=time(9,15)):
     return local.date().isoformat()==TARGET and time(9,10) <= local.time().replace(tzinfo=None) < cutoff
 
 
+def write_and_print(proof,summary):
+    Path("/tmp/g5-1-preopen-proof.json").write_text(
+        json.dumps(proof,indent=2,sort_keys=True,default=str)+"\n",encoding="utf-8"
+    )
+    print(json.dumps(summary,indent=2,default=str))
+
+
 def main():
+    session_state=classify_session(TARGET_DATE)
     proof={
-        "schema":"MDOS_G5_1_PREOPEN_PROOF_V1",
+        "schema":"MDOS_G5_1_PREOPEN_PROOF_V2",
         "target_date_ist":TARGET,
         "generated_at":now_iso(),
+        "calendar":{
+            "schema":CALENDAR.get("schema"),
+            "authority":CALENDAR.get("authority"),
+            "coverage_years":sorted(COVERAGE_YEARS),
+            "session_state":session_state,
+        },
         "point_12":{"status":"PENDING"},
         "nifty":{},
         "stocks":{},
         "errors":[],
     }
-    local=datetime.now(IST)
-    if local.date().isoformat()!=TARGET or local.time().replace(tzinfo=None)<time(9,15):
-        proof["point_12"]={"status":"NOT_DUE","observed_at_ist":local.isoformat()}
-        Path("/tmp/g5-1-preopen-proof.json").write_text(json.dumps(proof,indent=2,sort_keys=True)+"\n")
-        print(json.dumps(proof["point_12"],indent=2))
+
+    if session_state in {"WEEKEND","TRADING_HOLIDAY"}:
+        proof["point_12"]={
+            "status":"NON_TRADING_DAY",
+            "session_state":session_state,
+            "verification_required":False,
+            "canonical_expected":False,
+            "checked_at":now_iso(),
+        }
+        write_and_print(proof,{"point_12":proof["point_12"],"errors":[]})
         return 0
+
+    if session_state=="CALENDAR_COVERAGE_MISSING":
+        proof["point_12"]={
+            "status":"CALENDAR_COVERAGE_MISSING",
+            "verification_required":False,
+            "canonical_expected":False,
+            "checked_at":now_iso(),
+        }
+        proof["errors"].append({
+            "task":"CALENDAR",
+            "error":f"Governed NSE trading calendar does not cover {TARGET_DATE.year}",
+        })
+        write_and_print(proof,{"point_12":proof["point_12"],"errors":proof["errors"]})
+        return 1
+
+    local=datetime.now(IST)
+    if local.date()<TARGET_DATE or (local.date()==TARGET_DATE and local.time().replace(tzinfo=None)<time(9,15)):
+        proof["point_12"]={
+            "status":"NOT_DUE",
+            "session_state":"TRADING_DAY",
+            "verification_required":True,
+            "observed_at_ist":local.isoformat(),
+        }
+        write_and_print(proof,{"point_12":proof["point_12"],"errors":[]})
+        return 0
+
+    prior_session=previous_trading_day(TARGET_DATE).isoformat()
+    proof["calendar"]["previous_trading_session"]=prior_session
 
     try:
         code,nifty,err=api(f"/api/5dr/preopen-status?date={TARGET}")
@@ -116,7 +209,8 @@ def main():
             age=(requested-research).total_seconds()
             require(-120 <= age <= 90*60,f"{ticker} research was not fresh enough for pre-open",{"age_seconds":age,"row":row})
             require(str(row.get("target_trading_date") or "")[:10]==TARGET,f"{ticker} target trading date mismatch",row)
-            require(str(row.get("market_session_as_of") or "")[:10]=="2026-10-01",f"{ticker} prior-session provenance mismatch",row)
+            require(str(row.get("market_session_as_of") or "")[:10]==prior_session,
+                    f"{ticker} prior-session provenance mismatch",{"expected":prior_session,"row":row})
             require(data.get("trading_enabled") is False,f"{ticker} proof unexpectedly enables trading",data)
             proof["stocks"][ticker]={
                 "status":"PASS",
@@ -135,15 +229,18 @@ def main():
         except Exception as exc:
             proof["errors"].append({"task":ticker,"error":f"{type(exc).__name__}: {exc}"})
 
-    passed=proof.get("nifty",{}).get("status")=="PASS" and all(proof["stocks"].get(t,{}).get("status")=="PASS" for t in ("LTF","CUPID","RELIANCE"))
+    passed=proof.get("nifty",{}).get("status")=="PASS" and all(
+        proof["stocks"].get(t,{}).get("status")=="PASS" for t in ("LTF","CUPID","RELIANCE")
+    )
     proof["point_12"]={
         "status":"PASS" if passed and not proof["errors"] else "FAIL",
+        "session_state":"TRADING_DAY",
+        "verification_required":True,
         "acceptance":"genuine persisted NSE pre-open evidence; no backdating or timing inference",
         "checked_at":now_iso(),
     }
     proof["generated_at"]=now_iso()
-    Path("/tmp/g5-1-preopen-proof.json").write_text(json.dumps(proof,indent=2,sort_keys=True,default=str)+"\n")
-    print(json.dumps({"point_12":proof["point_12"],"errors":proof["errors"]},indent=2))
+    write_and_print(proof,{"point_12":proof["point_12"],"errors":proof["errors"]})
     return 0 if proof["point_12"]["status"]=="PASS" else 1
 
 
