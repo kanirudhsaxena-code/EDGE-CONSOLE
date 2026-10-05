@@ -87,7 +87,7 @@ test('bootstrap calendar remains bounded while dynamic cache understands holiday
   assert.equal(classifyPreopenTick(ist('2026-10-20T03:20:00Z')),'PREP');
 });
 
-test('G5.1 proof wakes every weekday at 09:20 IST but treats NSE holidays as clean no-op',()=>{
+test('G5.1 proof wakes daily at 09:20 IST and lets governed session authority decide',()=>{
   const workflow=fs.readFileSync('.github/workflows/g5-1-preopen-proof.yml','utf8');
   const proof=fs.readFileSync('scripts/g5-1-preopen-proof.py','utf8');
   assert.match(workflow,/cron: '50 3 \* \* \*'/);
