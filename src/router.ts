@@ -523,34 +523,6 @@ async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id:
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
-async function latestFreshEdgeResearchBundle(
-  env: Env,
-  ticker: string,
-  maxAgeMinutes = 24 * 60,
-  notBefore?: string | null,
-): Promise<{ bundleId: string; researchFreshAt: unknown } | null> {
-  if (!env.EDGE_DATABASE_URL) return null;
-  const sql = neon(env.EDGE_DATABASE_URL);
-  const ageCutoff = new Date(Date.now() - Math.max(1, maxAgeMinutes) * 60_000);
-  const explicitCutoff = notBefore && !Number.isNaN(Date.parse(notBefore)) ? new Date(notBefore) : null;
-  const cutoffDate = explicitCutoff && explicitCutoff > ageCutoff ? explicitCutoff : ageCutoff;
-  const cutoff = cutoffDate.toISOString();
-  const rows = await sql`
-    select bundle_id,payload,research_fresh_at
-      from edge_research_bundles
-     where ticker = ${ticker}
-       and status = 'READY'
-       and research_fresh_at >= ${cutoff}
-     order by research_fresh_at desc, inserted_at desc
-     limit 10
-  `;
-  for (const row of rows) {
-    const payload = row.payload;
-    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id), researchFreshAt: row.research_fresh_at };
-  }
-  return null;
-}
-
 async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise<{ id: string; runTimestamp: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -590,9 +562,6 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const canonicalAttemptSlot = typeof body.canonical_attempt_slot === 'string' ? body.canonical_attempt_slot.trim() : null;
   const lifecycleId = isNonEmptyString(body.lifecycle_id) ? String(body.lifecycle_id) : null;
   let marketSnapshotId = isNonEmptyString(body.market_snapshot_id) ? String(body.market_snapshot_id) : null;
-  const researchNotBefore = typeof body.research_not_before === 'string' && !Number.isNaN(Date.parse(body.research_not_before))
-    ? new Date(body.research_not_before).toISOString()
-    : null;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
   if (existingToday && !forceNew && !isObject(body.research_bundle) && !canonicalAttempt) {
     return json({
@@ -812,7 +781,6 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     canonical_attempt: canonicalAttempt,
     canonical_attempt_slot: canonicalAttemptSlot,
     canonical_requested_at: canonicalRequestedAt ?? null,
-    research_not_before: researchNotBefore,
     research_executed_this_run: true,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
