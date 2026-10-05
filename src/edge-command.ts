@@ -81,29 +81,37 @@ export async function dispatchEdgeWorkflow(
 }
 
 
-export async function checkEdgeWorkflowAccess(token: string): Promise<EdgeDispatchResult> {
-  if (!token.trim()) return { ok: false, status: 503, error: 'EDGE dispatch credential is not configured' };
-  const response = await fetch(
-    'https://api.github.com/repos/kanirudhsaxena-code/EDGE---V1/actions/workflows/autonomous-publish.yml',
+async function checkEdgeWorkflowFileAccess(token:string,workflow:string,label:string):Promise<EdgeDispatchResult>{
+  if(!token.trim())return {ok:false,status:503,error:'EDGE dispatch credential is not configured'};
+  const response=await fetch(
+    `https://api.github.com/repos/kanirudhsaxena-code/EDGE---V1/actions/workflows/${workflow}`,
     {
-      method: 'GET',
-      headers: {
-        authorization: `Bearer ${token}`,
-        accept: 'application/vnd.github+json',
-        'x-github-api-version': '2022-11-28',
-        'user-agent': 'EDGE-CONSOLE',
+      method:'GET',
+      headers:{
+        authorization:`Bearer ${token}`,
+        accept:'application/vnd.github+json',
+        'x-github-api-version':'2022-11-28',
+        'user-agent':'EDGE-CONSOLE',
       },
-    },
+    }
   );
-  if (response.ok) return { ok: true, status: response.status };
-  let detail = '';
-  try {
-    const payload = await response.json() as { message?: string };
-    detail = payload.message || '';
-  } catch {
-    detail = await response.text().catch(() => '');
-  }
-  return { ok: false, status: response.status, error: detail || 'GitHub workflow access check failed' };
+  if(response.ok)return {ok:true,status:response.status};
+  let detail='';
+  try{const payload=await response.json() as {message?:string};detail=payload.message||''}
+  catch{detail=await response.text().catch(()=>'')}
+  return {ok:false,status:response.status,error:detail||`${label} workflow access check failed`};
+}
+
+export async function checkEdgeWorkflowAccess(token:string):Promise<EdgeDispatchResult>{
+  return checkEdgeWorkflowFileAccess(token,'autonomous-publish.yml','EDGE compute');
+}
+
+export async function checkEdgeDataWorkflowAccess(token:string):Promise<EdgeDispatchResult>{
+  return checkEdgeWorkflowFileAccess(token,'stock-data-snapshot.yml','EDGE DATA');
+}
+
+export async function checkEdgeAuctionWorkflowAccess(token:string):Promise<EdgeDispatchResult>{
+  return checkEdgeWorkflowFileAccess(token,'stock-auction-snapshot.yml','EDGE AUCTION');
 }
 
 
