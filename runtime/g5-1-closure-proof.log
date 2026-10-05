@@ -1,27 +1,32 @@
 {
   "points": {
-    "8": {
-      "status": "PASS",
-      "basis": "authoritative 5DR assessment handoff refresh repaired and consumed by completed NIFTY execution"
+    "production_health": {
+      "status": "PASS"
     },
-    "9": {
+    "fault_boundaries": {
+      "status": "PASS"
+    },
+    "nifty": {
+      "status": "PASS"
+    },
+    "stocks_3_of_3": {
       "status": "FAIL"
     },
-    "10": {
+    "four_asset_user_output": {
       "status": "FAIL"
     },
-    "11": {
-      "status": "FAIL"
-    },
-    "12": {
-      "status": "FUTURE_LIVE_PROOF_REQUIRED",
-      "target_date_ist": "2026-10-05"
+    "live_preopen_window": {
+      "status": "SEPARATE_WINDOW_PROOF_REQUIRED"
     }
   },
   "errors": [
     {
-      "task": "nifty",
-      "error": "AssertionError: NIFTY production run did not complete inside closure window"
+      "task": "LTF",
+      "error": "AssertionError: LTF lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"LTF\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-LTF-USER-1fca34a8-b8d3-42d7-8c23-41b7d6e28ddc\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_INVALID_SOURCE_REF\", \"trading_enabled\": false}"
+    },
+    {
+      "task": "CUPID",
+      "error": "AssertionError: CUPID lifecycle blocked at COMPUTE_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"CUPID\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-CUPID-USER-411d7f0e-8f64-4bd3-9611-75177074574d\", \"lifecycle_stage\": \"COMPUTE_BLOCKED\", \"market_snapshot_id\": \"EDGE-MKT-CUPID-20261005-080457-f2cddbf99b4d\", \"research_bundle_id\": \"ER2-CUPID-bedf23cb749a4fe0\", \"auction_snapshot_id\": null, \"detail\": \"BLOCKED_G5_INPUTS: G5 Event-Shock Risk is not verified\", \"trading_enabled\": false}"
     }
   ]
 }
