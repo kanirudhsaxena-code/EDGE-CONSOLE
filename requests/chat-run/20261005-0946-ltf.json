@@ -1,0 +1,128 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-05T04:16:28.835Z",
+    "research_fresh_at": "2026-10-05T04:16:28.835Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-newsroom-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance official FY27 newsroom and disclosures",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-screener-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/533519/consolidated/",
+        "title": "L&T Finance consolidated financial, valuation and shareholding snapshot",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "ltf-fii-et-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://m.economictimes.com/markets/stocks/news/fiis-raised-stakes-in-13-stocks-for-4-straight-quarters-5-turned-multibaggers-do-you-own-any/lt-finance/slideshow/130772942.cms",
+        "title": "Economic Times review of sustained FII ownership increases including L&T Finance",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": null,
+        "event_date": null
+      },
+      {
+        "source_id": "india-market-reuters-20261005",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/indian-shares-likely-rise-oil-comes-off-bse-joins-nifty-2026-09-30/",
+        "title": "Reuters on September Indian equity outflows, oil and global-rate pressure",
+        "retrieved_at": "2026-10-05T04:16:28.835Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-business-20261005",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Fresh review of L&T Finance's FY27 newsroom and consolidated financial snapshot confirms the June 2026 quarter remained profitable with consolidated revenue and net profit above the year-earlier quarter; this is operating evidence, not a new October earnings announcement.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-newsroom-20261005",
+          "ltf-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-institutional-20261005",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Latest available quarterly shareholding shows FII ownership at 7.71% in June 2026 versus 7.64% in March 2026, while DII ownership was broadly stable at 14.90% versus 14.91%; this supports modest positive historical foreign ownership but is not current-session flow.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-screener-20261005",
+          "ltf-fii-et-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-catalyst-20261005",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Fresh review of the official FY27 newsroom shows September operating and partnership activity, including the Pine Labs partnership and community-development launches; no newer material company announcement was identified in the reviewed official page today.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-newsroom-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-valuation-20261005",
+        "evidence_category": "VALUATION",
+        "statement": "The freshly retrieved consolidated snapshot showed L&T Finance around 20.6x earnings and about 2.3x book value based on the displayed price and book value; this is valuation context only and is not converted into a price target.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-screener-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-event-shock-20261005",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Fresh review found no verified L&T Finance-specific default, fraud, insolvency, ban, auditor resignation or comparable acute shock. The broader Indian market remains under pressure from high oil, global rates and foreign outflows, which is treated as external risk rather than a fabricated company-specific shock.",
+        "materiality": "HIGH",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-newsroom-20261005",
+          "india-market-reuters-20261005"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Underlying corporate events retain their original event dates; research freshness is the retrieval time of this bundle.",
+      "Quarterly shareholding is historical ownership evidence, not same-session institutional flow.",
+      "Live price, volume, derivatives and technical evidence must be acquired independently by the governed market-data engine.",
+      "No fair-value target or recommendation is created by this research artifact."
+    ]
+  }
+}
