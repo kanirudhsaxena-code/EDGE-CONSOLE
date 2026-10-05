@@ -14,7 +14,7 @@ import {
   readMarketSnapshotPayload,
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
-import { classifyGovernedNseSession } from './nse-trading-calendar';
+import { resolveGovernedNseSession } from './nse-trading-calendar';
 
 type JsonRecord=Record<string,unknown>;
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -52,7 +52,7 @@ function istClock(now:Date):{weekday:string;date:string;hour:number;minute:numbe
 
 export function classifyPreopenTick(now:Date):PreopenTick{
   const c=istClock(now);
-  if(classifyGovernedNseSession(c.date)!=='TRADING_DAY')return 'OUTSIDE';
+  if(!['Mon','Tue','Wed','Thu','Fri'].includes(c.weekday))return 'OUTSIDE';
   if(c.hour===8&&c.minute===50)return 'PREP';
   if(c.hour===9&&c.minute>=5&&c.minute<=9)return 'RESEARCH';
   if(c.hour===9&&c.minute>=10&&c.minute<=14)return 'AUCTION';
@@ -408,12 +408,16 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
 
 export async function runPreopenScheduledTick(env:PreopenEnv,now=new Date(),scheduledTime?:number):Promise<void>{
   const clock=istClock(now);
-  const sessionState=classifyGovernedNseSession(clock.date);
   const tick=classifyPreopenTick(now);
-  if(tick==='OUTSIDE'){
+  const session=await resolveGovernedNseSession(env,clock.date,now);
+  if(tick==='OUTSIDE'||!session.preopen_eligible){
     console.log(JSON.stringify({
-      status:sessionState==='TRADING_DAY'?'PREOPEN_CRON_OUTSIDE_WINDOW':'PREOPEN_CRON_NON_TRADING_SESSION',
-      session_state:sessionState,
+      status:tick==='OUTSIDE'&&session.preopen_eligible?'PREOPEN_CRON_OUTSIDE_WINDOW':'PREOPEN_CRON_NON_TRADING_SESSION',
+      session_state:session.session_state,
+      session_authority:session.authority,
+      session_source_ref:session.source_ref,
+      session_acquired_at:session.acquired_at,
+      preopen_eligible:session.preopen_eligible,
       session_date_ist:clock.date,
       actual:now.toISOString(),
       scheduled_time:scheduledTime??null,
