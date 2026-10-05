@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkEdgeWorkflowAccess, dispatchEdgeAuctionWorkflow, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from '../src/edge-command';
+import { checkEdgeAuctionWorkflowAccess, checkEdgeDataWorkflowAccess, checkEdgeWorkflowAccess, dispatchEdgeAuctionWorkflow, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from '../src/edge-command';
 
 test('parses canonical EDGE command case-insensitively', () => {
   assert.deepEqual(parseEdgeCommand('  edge LTF  '), { raw: 'edge LTF', target: 'LTF' });
@@ -50,17 +50,26 @@ test('dispatch uses existing governed autonomous workflow and no trading endpoin
 });
 
 
-test('workflow access check is non-mutating', async () => {
+test('all lifecycle workflow access checks are non-mutating and target exact governed workflows', async () => {
   const original = globalThis.fetch;
-  let method = '';
-  globalThis.fetch = async (_input: RequestInfo | URL, init?: RequestInit) => {
-    method = String(init?.method || 'GET');
-    return new Response(JSON.stringify({ id: 1, name: 'EDGE Autonomous Publish' }), { status: 200 });
+  const calls:{url:string;method:string}[]=[];
+  globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+    calls.push({url:String(input),method:String(init?.method || 'GET')});
+    return new Response(JSON.stringify({ id: 1 }), { status: 200 });
   };
   try {
-    const result = await checkEdgeWorkflowAccess('secret-token');
-    assert.equal(result.ok, true);
-    assert.equal(method, 'GET');
+    const [compute,data,auction]=await Promise.all([
+      checkEdgeWorkflowAccess('secret-token'),
+      checkEdgeDataWorkflowAccess('secret-token'),
+      checkEdgeAuctionWorkflowAccess('secret-token'),
+    ]);
+    assert.equal(compute.ok,true);
+    assert.equal(data.ok,true);
+    assert.equal(auction.ok,true);
+    assert.deepEqual(calls.map(x=>x.method),['GET','GET','GET']);
+    assert.ok(calls.some(x=>/autonomous-publish\.yml$/.test(x.url)));
+    assert.ok(calls.some(x=>/stock-data-snapshot\.yml$/.test(x.url)));
+    assert.ok(calls.some(x=>/stock-auction-snapshot\.yml$/.test(x.url)));
   } finally {
     globalThis.fetch = original;
   }
