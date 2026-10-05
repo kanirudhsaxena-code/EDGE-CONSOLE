@@ -1,29 +1,51 @@
 {
   "acceptance_date_ist": "2026-10-05",
-  "acceptance_time_ist": "2026-10-05T17:01:50.077527+05:30",
+  "acceptance_time_ist": "2026-10-05T20:37:42.030824+05:30",
   "architecture": "DATA -> RESEARCH -> RECONCILE/COMPUTE -> PERSIST -> PRESENT",
   "errors": [
     {
-      "error": "AssertionError: NIFTY production run did not complete inside acceptance window",
-      "task": "nifty"
-    },
-    {
-      "error": "AssertionError: LTF lifecycle did not complete inside acceptance window",
+      "error": "AssertionError: LTF lifecycle blocked at COMPUTE_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"LTF\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-LTF-USER-e34a868e-8709-4eb9-bc0b-e98458f527a5\", \"lifecycle_stage\": \"COMPUTE_BLOCKED\", \"market_snapshot_id\": \"EDGE-MKT-LTF-20261005-151038-26d10bfe1dc9\", \"research_bundle_id\": \"ER2-LTF-50b9bd350ab967b4\", \"auction_snapshot_id\": null, \"detail\": \"BLOCKED_PRE_RUN_EFFICACY: EDGE-LTF-20260925-033422-AUTO has 1 overdue DUE checkpoint(s); EDGE-LTF-20260928-043317-AUTO has 1 overdue DUE checkpoint(s)\", \"trading_enabled\": false}",
       "task": "LTF"
     },
     {
-      "error": "AssertionError: CUPID lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"CUPID\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-CUPID-USER-665751bd-07c2-4dba-912f-718fbad58da4\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_DETERMINISTIC_COVERAGE_INSUFFICIENT:NEWS_EVENTS_CATALYSTS,EVENT_SHOCK\", \"trading_enabled\": false}",
+      "error": "AssertionError: CUPID active calls output missing current ticker :: [{\"ticker\": \"DMART\", \"recommendation_id\": \"EDGE-DMART-20260920-061903-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 3687.35, \"high\": 3812.45}, \"call_timestamp\": \"2026-09-20T06:19:03.475Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 3749.9, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 3.997, \"base\": 74.468, \"bear\": 21.535}}, {\"ticker\": \"JIOFIN\", \"recommendation_id\": \"EDGE-JIOFIN-20260918-180236-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 225.26, \"high\": 233.34}, \"call_timestamp\": \"2026-09-18T18:02:36.455Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 229.3, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.607, \"base\": 59.82, \"bear\": 38.573}}, {\"ticker\": \"LTF\", \"recommendation_id\": \"EDGE-LTF-20260928-043317-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 273.1, \"high\": 290.92}, \"call_timestamp\": \"2026-09-28T04:33:17.309Z\", \"expiry_trading_date\": \"2026-10-06T00:00:00.000Z\", \"current_price\": 280.7, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.011, \"base\": 53.478, \"bear\": 45.51}}, {\"ticker\": \"RELIANCE\", \"recommendation_id\": \"EDGE-RELIANCE-20260920-061622-AUTO\", \"definitive_forecast\": \"BEARISH\", \"definitive_recommendation\": \"AVOID; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 1206.1, \"high\": 1246.7}, \"call_timestamp\": \"2026-09-20T06:16:22.731Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 1226.4, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 1.102, \"base\": 37.208, \"bear\": 61.691}}, {\"ticker\": \"SKYGOLD\", \"recommendation_id\": \"EDGE-SKYGOLD-20260920-062214-AUTO\", \"definitive_forecast\": \"BASE_RANGE\", \"definitive_recommendation\": \"NO TRADE; NO OPTION TRADE.\", \"expected_price_zone\": {\"low\": 763.5, \"high\": 815.925}, \"call_timestamp\": \"2026-09-20T06:22:14.890Z\", \"expiry_trading_date\": \"2026-09-25T00:00:00.000Z\", \"current_price\": 783.7, \"current_return_pct\": 0, \"outcome_verdict\": \"OPEN\", \"probabilities\": {\"bull\": 33.309, \"base\": 65.122, \"bear\": 1.57}}, {\"ticker\": \"TCS\", \"recommendation_id\": \"EDGE-TCS-20260918",
       "task": "CUPID"
+    },
+    {
+      "error": "AssertionError: RELIANCE lifecycle blocked at RESEARCH_BLOCKED :: {\"status\": \"BLOCKED\", \"ticker\": \"RELIANCE\", \"lifecycle_id\": \"EDGE-LC-2026-10-05-RELIANCE-USER-3e836b3a-158b-4128-9b5a-8898b7ce6891\", \"lifecycle_stage\": \"RESEARCH_BLOCKED\", \"market_snapshot_id\": null, \"research_bundle_id\": null, \"auction_snapshot_id\": null, \"detail\": \"STOCK_RESEARCH_AI_INVALID_SOURCE_REF\", \"trading_enabled\": false}",
+      "task": "RELIANCE"
     }
   ],
   "fault_boundaries": {
     "canonical_without_lifecycle": "BLOCKED_409",
-    "checked_at": "2026-10-05T11:31:51.109614Z",
+    "checked_at": "2026-10-05T15:07:43.527738Z",
     "research_only_without_bundle": "BLOCKED_422",
     "status": "PASS",
     "unknown_lifecycle": "BLOCKED_409"
   },
-  "generated_at": "2026-10-05T11:49:11.810165Z",
+  "generated_at": "2026-10-05T15:14:46.073803Z",
+  "nifty": {
+    "contract_version": "1.0",
+    "framework_version": "5DR_V2_1",
+    "g1_market_data": "PASS",
+    "g2_system_research_8_8": "PASS",
+    "g3_intelligence_reconciliation": "PASS",
+    "g4_engine_sync": "PASS",
+    "g5_persisted_output": "PASS",
+    "provenance": {
+      "benchmark_role": "NONE",
+      "evidence_mode": "CLOSED_SESSION",
+      "market_session_as_of": "2026-10-05",
+      "research_as_of": "2026-10-05T15:08:49.117396+00:00",
+      "target_session": null,
+      "trigger_type": "USER"
+    },
+    "published": true,
+    "request_id": "5drreq_b2a9362d-0f2d-4149-9708-489b8556081e",
+    "research_dimensions_verified": "8/8",
+    "run_id": "5drrun_21546954-ee90-48e3-a054-dbe9de8f6367",
+    "status": "PASS"
+  },
   "points": {
     "fault_boundaries": {
       "status": "PASS"
@@ -35,7 +57,7 @@
       "status": "SEPARATE_WINDOW_PROOF_REQUIRED"
     },
     "nifty": {
-      "status": "FAIL"
+      "status": "PASS"
     },
     "production_health": {
       "status": "PASS"
@@ -45,7 +67,7 @@
     }
   },
   "production_health": {
-    "checked_at": "2026-10-05T11:31:50.424574Z",
+    "checked_at": "2026-10-05T15:07:42.697095Z",
     "research_authority": "EDGE_SYSTEM",
     "research_contract": "EDGE_RESEARCH_BUNDLE_V2",
     "scheduler_authority": "CLOUDFLARE_CRON",
@@ -57,53 +79,5 @@
     }
   },
   "schema": "MDOS_G5_1_V2_LIVE_CLOSURE_PROOF",
-  "stocks": {
-    "RELIANCE": {
-      "forecast_horizon": "D:D+4",
-      "fresh_source_count": 4,
-      "g1_data_first": "PASS",
-      "g2_fresh_system_research": "PASS",
-      "g3_exact_lineage": "PASS",
-      "g4_compute_persistence": "PASS",
-      "g5_user_output_parity": "PASS",
-      "lifecycle_id": "EDGE-LC-2026-10-05-RELIANCE-USER-9895bea4-c395-4cb3-93d2-c52596e1356f",
-      "market_snapshot_id": "EDGE-MKT-RELIANCE-20261005-114816-fa0c95434d84",
-      "observed_stages": [
-        "RUN_CREATED",
-        "DATA_PENDING",
-        "COMPUTE_DISPATCHED",
-        "COMPUTE_PENDING",
-        "PERSISTED"
-      ],
-      "presentation_contract": "EFFICACY_V2",
-      "provenance": {
-        "benchmark_role": "NONE",
-        "candidate_type": "USER_CANONICAL_SNAPSHOT",
-        "evidence_mode": "SESSION_FINAL",
-        "market_session_as_of": "2026-10-05T00:00:00.000Z",
-        "research_as_of": "2026-10-05T11:48:49.480Z",
-        "target_session": "2026-10-06T00:00:00.000Z",
-        "trigger_type": "USER"
-      },
-      "research_authority": "EDGE_SYSTEM",
-      "research_bundle_id": "ER2-RELIANCE-6c036204c97c27ac",
-      "research_contract": "EDGE_RESEARCH_BUNDLE_V2",
-      "research_coverage": "5/5 VERIFIED",
-      "result_id": "EDGE-RELIANCE-20261005-114900-AUTO",
-      "session_labels": [
-        "D",
-        "D+1",
-        "D+2",
-        "D+3",
-        "D+4"
-      ],
-      "standard_tables": [
-        "EDGE_MASTER_ASSESSMENT",
-        "ACTIVE_CALLS",
-        "CURRENT_STOCK_OUTCOME",
-        "DRILLDOWN"
-      ],
-      "status": "PASS"
-    }
-  }
+  "stocks": {}
 }
