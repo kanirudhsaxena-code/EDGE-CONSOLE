@@ -341,7 +341,7 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
         continue;
       }
 
-      if(['COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+      if(['COMPUTE_DISPATCHED','COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(lifecycle.stage)){
         stocks.push({
           ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
           auction_snapshot_id:lifecycle.auction_snapshot_id,
