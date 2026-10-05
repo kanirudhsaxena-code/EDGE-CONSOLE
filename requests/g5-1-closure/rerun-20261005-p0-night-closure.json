@@ -1,0 +1,18 @@
+{
+  "requested_at": "2026-10-05T15:08:00Z",
+  "reason": "Re-run live G5.1 closure after LTF same-day checkpoint fix, CUPID content-qualified no-neuron research, and 5DR deterministic degraded quota fallback",
+  "production_console_code_sha": "22decdb3bdb21ea7915e5e0738dc1cd3063d095d",
+  "edge_engine_main": "0e10fcce9b6ea73485c0d72b3d76d5a5f1d7cb47",
+  "expected_stock_research_mode": "AI_IF_AVAILABLE_ELSE_DETERMINISTIC_SOURCE_GROUNDED_V1",
+  "expected_5dr_intelligence_mode": "AI_IF_AVAILABLE_ELSE_DETERMINISTIC_DEGRADED_V1",
+  "required_assets": [
+    "NIFTY",
+    "LTF",
+    "CUPID",
+    "RELIANCE"
+  ],
+  "required_stock_result": "3/3 PASS",
+  "required_four_asset_output": "PASS",
+  "fail_closed": true,
+  "trading_enabled": false
+}
