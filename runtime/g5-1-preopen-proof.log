@@ -1,0 +1,25 @@
+{
+  "point_12": {
+    "status": "FAIL",
+    "acceptance": "genuine persisted NSE pre-open evidence; no backdating or timing inference",
+    "checked_at": "2026-10-05T04:01:22.802486Z"
+  },
+  "errors": [
+    {
+      "task": "NIFTY",
+      "error": "AssertionError: NIFTY persisted pre-open record missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}"
+    },
+    {
+      "task": "LTF",
+      "error": "AssertionError: LTF persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}"
+    },
+    {
+      "task": "CUPID",
+      "error": "AssertionError: CUPID persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}"
+    },
+    {
+      "task": "RELIANCE",
+      "error": "AssertionError: RELIANCE persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}"
+    }
+  ]
+}

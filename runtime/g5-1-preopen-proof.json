@@ -1,0 +1,30 @@
+{
+  "errors": [
+    {
+      "error": "AssertionError: NIFTY persisted pre-open record missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}",
+      "task": "NIFTY"
+    },
+    {
+      "error": "AssertionError: LTF persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}",
+      "task": "LTF"
+    },
+    {
+      "error": "AssertionError: CUPID persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}",
+      "task": "CUPID"
+    },
+    {
+      "error": "AssertionError: RELIANCE persisted pre-open candidate missing :: {\"code\": 422, \"body\": {\"error\": \"date=YYYY-MM-DD is mandatory\"}, \"stderr\": \"\"}",
+      "task": "RELIANCE"
+    }
+  ],
+  "generated_at": "2026-10-05T04:01:22.802503Z",
+  "nifty": {},
+  "point_12": {
+    "acceptance": "genuine persisted NSE pre-open evidence; no backdating or timing inference",
+    "checked_at": "2026-10-05T04:01:22.802486Z",
+    "status": "FAIL"
+  },
+  "schema": "MDOS_G5_1_PREOPEN_PROOF_V1",
+  "stocks": {},
+  "target_date_ist": "2026-10-05"
+}
