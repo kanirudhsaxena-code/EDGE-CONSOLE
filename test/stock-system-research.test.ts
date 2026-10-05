@@ -139,7 +139,7 @@ test('system research falls back to deterministic source-grounded claims when re
   assert.equal(aiCalls,2);
   assert.equal(result.model,'DETERMINISTIC_SOURCE_GROUNDED_V1');
   assert.ok(result.bundle.claims.every(claim=>claim.source_ids.every(id=>result.bundle.sources.some(source=>source.source_id===id))));
-  assert.ok(result.bundle.limitations.some(x=>x.includes('remained invalid after one bounded repair')));
+  assert.ok(result.bundle.limitations.some(x=>x.includes('source references remained invalid after one bounded repair')));
 });
 
 test('provider DATA claims are supplied only as claims-to-test while research citations remain independent',async()=>{
