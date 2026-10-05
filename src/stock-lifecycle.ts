@@ -3,7 +3,7 @@ import { neon } from '@neondatabase/serverless';
 export type StockLifecycleStage=
   'RUN_CREATED'|'DATA_PENDING'|'DATA_READY'|'DATA_BLOCKED'|
   'RESEARCH_PENDING'|'RESEARCH_READY'|'RESEARCH_BLOCKED'|
-  'AUCTION_PENDING'|'AUCTION_READY'|
+  'AUCTION_PENDING'|'AUCTION_READY'|'AUCTION_BLOCKED'|
   'RECONCILED'|'COMPUTE_PENDING'|'COMPUTED'|'COMPUTE_BLOCKED'|
   'PERSISTED'|'PRESENTED';
 
@@ -169,7 +169,7 @@ export async function markStockAuctionPending(env:Env,id:string):Promise<StockLi
            stage_detail='Governed 09:10-09:14:59 IST auction acquisition dispatched',
            updated_at=now()
      where lifecycle_id=${id}
-       and stage='RESEARCH_READY'
+       and stage in ('RESEARCH_READY','AUCTION_BLOCKED')
        and auction_snapshot_id is null
      returning lifecycle_id
   `;
@@ -181,4 +181,17 @@ export async function markStockAuctionPending(env:Env,id:string):Promise<StockLi
   const row=await getStockLifecycle(env,id);
   if(!row)throw new Error('lifecycle readback failed');
   return row;
+}
+
+
+export async function markStockAuctionBlocked(env:Env,id:string,detail:string):Promise<void>{
+  if(!env.EDGE_DATABASE_URL)return;
+  const sql=neon(env.EDGE_DATABASE_URL);
+  await sql`
+    update edge_run_lifecycles
+       set stage='AUCTION_BLOCKED',stage_detail=${detail.slice(0,1000)},updated_at=now()
+     where lifecycle_id=${id}
+       and stage='AUCTION_PENDING'
+       and auction_snapshot_id is null
+  `;
 }
