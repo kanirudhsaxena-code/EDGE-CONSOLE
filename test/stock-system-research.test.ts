@@ -230,3 +230,35 @@ test('deterministic fallback remains fail-closed when category source coverage i
   );
   assert.equal(aiCalls,2);
 });
+
+
+test('deterministic fallback accepts surviving content-qualified catalyst sources for CUPID',async()=>{
+  let aiCalls=0;
+  const env:any={AI:{run:async()=>{
+    aiCalls++;
+    throw new Error('4006: daily free allocation exhausted');
+  }}};
+  const fetcher:any=async(url:string)=>{
+    if(url.includes('shareholders-notice-2026-2027'))return new Response('',{status:503});
+    if(url.includes('news.google.com'))return new Response('',{status:503});
+    if(url.includes('financial-reports'))return html('Quarterly results 2026-2027 and financial reporting with business update disclosures.');
+    if(url.includes('screener.in'))return html('Market Cap ₹100 Cr. Stock P/E 20. Promoter holding 44%. Announcements include recent business update and results.');
+    if(url.includes('nseindia.com'))return html('NSE issuer page and shareholding information.');
+    return new Response('',{status:404});
+  };
+  const result=await produceStockSystemResearch(env,{
+    ticker:'CUPID',
+    lifecycle_id:'EDGE-LC-2026-10-05-CUPID-AI-CAPACITY',
+    market_snapshot_id:'EDGE-MKT-CUPID-20261005-112000-capacity1',
+    data_captured_at:'2026-10-05T11:20:00.000Z',
+    market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+  },fetcher);
+
+  assert.equal(aiCalls,2);
+  assert.equal(result.model,'DETERMINISTIC_SOURCE_GROUNDED_V1');
+  const news=result.bundle.claims.find(x=>x.evidence_category==='NEWS_EVENTS_CATALYSTS');
+  const event=result.bundle.claims.find(x=>x.evidence_category==='EVENT_SHOCK');
+  assert.ok(news?.source_ids.includes('CUPID_SCREENER')||news?.source_ids.includes('CUPID_OFFICIAL_FINANCIALS'));
+  assert.ok(event?.source_ids.includes('CUPID_SCREENER')||event?.source_ids.includes('CUPID_OFFICIAL_FINANCIALS'));
+  assert.ok(result.bundle.limitations.some(x=>x.includes('CUPID_OFFICIAL_NOTICES unavailable')));
+});
