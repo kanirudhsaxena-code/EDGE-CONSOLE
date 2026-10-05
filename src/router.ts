@@ -588,11 +588,13 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const forceNew = body.force_new === true;
   const canonicalAttempt = body.canonical_attempt === true;
   const canonicalAttemptSlot = typeof body.canonical_attempt_slot === 'string' ? body.canonical_attempt_slot.trim() : null;
+  const lifecycleId = isNonEmptyString(body.lifecycle_id) ? String(body.lifecycle_id) : null;
+  let marketSnapshotId = isNonEmptyString(body.market_snapshot_id) ? String(body.market_snapshot_id) : null;
   const researchNotBefore = typeof body.research_not_before === 'string' && !Number.isNaN(Date.parse(body.research_not_before))
     ? new Date(body.research_not_before).toISOString()
     : null;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
-  if (existingToday && !forceNew && !isObject(body.research_bundle)) {
+  if (existingToday && !forceNew && !isObject(body.research_bundle) && !canonicalAttempt) {
     return json({
       ok: true,
       status: 'ALREADY_PUBLISHED_TODAY',
@@ -608,17 +610,19 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   }
 
   let researchBundleId: string | undefined;
+  let researchContractVersion: string | undefined;
   if (isObject(body.research_bundle)) {
     const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
     researchBundleId = saved.bundleId;
+    researchContractVersion = saved.contractVersion;
 
     if (researchOnly) {
       if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
       const sql = neon(env.EDGE_DATABASE_URL);
       const rows = await sql`
         select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
-               payload_hash,status,payload
+               payload_hash,status,payload,lifecycle_id,market_snapshot_id
           from edge_research_bundles
          where bundle_id=${researchBundleId}
          limit 1
@@ -629,13 +633,20 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       const row = rows[0] as Record<string, unknown>;
       const exactPayloadReadback = isObject(row.payload)
         && stableJson(row.payload) === stableJson(body.research_bundle);
+      const expectedVersion=String(body.research_bundle.contract_version);
+      const expectedAuthority=String(body.research_bundle.research_authority);
       const exactIdentity =
         String(row.bundle_id) === researchBundleId
         && String(row.ticker).toUpperCase() === ticker
-        && String(row.contract_version) === EDGE_RESEARCH_BUNDLE_VERSION
-        && String(row.research_authority) === 'CHATGPT'
+        && String(row.contract_version) === expectedVersion
+        && String(row.research_authority) === expectedAuthority
         && String(row.status) === 'READY'
-        && isNonEmptyString(row.payload_hash);
+        && isNonEmptyString(row.payload_hash)
+        && (expectedVersion!==EDGE_RESEARCH_BUNDLE_VERSION
+          || (
+            String(row.lifecycle_id??'')===String(body.research_bundle.lifecycle_id??'')
+            && String(row.market_snapshot_id??'')===String(body.research_bundle.market_snapshot_id??'')
+          ));
       if (!exactPayloadReadback || !exactIdentity) {
         return json({
           error: 'Immutable stored research readback mismatch',
@@ -649,7 +660,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         status: 'READY',
         mode: 'RESEARCH_ONLY',
         engine: 'EDGE_STOCKS',
-        research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        research_contract_version: String(row.contract_version),
         ticker,
         command: command.raw,
         research_bundle_id: researchBundleId,
@@ -664,39 +675,67 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   } else {
     if (!canonicalAttempt) {
       return json({
-        error: 'A distinct new EDGE run requires a newly executed governed research bundle in this request; prior bundles cannot be reused by age alone',
-        code: 'EDGE_NEW_RUN_RESEARCH_REQUIRED',
+        error: 'A distinct new EDGE run must first create a DATA lifecycle and lifecycle-bound research bundle',
+        code: 'EDGE_NEW_RUN_LIFECYCLE_REQUIRED',
         contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
         ticker,
         fresh_run_requested: forceNew,
         trading_enabled: false,
       }, 409);
     }
-    if (!researchNotBefore) {
+    if (!lifecycleId) {
       return json({
-        error: 'Pre-open canonical EDGE requires the start timestamp of its own PREP research lifecycle',
-        code: 'EDGE_CANONICAL_RESEARCH_LIFECYCLE_REQUIRED',
+        error: 'Pre-open canonical EDGE requires its exact production lifecycle_id',
+        code: 'EDGE_CANONICAL_LIFECYCLE_REQUIRED',
         ticker,
         canonical_attempt: true,
         canonical_attempt_slot: canonicalAttemptSlot,
         trading_enabled: false,
       }, 409);
     }
-    const fresh = await latestFreshEdgeResearchBundle(env, ticker, 90, researchNotBefore);
-    researchBundleId = fresh?.bundleId;
-    if (!researchBundleId) {
-      return json({
-        error: 'A pre-open canonical EDGE run requires a complete five-dimension ChatGPT research bundle created during this PREP lifecycle and within the 90-minute ceiling',
-        code: 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED',
-        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-        ticker,
-        fresh_run_requested: forceNew,
-        canonical_attempt: canonicalAttempt,
-        canonical_attempt_slot: canonicalAttemptSlot,
-        research_not_before: researchNotBefore,
-        trading_enabled: false,
-      }, 409);
+    if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
+    const sql=neon(env.EDGE_DATABASE_URL);
+    const rows=await sql`
+      select ticker,stage,market_snapshot_id,research_bundle_id
+        from edge_run_lifecycles
+       where lifecycle_id=${lifecycleId}
+       limit 1
+    `;
+    if(!rows.length){
+      return json({error:'Pre-open stock lifecycle was not found',code:'EDGE_CANONICAL_LIFECYCLE_MISSING',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
     }
+    const lifecycle=rows[0];
+    if(String(lifecycle.ticker).toUpperCase()!==ticker||String(lifecycle.stage)!=='RESEARCH_READY'){
+      return json({
+        error:'Pre-open stock lifecycle is not RESEARCH_READY',
+        code:'EDGE_CANONICAL_RESEARCH_NOT_READY',
+        ticker,
+        lifecycle_id:lifecycleId,
+        stage:String(lifecycle.stage),
+        trading_enabled:false,
+      },409);
+    }
+    marketSnapshotId=String(lifecycle.market_snapshot_id??'');
+    researchBundleId=String(lifecycle.research_bundle_id??'');
+    if(!marketSnapshotId||!researchBundleId){
+      return json({error:'Pre-open lifecycle lineage is incomplete',code:'EDGE_CANONICAL_LINEAGE_INCOMPLETE',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
+    }
+    const researchRows=await sql`
+      select contract_version,lifecycle_id,market_snapshot_id,status
+        from edge_research_bundles
+       where bundle_id=${researchBundleId}
+       limit 1
+    `;
+    if(
+      !researchRows.length
+      || String(researchRows[0].contract_version)!==EDGE_RESEARCH_BUNDLE_VERSION
+      || String(researchRows[0].lifecycle_id??'')!==lifecycleId
+      || String(researchRows[0].market_snapshot_id??'')!==marketSnapshotId
+      || String(researchRows[0].status)!=='READY'
+    ){
+      return json({error:'Lifecycle research bundle identity is not valid for this DATA snapshot',code:'EDGE_CANONICAL_RESEARCH_LINEAGE_MISMATCH',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
+    }
+    researchContractVersion=String(researchRows[0].contract_version);
   }
 
   const baseline = await latestEdgeRecommendation(env, ticker);
@@ -710,7 +749,8 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
 
   const dispatch = await dispatchEdgeWorkflow(
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
-    canonicalRequestedAt, canonicalAttemptSlot ?? undefined
+    canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
+    lifecycleId ?? undefined, marketSnapshotId ?? undefined
   );
   if (!dispatch.ok) {
     return json({
@@ -727,10 +767,12 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     status: 'DISPATCHED',
     engine: 'EDGE_STOCKS',
     contract_version: 'EDGE_STOCKS_V1_3',
-    research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+    research_contract_version: researchContractVersion ?? EDGE_RESEARCH_BUNDLE_VERSION,
     ticker,
     command: command.raw,
     research_bundle_id: researchBundleId,
+    lifecycle_id: lifecycleId,
+    market_snapshot_id: marketSnapshotId,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
