@@ -43,9 +43,16 @@ test('Cloudflare production clock owns all pre-open production phases',()=>{
   assert.doesNotMatch(scheduler,/research_not_before/);
 });
 
-test('router canonical path requires lifecycle-bound research and auction readiness',()=>{
+test('router normal and canonical paths fail closed on lifecycle, research, and auction lineage',()=>{
   const source=fs.readFileSync('src/router.ts','utf8');
-  assert.match(source,/EDGE_NEW_RUN_LIFECYCLE_REQUIRED/);
+  assert.match(source,/beginNormalStockLifecycle\(env,ticker\)/);
+  assert.match(source,/EDGE_LIFECYCLE_START_FAILED/);
+  assert.match(source,/data_first:true/);
+  assert.match(source,/EDGE_EXTERNAL_RESEARCH_COMPUTE_PROHIBITED/);
+  assert.ok(
+    source.indexOf('beginNormalStockLifecycle(env,ticker)') < source.indexOf('const dispatch = await dispatchEdgeWorkflow'),
+    'normal run must establish DATA-first lifecycle before any compute dispatch path'
+  );
   assert.match(source,/EDGE_CANONICAL_LIFECYCLE_REQUIRED/);
   assert.match(source,/EDGE_CANONICAL_AUCTION_NOT_READY/);
   assert.match(source,/EDGE_CANONICAL_RESEARCH_LINEAGE_MISMATCH/);
