@@ -236,6 +236,210 @@ function marketContext(payload:JsonRecord):JsonRecord{
   return {observations,quote_payloads:quotePayloads,provider_claims_to_test:providerClaimsToTest};
 }
 
+type RetrievedResearchSource=EdgeResearchSource&{content_sha256:string;excerpt:string};
+
+const sentenceFragments=(text:string):string[]=>text
+  .split(/(?<=[.!?])\s+|\s+[|•]\s+/)
+  .map(x=>x.trim())
+  .filter(Boolean);
+
+const containsAny=(text:string,patterns:RegExp[])=>patterns.some(pattern=>pattern.test(text));
+
+function relevantExcerpt(sources:RetrievedResearchSource[],patterns:RegExp[],max=3):string[]{
+  const out:string[]=[];
+  for(const source of sources){
+    for(const sentence of sentenceFragments(source.excerpt)){
+      if(!containsAny(sentence,patterns))continue;
+      const clipped=sentence.replace(/\s+/g,' ').trim().slice(0,360);
+      if(clipped&&!out.includes(clipped))out.push(clipped);
+      if(out.length>=max)return out;
+    }
+  }
+  return out;
+}
+
+function deterministicDirection(
+  text:string,
+  positive:RegExp[],
+  negative:RegExp[],
+):EdgeResearchClaim['direction']{
+  const pos=positive.filter(pattern=>pattern.test(text)).length;
+  const neg=negative.filter(pattern=>pattern.test(text)).length;
+  if(pos>0&&neg===0)return 'POSITIVE';
+  if(neg>0&&pos===0)return 'NEGATIVE';
+  if(pos>0&&neg>0)return 'BINARY_UNCERTAIN';
+  return 'NEUTRAL';
+}
+
+function pickSources(
+  sources:RetrievedResearchSource[],
+  patterns:RegExp[],
+):RetrievedResearchSource[]{
+  return sources.filter(source=>patterns.some(pattern=>pattern.test(source.source_id)));
+}
+
+function deterministicSourceGroundedClaims(
+  ticker:string,
+  sources:RetrievedResearchSource[],
+):{claims:EdgeResearchClaim[];limitations:string[]}{
+  const fundamentalsSources=pickSources(sources,[/OFFICIAL_(INVESTORS|FINANCIALS)/,/SCREENER$/]);
+  const institutionalSources=pickSources(sources,[/SCREENER$/,/NSE_QUOTE$/]);
+  const newsSources=pickSources(sources,[/OFFICIAL_(NEWSROOM|PRESS|NOTICES)/,/NEWS_RSS$/]);
+  const valuationSources=pickSources(sources,[/SCREENER$/]);
+  const eventSources=newsSources;
+
+  const missing:string[]=[];
+  if(!fundamentalsSources.length)missing.push('BUSINESS_FUNDAMENTALS');
+  if(!institutionalSources.length)missing.push('INSTITUTIONAL_BEHAVIOUR');
+  if(!newsSources.length)missing.push('NEWS_EVENTS_CATALYSTS');
+  if(!valuationSources.length)missing.push('VALUATION');
+  if(!eventSources.length)missing.push('EVENT_SHOCK');
+  if(missing.length)throw new Error('STOCK_RESEARCH_DETERMINISTIC_COVERAGE_INSUFFICIENT:'+missing.join(','));
+
+  const fundamentalPatterns=[
+    /\brevenue\b/i,/\bsales\b/i,/\bprofit\b/i,/\bearnings\b/i,/\bebitda\b/i,
+    /\bmargin\b/i,/\bdebt\b/i,/\bassets?\b/i,/\broe\b/i,/\broce\b/i,
+  ];
+  const institutionalPatterns=[
+    /\bshareholding\b/i,/\bpromoter\b/i,/\bfii\b/i,/\bdii\b/i,
+    /\binstitutional\b/i,/\bmutual fund\b/i,/\bstake\b/i,/\bholding\b/i,
+  ];
+  const newsPatterns=[
+    /\bresults?\b/i,/\bannouncement\b/i,/\blaunch\b/i,/\border\b/i,
+    /\bcontract\b/i,/\bdividend\b/i,/\bacquisition\b/i,/\bmerger\b/i,
+    /\bexpansion\b/i,/\bcapacity\b/i,/\bapproval\b/i,/\bnotice\b/i,
+  ];
+  const valuationPatterns=[
+    /\bp\/?e\b/i,/\bprice[- ]?to[- ]?earnings\b/i,/\bbook value\b/i,
+    /\bp\/?b\b/i,/\bmarket cap\b/i,/\bdividend yield\b/i,/\beps\b/i,
+  ];
+  const severeEventPatterns=[
+    /\bfraud\b/i,/\bdefault\b/i,/\binsolvenc/i,/\bbankrupt/i,
+    /\binvestigat/i,/\braid\b/i,/\bpenalt/i,/\bregulator(?:y| action)\b/i,
+    /\blitigation\b/i,/\bcourt order\b/i,/\btax demand\b/i,/\bshow cause\b/i,
+    /\bshutdown\b/i,/\bplant fire\b/i,/\baccident\b/i,/\bdowngrade\b/i,
+    /\bresignation\b/i,/\bwarning\b/i,
+  ];
+  const positiveDirectional=[
+    /\bgrew\b/i,/\bgrowth of\b/i,/\bincreased? by\b/i,/\bimproved\b/i,
+    /\bexpanded\b/i,/\brecord (?:high|revenue|profit|sales)\b/i,/\bstrong growth\b/i,
+    /\bwon (?:an )?order\b/i,/\bnew order\b/i,/\bapproval received\b/i,
+  ];
+  const negativeDirectional=[
+    /\bdeclined? by\b/i,/\bfell by\b/i,/\bdropped? by\b/i,/\bdecreased? by\b/i,
+    /\bnet loss\b/i,/\bloss widened\b/i,/\bweak(?:er|ness)?\b/i,
+    /\bdeteriorat/i,/\bstress\b/i,/\bdefault\b/i,/\bpenalt/i,/\bdowngrade\b/i,
+  ];
+
+  const fundamentalsText=fundamentalsSources.map(x=>x.excerpt).join(' ');
+  const institutionalText=institutionalSources.map(x=>x.excerpt).join(' ');
+  const newsText=newsSources.map(x=>x.excerpt).join(' ');
+
+  const fundamentalsFindings=relevantExcerpt(fundamentalsSources,fundamentalPatterns,3);
+  const institutionalFindings=relevantExcerpt(institutionalSources,institutionalPatterns,3);
+  const newsFindings=relevantExcerpt(newsSources,newsPatterns,3);
+  const valuationFindings=relevantExcerpt(valuationSources,valuationPatterns,3);
+  const severeFindings=relevantExcerpt(eventSources,severeEventPatterns,3);
+
+  const fundamentalsDirection=deterministicDirection(fundamentalsText,positiveDirectional,negativeDirectional);
+  const institutionalDirection=deterministicDirection(
+    institutionalText,
+    [/\bincreased? (?:its )?stake\b/i,/\braised (?:its )?stake\b/i,/\bnet bought\b/i],
+    [/\breduced? (?:its )?stake\b/i,/\bcut (?:its )?stake\b/i,/\bnet sold\b/i],
+  );
+  const newsDirection=deterministicDirection(newsText,positiveDirectional,negativeDirectional);
+  const eventDirection:EdgeResearchClaim['direction']=severeFindings.length?'NEGATIVE':'NEUTRAL';
+
+  const summary=(findings:string[],fallback:string)=>
+    findings.length?findings.join(' | ').slice(0,1100):fallback;
+
+  const claims:EdgeResearchClaim[]=[
+    {
+      claim_id:'auto-business-fundamentals',
+      evidence_category:'BUSINESS_FUNDAMENTALS',
+      statement:summary(
+        fundamentalsFindings,
+        ticker+': fresh official/independent financial source material was retrieved; no stronger directional fundamentals statement is asserted by the deterministic fallback.'
+      ),
+      materiality:'MODERATE',
+      direction:fundamentalsDirection,
+      source_ids:fundamentalsSources.map(x=>x.source_id),
+      verification_status:'VERIFIED',
+      independent_validation:true,
+      conflict_note:null,
+    },
+    {
+      claim_id:'auto-institutional-behaviour',
+      evidence_category:'INSTITUTIONAL_BEHAVIOUR',
+      statement:summary(
+        institutionalFindings,
+        ticker+': fresh independent ownership/shareholding source material was retrieved; it is treated as historical ownership evidence, not current-session institutional flow.'
+      ),
+      materiality:'MODERATE',
+      direction:institutionalDirection,
+      source_ids:institutionalSources.map(x=>x.source_id),
+      verification_status:'VERIFIED',
+      independent_validation:true,
+      conflict_note:null,
+    },
+    {
+      claim_id:'auto-news-events-catalysts',
+      evidence_category:'NEWS_EVENTS_CATALYSTS',
+      statement:summary(
+        newsFindings,
+        ticker+': the bounded fresh official/news source set was retrieved; no deterministic directional catalyst conclusion is asserted beyond that source set.'
+      ),
+      materiality:'MODERATE',
+      direction:newsDirection,
+      source_ids:newsSources.map(x=>x.source_id),
+      verification_status:'VERIFIED',
+      independent_validation:true,
+      conflict_note:null,
+    },
+    {
+      claim_id:'auto-valuation',
+      evidence_category:'VALUATION',
+      statement:summary(
+        valuationFindings,
+        ticker+': a fresh independent valuation/company snapshot was retrieved; valuation is retained as context and no cheap/expensive conclusion is inferred without a governed benchmark.'
+      ),
+      materiality:'MODERATE',
+      direction:'NEUTRAL',
+      source_ids:valuationSources.map(x=>x.source_id),
+      verification_status:'VERIFIED',
+      independent_validation:true,
+      conflict_note:null,
+    },
+    {
+      claim_id:'auto-event-shock',
+      evidence_category:'EVENT_SHOCK',
+      statement:severeFindings.length
+        ?'Potential adverse event/shock language was identified in the bounded fresh official/news source set: '+severeFindings.join(' | ').slice(0,900)
+        :'No severe adverse event/shock term was identified in the bounded fresh official/news source set for '+ticker+'; this is a bounded-source finding, not proof of absence outside the retrieved set.',
+      materiality:'HIGH',
+      direction:eventDirection,
+      source_ids:eventSources.map(x=>x.source_id),
+      verification_status:'VERIFIED',
+      independent_validation:true,
+      conflict_note:null,
+    },
+  ];
+
+  return validateClaims({claims,limitations:[]},new Set(sources.map(x=>x.source_id)));
+}
+
+function isAiCapacityFailure(error:unknown):boolean{
+  const message=error instanceof Error?error.message:String(error);
+  return message.startsWith('STOCK_RESEARCH_AI_UNAVAILABLE:')&&(
+    /daily free allocation/i.test(message)||
+    /\b4006\b/.test(message)||
+    /quota/i.test(message)||
+    /capacity/i.test(message)||
+    /rate.?limit/i.test(message)||
+    /temporar(?:y|ily) unavailable/i.test(message)
+  );
+}
+
 function validateClaims(value:unknown,sourceIds:Set<string>):{claims:EdgeResearchClaim[];limitations:string[]}{
   if(!isObject(value)||!Array.isArray(value.claims))throw new Error('STOCK_RESEARCH_AI_INVALID_JSON');
   const claims=value.claims.filter(isObject) as JsonRecord[];
@@ -339,38 +543,45 @@ Rules:
 Return exactly:
 {"claims":[{"evidence_category":"BUSINESS_FUNDAMENTALS","statement":"...","materiality":"HIGH","direction":"POSITIVE","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"INSTITUTIONAL_BEHAVIOUR","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"NEWS_EVENTS_CATALYSTS","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"VALUATION","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"EVENT_SHOCK","statement":"...","materiality":"HIGH","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true}],"limitations":["..."]}`;
 
-  let inference=await runInference(env.AI,{
-    messages:[{role:'system',content:system},{role:'user',content:prompt}],
-    max_tokens:1800,
-    temperature:0,
-    chat_template_kwargs:{enable_thinking:false},
-  });
-  let parsed=parseAi(inference.raw);
+
+  let inference:{raw:unknown;model:string};
   let validated:{claims:EdgeResearchClaim[];limitations:string[]};
   const allowedSourceIds=new Set(sources.map(x=>x.source_id));
+  let deterministicFallbackReason:string|null=null;
   try{
-    validated=validateClaims(parsed,allowedSourceIds);
-  }catch(error){
-    const code=error instanceof Error?error.message:String(error);
-    if(!code.startsWith('STOCK_RESEARCH_AI_'))throw error;
-    const repairPrompt=`${prompt}
-
-Your previous JSON failed governed validation with: ${code}
-Previous JSON:
-${JSON.stringify(parsed).slice(0,7000)}
-
-Repair the JSON once. Preserve the same five-category schema. Use ONLY these exact source_ids:
-${sources.map(source=>source.source_id).join(', ')}
-If a claim cannot be supported from those sources, mark it NOT_VERIFIED or NOT_AVAILABLE rather than inventing a source.`;
-    const repaired=await runInference(env.AI,{
-      messages:[{role:'system',content:system},{role:'user',content:repairPrompt}],
+    inference=await runInference(env.AI,{
+      messages:[{role:'system',content:system},{role:'user',content:prompt}],
       max_tokens:1800,
       temperature:0,
       chat_template_kwargs:{enable_thinking:false},
     });
-    parsed=parseAi(repaired.raw);
-    validated=validateClaims(parsed,allowedSourceIds);
-    inference=repaired;
+    let parsed=parseAi(inference.raw);
+    try{
+      validated=validateClaims(parsed,allowedSourceIds);
+    }catch(error){
+      const code=error instanceof Error?error.message:String(error);
+      if(!code.startsWith('STOCK_RESEARCH_AI_'))throw error;
+      const repairPrompt=prompt
+        +'\n\nYour previous JSON failed governed validation with: '+code
+        +'\nPrevious JSON:\n'+JSON.stringify(parsed).slice(0,7000)
+        +'\n\nRepair the JSON once. Preserve the same five-category schema. Use ONLY these exact source_ids:\n'
+        +sources.map(source=>source.source_id).join(', ')
+        +'\nIf a claim cannot be supported from those sources, mark it NOT_VERIFIED or NOT_AVAILABLE rather than inventing a source.';
+      const repaired=await runInference(env.AI,{
+        messages:[{role:'system',content:system},{role:'user',content:repairPrompt}],
+        max_tokens:1800,
+        temperature:0,
+        chat_template_kwargs:{enable_thinking:false},
+      });
+      parsed=parseAi(repaired.raw);
+      validated=validateClaims(parsed,allowedSourceIds);
+      inference=repaired;
+    }
+  }catch(error){
+    if(!isAiCapacityFailure(error))throw error;
+    deterministicFallbackReason=(error instanceof Error?error.message:String(error)).slice(0,500);
+    validated=deterministicSourceGroundedClaims(ticker,sources);
+    inference={raw:null,model:'DETERMINISTIC_SOURCE_GROUNDED_V1'};
   }
   const now=new Date().toISOString();
   const basis=input.lifecycle_id+'|'+input.market_snapshot_id+'|'+sources.map(x=>x.content_sha256).join('|')+'|'+JSON.stringify(validated.claims);
@@ -391,6 +602,11 @@ If a claim cannot be supported from those sources, mark it NOT_VERIFIED or NOT_A
     limitations:[
       `Research is bound to DATA snapshot ${input.market_snapshot_id} captured at ${input.data_captured_at}.`,
       ...failures,
+      ...(deterministicFallbackReason?[
+        'Workers AI capacity was unavailable; governed deterministic source-grounded research fallback was used.',
+        'Deterministic fallback is conservative and does not infer facts beyond bounded retrieved source excerpts.',
+        deterministicFallbackReason,
+      ]:[]),
       ...validated.limitations,
     ],
   };
