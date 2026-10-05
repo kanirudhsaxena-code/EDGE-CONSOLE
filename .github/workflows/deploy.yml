@@ -105,6 +105,27 @@ jobs:
           echo "Tagged deployment did not pass production health verification"
           cat /tmp/deploy-health.json || true
           exit 1
+      - name: Verify dynamic NSE calendar authority is live
+        run: |
+          set -euo pipefail
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          TARGET_DATE="$(TZ=Asia/Kolkata date +%F)"
+          STATUS="$(curl --location --silent --show-error             -o /tmp/calendar-health.json -w '%{http_code}'             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H 'Cache-Control: no-cache'             -H 'Accept: application/json'             "$BASE/api/market-calendar/session?date=$TARGET_DATE")"
+          cat /tmp/calendar-health.json
+          echo
+          test "$STATUS" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/calendar-health.json'))
+          assert d.get('session_state') in {'TRADING_DAY','TRADING_HOLIDAY','WEEKEND','SPECIAL_TIMING'}, d
+          assert d.get('authority') in {'EXACT_PROVIDER_SESSION','VERIFIED_YEAR_CACHE'}, d
+          assert d.get('calendar_schema') == 'NSE_SESSION_CALENDAR_DYNAMIC_V1', d
+          assert d.get('trading_enabled') is False, d
+          print('dynamic_nse_calendar_authority=PASS')
+          print('authority='+str(d.get('authority')))
+          print('session_state='+str(d.get('session_state')))
+          PY
+
       - name: Verify governed 5DR ingestion route is deployed
         run: |
           set -euo pipefail
