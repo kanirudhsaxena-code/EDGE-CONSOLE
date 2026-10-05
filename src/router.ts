@@ -611,6 +611,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
 
   let researchBundleId: string | undefined;
   let researchContractVersion: string | undefined;
+  let auctionSnapshotIdForDispatch: string | undefined;
   if (isObject(body.research_bundle)) {
     const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
@@ -764,7 +765,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         trading_enabled:false,
       },409);
     }
-    body={...body,auction_snapshot_id:auctionSnapshotId};
+    auctionSnapshotIdForDispatch=auctionSnapshotId;
   }
 
   const baseline = await latestEdgeRecommendation(env, ticker);
@@ -780,7 +781,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
     canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
     lifecycleId ?? undefined, marketSnapshotId ?? undefined,
-    isNonEmptyString(body.auction_snapshot_id)?String(body.auction_snapshot_id):undefined
+    auctionSnapshotIdForDispatch
   );
   if (!dispatch.ok) {
     return json({
@@ -803,7 +804,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     research_bundle_id: researchBundleId,
     lifecycle_id: lifecycleId,
     market_snapshot_id: marketSnapshotId,
-    auction_snapshot_id: isNonEmptyString(body.auction_snapshot_id)?String(body.auction_snapshot_id):null,
+    auction_snapshot_id: auctionSnapshotIdForDispatch??null,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
