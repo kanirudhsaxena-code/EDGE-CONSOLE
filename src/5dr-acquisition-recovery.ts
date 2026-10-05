@@ -33,7 +33,29 @@ export async function recoverBlocked5drAcquisition(
     return { recovered: false, status: 'NOT_CONFIGURED' };
   }
 
-  const sync = await sync5drAcquisitionResult(env, requestId);
+  const sql = neon(env.DATABASE_URL);
+  const rows = await sql`
+    select status,metadata
+      from analysis_requests
+     where request_id=${requestId} and engine='5DR'
+     limit 1
+  `;
+  if (!rows.length) return { recovered: false, status: 'REQUEST_NOT_FOUND' };
+
+  const metadata = isObject(rows[0].metadata) ? rows[0].metadata : {};
+  const provenance = isObject(metadata.run_provenance) ? metadata.run_provenance : {};
+  const invocation = isObject(metadata.invocation) ? metadata.invocation : {};
+  const preopenAcquisition =
+    provenance.evidence_mode === 'PREOPEN' ||
+    provenance.evidence_mode === 'PREOPEN_PREP' ||
+    invocation.canonical_attempt === true ||
+    invocation.prep_only === true ||
+    metadata.preopen_prep_only === true;
+  const workflow = preopenAcquisition
+    ? env.FIVEDR_PREOPEN_ACQUIRE_WORKFLOW
+    : env.FIVEDR_ACQUIRE_WORKFLOW;
+
+  const sync = await sync5drAcquisitionResult(env, requestId, fetch, workflow);
   if (sync.status !== 'SUCCEEDED' || !sync.evidence) {
     return {
       recovered: false,
@@ -60,21 +82,11 @@ export async function recoverBlocked5drAcquisition(
     };
   }
 
-  const sql = neon(env.DATABASE_URL);
-  const rows = await sql`
-    select status,metadata
-      from analysis_requests
-     where request_id=${requestId} and engine='5DR'
-     limit 1
-  `;
-  if (!rows.length) return { recovered: false, status: 'REQUEST_NOT_FOUND' };
-
   const status = String(rows[0].status ?? '');
   if (status === 'COMPLETED' || status === 'CANCELLED') {
     return { recovered: false, status: 'REQUEST_FINALIZED' };
   }
 
-  const metadata = isObject(rows[0].metadata) ? rows[0].metadata : {};
   if (String(metadata.adapter_stage ?? '') !== 'AUTOMATED_MARKET_DATA_BLOCKED') {
     return { recovered: false, status: 'STAGE_ALREADY_ADVANCED' };
   }
