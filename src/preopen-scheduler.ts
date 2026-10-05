@@ -200,26 +200,27 @@ async function research(env:PreopenEnv,now:Date):Promise<void>{
       }
 
       if(!lifecycle.market_snapshot_id)throw new Error('DATA_READY lifecycle has no market_snapshot_id');
-      lifecycle=await markStockResearchPending(env,lifecycleId,lifecycle.market_snapshot_id);
-      const snapshot=await readMarketSnapshotPayload(env,lifecycleId,lifecycle.market_snapshot_id);
+      const marketSnapshotId=lifecycle.market_snapshot_id;
+      lifecycle=await markStockResearchPending(env,lifecycleId,marketSnapshotId);
+      const snapshot=await readMarketSnapshotPayload(env,lifecycleId,marketSnapshotId);
       if(!snapshot)throw new Error('immutable DATA snapshot readback failed');
 
       try{
         const produced=await produceStockSystemResearch(env,{
           ticker,
           lifecycle_id:lifecycleId,
-          market_snapshot_id:lifecycle.market_snapshot_id,
+          market_snapshot_id:marketSnapshotId,
           data_captured_at:snapshot.captured_at,
           market_payload:snapshot.payload,
         },fetch);
-        const saved=await persistEdgeResearchBundle(env,produced.bundle,ticker);
+        const saved=await persistEdgeResearchBundle(env as never,produced.bundle,ticker);
         if(!saved.bundleId)throw new Error(saved.error??'governed research persistence failed');
         const ready=await getStockLifecycle(env,lifecycleId);
         stocks.push({
           ticker,
           lifecycle_id:lifecycleId,
           status:ready?.stage??'RESEARCH_READY',
-          market_snapshot_id:lifecycle.market_snapshot_id,
+          market_snapshot_id:marketSnapshotId,
           research_bundle_id:saved.bundleId,
           research_model:produced.model,
           source_failures:produced.source_failures,
