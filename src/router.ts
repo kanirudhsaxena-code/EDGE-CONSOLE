@@ -696,7 +696,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
     const sql=neon(env.EDGE_DATABASE_URL);
     const rows=await sql`
-      select ticker,stage,market_snapshot_id,research_bundle_id
+      select ticker,stage,market_snapshot_id,research_bundle_id,auction_snapshot_id
         from edge_run_lifecycles
        where lifecycle_id=${lifecycleId}
        limit 1
@@ -717,6 +717,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     }
     marketSnapshotId=String(lifecycle.market_snapshot_id??'');
     researchBundleId=String(lifecycle.research_bundle_id??'');
+    const auctionSnapshotId=String(lifecycle.auction_snapshot_id??'');
     if(!marketSnapshotId||!researchBundleId){
       return json({error:'Pre-open lifecycle lineage is incomplete',code:'EDGE_CANONICAL_LINEAGE_INCOMPLETE',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
     }
@@ -736,6 +737,34 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       return json({error:'Lifecycle research bundle identity is not valid for this DATA snapshot',code:'EDGE_CANONICAL_RESEARCH_LINEAGE_MISMATCH',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
     }
     researchContractVersion=String(researchRows[0].contract_version);
+    if(!auctionSnapshotId){
+      return json({
+        error:'Pre-open lifecycle does not yet contain a frozen auction snapshot',
+        code:'EDGE_CANONICAL_AUCTION_NOT_READY',
+        ticker,
+        lifecycle_id:lifecycleId,
+        trading_enabled:false,
+      },409);
+    }
+    const auctionRows=await sql`
+      select auction_snapshot_id,status,captured_at
+        from edge_auction_snapshots
+       where auction_snapshot_id=${auctionSnapshotId}
+         and lifecycle_id=${lifecycleId}
+         and ticker=${ticker}
+       limit 1
+    `;
+    if(!auctionRows.length||String(auctionRows[0].status)!=='AUCTION_READY'){
+      return json({
+        error:'Frozen pre-open auction snapshot identity is invalid',
+        code:'EDGE_CANONICAL_AUCTION_LINEAGE_MISMATCH',
+        ticker,
+        lifecycle_id:lifecycleId,
+        auction_snapshot_id:auctionSnapshotId,
+        trading_enabled:false,
+      },409);
+    }
+    body={...body,auction_snapshot_id:auctionSnapshotId};
   }
 
   const baseline = await latestEdgeRecommendation(env, ticker);
@@ -750,7 +779,8 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const dispatch = await dispatchEdgeWorkflow(
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
     canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
-    lifecycleId ?? undefined, marketSnapshotId ?? undefined
+    lifecycleId ?? undefined, marketSnapshotId ?? undefined,
+    isNonEmptyString(body.auction_snapshot_id)?String(body.auction_snapshot_id):undefined
   );
   if (!dispatch.ok) {
     return json({
@@ -773,6 +803,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     research_bundle_id: researchBundleId,
     lifecycle_id: lifecycleId,
     market_snapshot_id: marketSnapshotId,
+    auction_snapshot_id: isNonEmptyString(body.auction_snapshot_id)?String(body.auction_snapshot_id):null,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
