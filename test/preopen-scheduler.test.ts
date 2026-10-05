@@ -5,75 +5,56 @@ import { classifyPreopenTick, REQUIRED_PREOPEN_STOCK_TICKERS } from '../src/preo
 
 const ist=(iso:string)=>new Date(iso);
 
-test('Cloudflare pre-open clock recognizes only governed IST windows',()=>{
-  assert.equal(classifyPreopenTick(ist('2026-10-05T03:20:00Z')),'PREP');
-  assert.equal(classifyPreopenTick(ist('2026-10-05T03:40:00Z')),'AUCTION');
+test('Cloudflare clock exposes explicit PREP, RESEARCH and AUCTION stages',()=>{
+  assert.equal(classifyPreopenTick(ist('2026-10-05T03:20:00Z')),'PREP');      // 08:50 IST
+  assert.equal(classifyPreopenTick(ist('2026-10-05T03:35:00Z')),'RESEARCH');  // 09:05 IST
+  assert.equal(classifyPreopenTick(ist('2026-10-05T03:39:59Z')),'RESEARCH');  // 09:09 IST
+  assert.equal(classifyPreopenTick(ist('2026-10-05T03:40:00Z')),'AUCTION');   // 09:10 IST
   assert.equal(classifyPreopenTick(ist('2026-10-05T03:44:59Z')),'AUCTION');
   assert.equal(classifyPreopenTick(ist('2026-10-05T03:45:00Z')),'OUTSIDE');
   assert.equal(classifyPreopenTick(ist('2026-10-03T03:40:00Z')),'OUTSIDE');
 });
 
-test('wrangler schedules prep and each governed auction retry minute',()=>{
+test('wrangler schedules DATA, bounded research readiness and auction windows',()=>{
   const text=fs.readFileSync('wrangler.jsonc','utf8');
   assert.match(text,/"20 3 \* \* 1-5"/);
+  assert.match(text,/"35-39 3 \* \* 1-5"/);
   assert.match(text,/"40-44 3 \* \* 1-5"/);
   assert.match(text,/FIVEDR_PREOPEN_ACQUIRE_WORKFLOW/);
-  assert.match(text,/5dr-console-preopen-acquire-proxy\.yml/);
 });
 
-test('production entrypoint exposes Cloudflare scheduled handler',()=>{
+test('required pre-open stock population is explicit and independent of open-call discovery',()=>{
+  assert.deepEqual([...REQUIRED_PREOPEN_STOCK_TICKERS],['LTF','CUPID','RELIANCE']);
+});
+
+test('production scheduler owns DATA then RESEARCH then AUCTION dispatch',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(scheduler,/dispatchEdgeDataWorkflow/);
+  assert.match(scheduler,/produceStockSystemResearch/);
+  assert.match(scheduler,/persistEdgeResearchBundle/);
+  assert.match(scheduler,/dispatchEdgeAuctionWorkflow/);
+  assert.match(scheduler,/markStockAuctionPending/);
+  assert.match(scheduler,/PREP_DATA_THEN_RESEARCH_THEN_AUCTION_DATA_THEN_COMPUTE/);
+});
+
+test('stock canonical invocation carries exact lifecycle instead of research-age lookup',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  assert.match(scheduler,/lifecycle_id:lifecycleId/);
+  assert.doesNotMatch(scheduler,/research_not_before:researchNotBefore/);
+  assert.doesNotMatch(scheduler,/latest_research_fresh_at/);
+});
+
+test('NIFTY PREP and fresh delta research are both production-owned',()=>{
+  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
+  const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
+  assert.match(scheduler,/prep_only:true/);
+  assert.match(scheduler,/refreshPreopenPrepResearch/);
+  assert.match(mobile,/DELTA_RESEARCH_READY/);
+  assert.match(mobile,/acquireSystemResearch\(\)/);
+});
+
+test('production entrypoint exposes the Cloudflare scheduled handler',()=>{
   const text=fs.readFileSync('src/production-entry.ts','utf8');
   assert.match(text,/async scheduled\(controller: ScheduledController/);
   assert.match(text,/runPreopenScheduledTick\(env, new Date\(\), controller\.scheduledTime\)/);
-});
-
-test('NIFTY pre-open scheduler calls canonical endpoint with daily idempotency path',()=>{
-  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
-  const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
-  assert.match(scheduler,/canonical_attempt:true/);
-  assert.match(scheduler,/canonical_attempt_slot:clock\.slot/);
-  assert.match(scheduler,/cf-preopen-/);
-  assert.match(mobile,/5DR:\$\{istParts\.year\}-\$\{istParts\.month\}-\$\{istParts\.day\}:PREOPEN/);
-  assert.match(mobile,/dispatch5drPreopenAcquisition/);
-  assert.match(mobile,/UPSTOX_PREOPEN_PRIMARY/);
-});
-
-
-test('NIFTY pre-open retries recover the same daily request instead of duplicating it',()=>{
-  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
-  const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
-  assert.match(scheduler,/resumeProcessing\(resumeRequest,env as never,niftyRequestId\)/);
-  assert.match(scheduler,/AUTOMATED_MARKET_DATA_BLOCKED/);
-  assert.match(scheduler,/const retry=await createAutomatedRun/);
-  assert.match(mobile,/status in \('READY_FOR_ENGINE','PROCESSING','COMPLETED','FAILED'\)/);
-  assert.match(mobile,/retryablePreopenBlock/);
-  assert.match(mobile,/PREOPEN_ACQUISITION_RETRY/);
-  assert.match(mobile,/preopen_retry_count/);
-  assert.match(mobile,/dispatch5drPreopenAcquisition\(env,String\(row\.request_id\)/);
-});
-
-
-test('Monday pre-open guarantees the three governed EDGE Stocks targets',()=>{
-  assert.deepEqual([...REQUIRED_PREOPEN_STOCK_TICKERS],['LTF','CUPID','RELIANCE']);
-  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
-  assert.match(scheduler,/required_preopen_target:true/);
-  assert.match(scheduler,/for\(const ticker of REQUIRED_PREOPEN_STOCK_TICKERS\)/);
-  assert.match(scheduler,/command:`EDGE \$\{ticker\}`/);
-});
-
-
-test('08:50 PREP starts fresh NIFTY acquisition/research and same-cycle stock research boundary',()=>{
-  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
-  assert.match(scheduler,/prep_only:true/);
-  assert.match(scheduler,/cf-preopen-prep-/);
-  assert.match(scheduler,/PREOPEN_PREP_STARTED/);
-  assert.match(scheduler,/research_not_before/);
-  assert.match(scheduler,/research_refresh_required/);
-  assert.match(scheduler,/T03:20:00\.000Z/);
-});
-
-test('09:10 stock canonical attempts are bound to the same 08:50 research lifecycle',()=>{
-  const scheduler=fs.readFileSync('src/preopen-scheduler.ts','utf8');
-  assert.match(scheduler,/canonical_requested_at:now\.toISOString\(\)/);
-  assert.match(scheduler,/research_not_before:researchNotBefore/);
 });
