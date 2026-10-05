@@ -551,6 +551,145 @@ async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
+
+function currentIstDate():string{
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function newUserStockLifecycleId(ticker:string):string{
+  return `EDGE-LC-${currentIstDate()}-${ticker}-USER-${crypto.randomUUID()}`;
+}
+
+async function beginNormalStockLifecycle(env:Env,ticker:string):Promise<{
+  ok:boolean;lifecycle_id:string;status:string;dispatch_status?:number;error?:string
+}>{
+  const lifecycleId=newUserStockLifecycleId(ticker);
+  await ensureStockLifecycle(env,{
+    lifecycle_id:lifecycleId,
+    ticker,
+    trigger_type:'USER',
+    target_session:currentIstDate(),
+  });
+  const dispatched=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
+    ticker,lifecycle_id:lifecycleId,trigger_type:'USER',target_session:currentIstDate()
+  });
+  if(!dispatched.ok){
+    await markStockDataBlocked(env,lifecycleId,`DATA dispatch failed: ${dispatched.error??dispatched.status}`);
+    return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',dispatch_status:dispatched.status,error:dispatched.error};
+  }
+  return {ok:true,lifecycle_id:lifecycleId,status:'DATA_DISPATCHED',dispatch_status:dispatched.status};
+}
+
+export async function progressNormalStockLifecycle(
+  env:Env,
+  ticker:string,
+  lifecycleId:string
+):Promise<{
+  status:'RUNNING'|'COMPLETE'|'BLOCKED';
+  lifecycle_stage:string;
+  lifecycle_id:string;
+  run_id?:string|null;
+  detail?:string|null;
+}>{
+  let lifecycle=await getStockLifecycle(env,lifecycleId);
+  if(!lifecycle)return {status:'BLOCKED',lifecycle_stage:'MISSING',lifecycle_id:lifecycleId,detail:'lifecycle not found'};
+  if(lifecycle.ticker!==ticker.toUpperCase())return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'lifecycle ticker mismatch'};
+  if(lifecycle.trigger_type!=='USER')return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'normal-run progress requires USER lifecycle'};
+
+  if(lifecycle.stage==='DATA_READY'){
+    if(!lifecycle.market_snapshot_id)return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'DATA_READY without market_snapshot_id'};
+    const marketSnapshotId=lifecycle.market_snapshot_id;
+    await markStockResearchPending(env,lifecycleId,marketSnapshotId);
+    const snapshot=await readMarketSnapshotPayload(env,lifecycleId,marketSnapshotId);
+    if(!snapshot){
+      await markStockResearchBlocked(env,lifecycleId,'immutable DATA snapshot readback failed');
+      return {status:'BLOCKED',lifecycle_stage:'RESEARCH_BLOCKED',lifecycle_id:lifecycleId,detail:'immutable DATA snapshot readback failed'};
+    }
+    try{
+      const produced=await produceStockSystemResearch(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:marketSnapshotId,
+        data_captured_at:snapshot.captured_at,
+        market_payload:snapshot.payload,
+      },fetch);
+      const saved=await persistEdgeResearchBundle(env,produced.bundle,ticker);
+      if(!saved.bundleId)throw new Error(saved.error??'research persistence failed');
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      await markStockResearchBlocked(env,lifecycleId,detail);
+      return {status:'BLOCKED',lifecycle_stage:'RESEARCH_BLOCKED',lifecycle_id:lifecycleId,detail};
+    }
+    lifecycle=(await getStockLifecycle(env,lifecycleId))??lifecycle;
+  }
+
+  if(lifecycle.stage==='RESEARCH_READY'){
+    if(!lifecycle.market_snapshot_id||!lifecycle.research_bundle_id){
+      return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'RESEARCH_READY lineage is incomplete'};
+    }
+    const dispatch=await dispatchEdgeWorkflow(
+      env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
+      undefined,undefined,lifecycleId,lifecycle.market_snapshot_id,undefined
+    );
+    if(!dispatch.ok){
+      return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:dispatch.error??'compute dispatch failed'};
+    }
+    lifecycle=await markStockComputeDispatched(env,lifecycleId,'RESEARCH_READY');
+  }
+
+  if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+    return {
+      status:'COMPLETE',
+      lifecycle_stage:lifecycle.stage,
+      lifecycle_id:lifecycleId,
+      run_id:lifecycle.recommendation_id??null
+    };
+  }
+  if(['DATA_BLOCKED','RESEARCH_BLOCKED','COMPUTE_BLOCKED','AUCTION_BLOCKED'].includes(lifecycle.stage)){
+    return {
+      status:'BLOCKED',
+      lifecycle_stage:lifecycle.stage,
+      lifecycle_id:lifecycleId,
+      detail:lifecycle.stage_detail
+    };
+  }
+  return {
+    status:'RUNNING',
+    lifecycle_stage:lifecycle.stage,
+    lifecycle_id:lifecycleId,
+    run_id:lifecycle.recommendation_id??null,
+    detail:lifecycle.stage_detail
+  };
+}
+
+export async function progressPendingNormalStockLifecycles(env:Env,limit=12):Promise<JsonRecord[]>{
+  if(!env.EDGE_DATABASE_URL)return [];
+  const sql=neon(env.EDGE_DATABASE_URL);
+  const rows=await sql`
+    select lifecycle_id,ticker
+      from edge_run_lifecycles
+     where trigger_type='USER'
+       and stage in ('RUN_CREATED','DATA_PENDING','DATA_READY','RESEARCH_PENDING','RESEARCH_READY','COMPUTE_DISPATCHED','COMPUTE_PENDING')
+     order by created_at asc
+     limit ${Math.max(1,Math.min(50,limit))}
+  `;
+  const results:JsonRecord[]=[];
+  for(const row of rows){
+    const ticker=String(row.ticker).toUpperCase();
+    const lifecycleId=String(row.lifecycle_id);
+    try{
+      const result=await progressNormalStockLifecycle(env,ticker,lifecycleId);
+      results.push({ticker,...result});
+    }catch(error){
+      results.push({ticker,lifecycle_id:lifecycleId,status:'BLOCKED',detail:error instanceof Error?error.message:String(error)});
+    }
+  }
+  return results;
+}
+
 async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   let body: unknown;
   try { body = await request.json(); } catch { return json({ error: 'Invalid JSON body' }, 400); }
