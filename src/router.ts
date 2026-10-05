@@ -1785,7 +1785,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/api/edge-stocks/preopen-status' && request.method === 'GET') return edgeStocksPreopenStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('date') || '');
   if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
-  if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
+  if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '', url.searchParams.get('lifecycle_id'));
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/history' && request.method === 'GET') return edgeStocksHistory(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
