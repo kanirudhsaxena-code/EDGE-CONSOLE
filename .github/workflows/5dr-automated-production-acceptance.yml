@@ -20,6 +20,12 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 8
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve governed NSE session state
+        run: |
+          python scripts/nse-session-state.py | tee /tmp/nse-session.json
+
       - name: Start sandbox zero-upload 5DR run
         env:
           CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
@@ -70,19 +76,19 @@ jobs:
             fi
             if python - <<'PY'
           import json
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
           d=json.load(open('/tmp/status.json'))
+          session=json.load(open('/tmp/nse-session.json'))
           if d.get('adapter_stage')!='AUTOMATED_MARKET_DATA_BLOCKED':
               raise SystemExit(1)
           blockers=d.get('blockers') or []
-          weekend=datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
-          if blockers in (['CANDLE_ARRAY_MISSING'], ['INTRADAY_CANDLES_EMPTY']) and weekend:
+          closed=session.get('expected_live_market_data') is False
+          covered=session.get('session_state')!='CALENDAR_COVERAGE_MISSING'
+          if blockers in (['CANDLE_ARRAY_MISSING'], ['INTRADAY_CANDLES_EMPTY']) and closed and covered:
               raise SystemExit(0)
           raise SystemExit(2)
           PY
             then
-              echo "Weekend transport acceptance reached governed market-data block as expected"
+              echo "Closed-session transport acceptance reached governed market-data block as expected"
               break
             else
               rc=$?
@@ -110,8 +116,7 @@ jobs:
           python - <<'PY'
           import json
           d=json.load(open('/tmp/final.json'))
-          from datetime import datetime
-          from zoneinfo import ZoneInfo
+          session=json.load(open('/tmp/nse-session.json'))
           if d.get('status')=='COMPLETED':
               if d.get('sandbox') is not True:
                   raise SystemExit('tester acceptance result was not marked sandbox')
@@ -129,10 +134,13 @@ jobs:
           elif (
               d.get('adapter_stage')=='AUTOMATED_MARKET_DATA_BLOCKED'
               and (d.get('blockers') or []) in (['CANDLE_ARRAY_MISSING'], ['INTRADAY_CANDLES_EMPTY'])
-              and datetime.now(ZoneInfo('Asia/Kolkata')).weekday()>=5
+              and session.get('expected_live_market_data') is False
+              and session.get('session_state')!='CALENDAR_COVERAGE_MISSING'
           ):
               print('5DR_AUTOMATED_TRANSPORT_ACCEPTANCE=PASS')
-              print('acceptance_mode=WEEKEND_FAIL_CLOSED')
+              print('acceptance_mode=CLOSED_SESSION_FAIL_CLOSED')
+              print('session_state='+str(session.get('session_state')))
+              print('market_phase='+str(session.get('market_phase')))
               print('request_id='+str(d.get('request_id')))
               print('live_engine_execution_proven=false')
               print('base_product_acceptance=false')
