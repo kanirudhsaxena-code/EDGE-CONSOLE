@@ -1,0 +1,51 @@
+{
+  "contract": "EDGE_RESEARCH_GOVERNANCE_V2",
+  "status": "PRODUCTION_AUTHORITY",
+  "lifecycle_order": [
+    "DATA",
+    "RESEARCH",
+    "RECONCILE",
+    "COMPUTE",
+    "PERSIST",
+    "PRESENT"
+  ],
+  "production_research_authority": "EDGE_SYSTEM",
+  "legacy_compatibility_contract": "EDGE_RESEARCH_GOVERNANCE_V1",
+  "legacy_chatgpt_research_is_production_dependency": false,
+  "fresh_data_required_every_run": true,
+  "research_must_reference_current_lifecycle_id": true,
+  "research_must_reference_current_market_snapshot_id": true,
+  "research_must_begin_after_market_snapshot": true,
+  "mandatory_retrieval_provider": "SYSTEM_WEB",
+  "optional_retrieval_providers": [
+    "EXA"
+  ],
+  "supporting_structured_providers": [
+    "UPSTOX"
+  ],
+  "mandatory_research_dimensions": [
+    "BUSINESS_FUNDAMENTALS",
+    "INSTITUTIONAL_BEHAVIOUR",
+    "NEWS_EVENTS_CATALYSTS",
+    "VALUATION",
+    "EVENT_SHOCK"
+  ],
+  "material_provider_claim_requires_independent_web_validation": true,
+  "provider_self_validation_prohibited": true,
+  "stale_research_publish_prohibited": true,
+  "cross_lifecycle_research_reuse_prohibited": true,
+  "unresolved_high_critical_conflict_publish_prohibited": true,
+  "scheduled_provider_only_publish_prohibited": true,
+  "preopen_stages": {
+    "08:50_IST": "PREP_DATA",
+    "09:05_09:09_IST": "FRESH_RESEARCH_READINESS",
+    "09:10_09:14:59_IST": "FROZEN_AUCTION_DATA_AND_CANONICAL"
+  },
+  "frozen_methodology_changed": false,
+  "user_facing_order": [
+    "EDGE_MASTER_ASSESSMENT",
+    "ACTIVE_CALLS",
+    "CURRENT_STOCK_OUTCOME",
+    "DRILLDOWN"
+  ]
+}
