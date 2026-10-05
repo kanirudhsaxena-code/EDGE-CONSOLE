@@ -210,14 +210,30 @@ function marketContext(payload:JsonRecord):JsonRecord{
     captured_at:row.captured_at,
   }));
   const quotePayloads:JsonRecord[]=[];
-  const payloads=isObject(market.payloads)?market.payloads:{};
-  for(const [ref,value] of Object.entries(payloads)){
+  const marketPayloads=isObject(market.payloads)?market.payloads:{};
+  for(const [ref,value] of Object.entries(marketPayloads)){
     if(!ref.includes('/v3/market-quote/quotes')||!isObject(value))continue;
     const text=JSON.stringify(value);
     try{quotePayloads.push(JSON.parse(text.slice(0,6000)))}catch{quotePayloads.push({source_ref:ref,summary:text.slice(0,5500)})}
     if(quotePayloads.length>=2)break;
   }
-  return {observations,quote_payloads:quotePayloads};
+
+  // DATA-first research must know the provider claims it is independently testing.
+  // These payloads are context only: they are never eligible research source_ids.
+  const providerClaimsToTest:JsonRecord[]=[];
+  for(const container of [market,providerResearch]){
+    const payloads=isObject(container.payloads)?container.payloads:{};
+    for(const [ref,value] of Object.entries(payloads)){
+      if(!isObject(value))continue;
+      if(!['/v2/news','/income-statement','/key-ratios','/share-holdings'].some(marker=>ref.includes(marker)))continue;
+      const text=JSON.stringify(value);
+      try{providerClaimsToTest.push({source_ref:ref,payload:JSON.parse(text.slice(0,6000))})}
+      catch{providerClaimsToTest.push({source_ref:ref,summary:text.slice(0,5500)})}
+      if(providerClaimsToTest.length>=6)break;
+    }
+    if(providerClaimsToTest.length>=6)break;
+  }
+  return {observations,quote_payloads:quotePayloads,provider_claims_to_test:providerClaimsToTest};
 }
 
 function validateClaims(value:unknown,sourceIds:Set<string>):{claims:EdgeResearchClaim[];limitations:string[]}{
@@ -240,6 +256,7 @@ function validateClaims(value:unknown,sourceIds:Set<string>):{claims:EdgeResearc
     const materiality=String(raw.materiality);
     const verification=String(raw.verification_status);
     if(!['POSITIVE','NEUTRAL','NEGATIVE','BINARY_UNCERTAIN'].includes(direction))throw new Error('STOCK_RESEARCH_AI_INVALID_DIRECTION');
+    if(category==='EVENT_SHOCK'&&direction==='POSITIVE')throw new Error('STOCK_RESEARCH_AI_INVALID_EVENT_SHOCK_DIRECTION');
     if(!['LOW','MODERATE','HIGH','CRITICAL'].includes(materiality))throw new Error('STOCK_RESEARCH_AI_INVALID_MATERIALITY');
     if(!['VERIFIED','CONFLICTED','NOT_VERIFIED','NOT_AVAILABLE'].includes(verification))throw new Error('STOCK_RESEARCH_AI_INVALID_VERIFICATION');
     const statement=String(raw.statement||'').trim();
@@ -299,14 +316,20 @@ ${JSON.stringify(marketContext(input.market_payload))}
 Fresh independent web sources:
 ${JSON.stringify(sourcePacket)}
 
+Allowed source_ids (copy EXACTLY; never invent or rewrite them):
+${sources.map(source=>source.source_id).join(', ')}
+
 Produce EXACTLY one claim for each category:
 ${MANDATORY_EDGE_RESEARCH_CATEGORIES.join(', ')}
 
 Rules:
 - Use only supplied source_ids and source text.
-- A VERIFIED claim must be directly supported by the supplied source set.
+- Provider/market context above is the claim-to-test from DATA; it is NOT independent evidence and may never appear in source_ids.
+- A VERIFIED claim must be directly supported by the supplied independent source set.
 - If evidence is insufficient, use NOT_VERIFIED or NOT_AVAILABLE; do not invent. The downstream gate will fail closed.
 - "No severe event found" may only mean none was identified in the bounded fresh source set; say that explicitly.
+- EVENT_SHOCK direction semantics: NEGATIVE = independently corroborated adverse shock/caution; NEUTRAL = no material shock identified in the bounded independent set; BINARY_UNCERTAIN = mixed/unclear. Never use POSITIVE for EVENT_SHOCK.
+- When provider context flags event/catalyst risk, explicitly test that claim against the independent sources before choosing EVENT_SHOCK direction.
 - Institutional shareholding is historical ownership evidence unless a source explicitly proves current-session flow.
 - Valuation is context, not a stand-alone trade recommendation.
 - Do not output an EDGE recommendation, probability, DES, Market Trust, BOT score or price target.
@@ -316,14 +339,39 @@ Rules:
 Return exactly:
 {"claims":[{"evidence_category":"BUSINESS_FUNDAMENTALS","statement":"...","materiality":"HIGH","direction":"POSITIVE","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"INSTITUTIONAL_BEHAVIOUR","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"NEWS_EVENTS_CATALYSTS","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"VALUATION","statement":"...","materiality":"MODERATE","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true},{"evidence_category":"EVENT_SHOCK","statement":"...","materiality":"HIGH","direction":"NEUTRAL","source_ids":["..."],"verification_status":"VERIFIED","independent_validation":true}],"limitations":["..."]}`;
 
-  const inference=await runInference(env.AI,{
+  let inference=await runInference(env.AI,{
     messages:[{role:'system',content:system},{role:'user',content:prompt}],
     max_tokens:1800,
     temperature:0,
     chat_template_kwargs:{enable_thinking:false},
   });
-  const parsed=parseAi(inference.raw);
-  const validated=validateClaims(parsed,new Set(sources.map(x=>x.source_id)));
+  let parsed=parseAi(inference.raw);
+  let validated:{claims:EdgeResearchClaim[];limitations:string[]};
+  const allowedSourceIds=new Set(sources.map(x=>x.source_id));
+  try{
+    validated=validateClaims(parsed,allowedSourceIds);
+  }catch(error){
+    const code=error instanceof Error?error.message:String(error);
+    if(!code.startsWith('STOCK_RESEARCH_AI_'))throw error;
+    const repairPrompt=`${prompt}
+
+Your previous JSON failed governed validation with: ${code}
+Previous JSON:
+${JSON.stringify(parsed).slice(0,7000)}
+
+Repair the JSON once. Preserve the same five-category schema. Use ONLY these exact source_ids:
+${sources.map(source=>source.source_id).join(', ')}
+If a claim cannot be supported from those sources, mark it NOT_VERIFIED or NOT_AVAILABLE rather than inventing a source.`;
+    const repaired=await runInference(env.AI,{
+      messages:[{role:'system',content:system},{role:'user',content:repairPrompt}],
+      max_tokens:1800,
+      temperature:0,
+      chat_template_kwargs:{enable_thinking:false},
+    });
+    parsed=parseAi(repaired.raw);
+    validated=validateClaims(parsed,allowedSourceIds);
+    inference=repaired;
+  }
   const now=new Date().toISOString();
   const basis=input.lifecycle_id+'|'+input.market_snapshot_id+'|'+sources.map(x=>x.content_sha256).join('|')+'|'+JSON.stringify(validated.claims);
   const idHash=(await digest(basis)).slice(0,16);
