@@ -83,11 +83,11 @@ export function classifyCachedNseSession(
   const parsed=parseIsoDate(dateIso);
   if(!parsed)return 'CALENDAR_COVERAGE_MISSING';
   const day=weekday(parsed);
-  if(day===0||day===6)return 'WEEKEND';
   const closed=new Set(arrayOfStrings(cache.trading_holidays));
   const special=new Set(arrayOfStrings(cache.special_timing_dates));
   if(closed.has(dateIso))return 'TRADING_HOLIDAY';
   if(special.has(dateIso))return 'SPECIAL_TIMING';
+  if(day===0||day===6)return 'WEEKEND';
   return 'TRADING_DAY';
 }
 
@@ -134,12 +134,6 @@ export async function resolveGovernedNseSession(
   const parsed=parseIsoDate(dateIso);
   if(!parsed)return bootstrapResolution(dateIso);
   const day=weekday(parsed);
-  if(day===0||day===6)return {
-    date:dateIso,session_state:'WEEKEND',preopen_eligible:false,
-    authority:'CALENDAR_RULE',source_ref:null,acquired_at:null,
-    market_open_at:null,market_close_at:null,cache_age_hours:null,
-    calendar_schema:'NSE_SESSION_CALENDAR_DYNAMIC_V1'
-  };
 
   if(env.EDGE_DATABASE_URL){
     try{
