@@ -33,6 +33,9 @@ export async function dispatchEdgeWorkflow(
   researchBundleId?: string,
   canonicalRequestedAt?: string,
   canonicalAttemptSlot?: string,
+  lifecycleId?: string,
+  marketSnapshotId?: string,
+  auctionSnapshotId?: string,
 ): Promise<EdgeDispatchResult> {
   if (!token.trim()) return { ok: false, status: 503, error: 'EDGE dispatch credential is not configured' };
   const response = await fetch(
@@ -54,6 +57,9 @@ export async function dispatchEdgeWorkflow(
           ...(researchBundleId ? { research_bundle_id: researchBundleId } : {}),
           ...(canonicalRequestedAt ? { canonical_requested_at: canonicalRequestedAt } : {}),
           ...(canonicalAttemptSlot ? { canonical_attempt_slot: canonicalAttemptSlot } : {}),
+          ...(lifecycleId ? { lifecycle_id: lifecycleId } : {}),
+          ...(marketSnapshotId ? { market_snapshot_id: marketSnapshotId } : {}),
+          ...(auctionSnapshotId ? { auction_snapshot_id: auctionSnapshotId } : {}),
         },
       }),
     },
@@ -98,4 +104,76 @@ export async function checkEdgeWorkflowAccess(token: string): Promise<EdgeDispat
     detail = await response.text().catch(() => '');
   }
   return { ok: false, status: response.status, error: detail || 'GitHub workflow access check failed' };
+}
+
+
+export async function dispatchEdgeDataWorkflow(
+  token:string,
+  input:{
+    ticker:string;
+    lifecycle_id:string;
+    trigger_type:'USER'|'SCHEDULED';
+    target_session?:string|null;
+    canonical_requested_at?:string|null;
+  },
+):Promise<EdgeDispatchResult>{
+  if(!token.trim())return {ok:false,status:503,error:'EDGE dispatch credential is not configured'};
+  const response=await fetch(
+    'https://api.github.com/repos/kanirudhsaxena-code/EDGE---V1/actions/workflows/stock-data-snapshot.yml/dispatches',
+    {
+      method:'POST',
+      headers:{
+        authorization:`Bearer ${token}`,
+        accept:'application/vnd.github+json',
+        'x-github-api-version':'2022-11-28',
+        'user-agent':'EDGE-CONSOLE',
+        'content-type':'application/json',
+      },
+      body:JSON.stringify({
+        ref:'main',
+        inputs:{
+          ticker:input.ticker,
+          lifecycle_id:input.lifecycle_id,
+          trigger_type:input.trigger_type,
+          target_session:input.target_session??'',
+          canonical_requested_at:input.canonical_requested_at??'',
+        },
+      }),
+    }
+  );
+  if(response.status===204)return {ok:true,status:204};
+  let detail='';
+  try{const payload=await response.json() as {message?:string};detail=payload.message||''}
+  catch{detail=await response.text().catch(()=>'')}
+  return {ok:false,status:response.status,error:detail||'EDGE DATA workflow dispatch failed'};
+}
+
+
+export async function dispatchEdgeAuctionWorkflow(
+  token:string,
+  input:{ticker:string;lifecycle_id:string},
+):Promise<EdgeDispatchResult>{
+  if(!token.trim())return {ok:false,status:503,error:'EDGE dispatch credential is not configured'};
+  const response=await fetch(
+    'https://api.github.com/repos/kanirudhsaxena-code/EDGE---V1/actions/workflows/stock-auction-snapshot.yml/dispatches',
+    {
+      method:'POST',
+      headers:{
+        authorization:`Bearer ${token}`,
+        accept:'application/vnd.github+json',
+        'x-github-api-version':'2022-11-28',
+        'user-agent':'EDGE-CONSOLE',
+        'content-type':'application/json',
+      },
+      body:JSON.stringify({
+        ref:'main',
+        inputs:{ticker:input.ticker,lifecycle_id:input.lifecycle_id},
+      }),
+    }
+  );
+  if(response.status===204)return {ok:true,status:204};
+  let detail='';
+  try{const payload=await response.json() as {message?:string};detail=payload.message||''}
+  catch{detail=await response.text().catch(()=>'')}
+  return {ok:false,status:response.status,error:detail||'EDGE AUCTION workflow dispatch failed'};
 }

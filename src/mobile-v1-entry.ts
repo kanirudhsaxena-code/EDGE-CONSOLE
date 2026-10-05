@@ -316,6 +316,103 @@ async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:
 }
 
 
+export async function refreshPreopenPrepResearch(env:Env,targetDate:string):Promise<Response>{
+  if(!env.DATABASE_URL)return json({ok:false,error:'Database is not configured'},503);
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(targetDate))return json({ok:false,error:'targetDate must be YYYY-MM-DD'},422);
+  const sql=neon(env.DATABASE_URL);
+  const invocationId=`cf-preopen-prep-${targetDate}`;
+  let rows=await sql`
+    select request_id,status,metadata
+      from analysis_requests
+     where engine='5DR'
+       and metadata->'invocation'->>'client_invocation_id'=${invocationId}
+     order by created_at desc
+     limit 1
+  `;
+  if(!rows.length)return json({ok:false,status:'MISSING',target_date:targetDate,stage:'PREP_REQUEST_MISSING'},404);
+
+  const requestId=String(rows[0].request_id);
+  let metadata=isObject(rows[0].metadata)?rows[0].metadata:{};
+  let stage=String(metadata.adapter_stage??'');
+  const existingDelta=isObject(metadata.preopen_delta_research)?metadata.preopen_delta_research:{};
+  if(existingDelta.status==='DELTA_RESEARCH_READY'){
+    return json({
+      ok:true,
+      status:'DELTA_RESEARCH_READY',
+      target_date:targetDate,
+      request_id:requestId,
+      adapter_stage:stage||'PREOPEN_PREP_RESEARCH_READY',
+      research_manifest_complete:true,
+      missing_dimensions:[],
+      retrieved_at:existingDelta.retrieved_at??null,
+      idempotent:true,
+      trading_enabled:false
+    },200);
+  }
+
+  if(stage==='AUTOMATED_MARKET_DATA_PENDING'){
+    const internal=new Request(`https://edge-console.internal/api/5dr/run-requests/${encodeURIComponent(requestId)}/resume-processing`,{
+      method:'POST',headers:{'content-type':'application/json'},body:'{}'
+    });
+    await resumeProcessing(internal,env,requestId);
+    rows=await sql`
+      select request_id,status,metadata
+        from analysis_requests
+       where request_id=${requestId} and engine='5DR'
+       limit 1
+    `;
+    metadata=rows.length&&isObject(rows[0].metadata)?rows[0].metadata:{};
+    stage=String(metadata.adapter_stage??'');
+  }
+
+  if(!['PREOPEN_PREP_RESEARCH_READY','RESEARCH_RETRIEVED'].includes(stage)){
+    return json({
+      ok:false,
+      status:'BLOCKED',
+      target_date:targetDate,
+      request_id:requestId,
+      adapter_stage:stage||null,
+      next_step:'COMPLETE_PREP_DATA_AND_RESEARCH',
+      trading_enabled:false
+    },409);
+  }
+
+  const acquisition=await acquireSystemResearch();
+  const categoryReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
+  const allReady=categoryReady&&acquisition.research_manifest_complete;
+  const refreshedAt=new Date().toISOString();
+  const record={
+    status:allReady?'DELTA_RESEARCH_READY':'DELTA_RESEARCH_BLOCKED',
+    retrieved_at:refreshedAt,
+    research_manifest:'NIFTY_G5_1_DELTA_V1',
+    ...acquisition
+  };
+  const provenance=isObject(metadata.run_provenance)?metadata.run_provenance:{};
+  const next={
+    ...metadata,
+    preopen_delta_research:record,
+    run_provenance:{...provenance,research_as_of:allReady?refreshedAt:provenance.research_as_of??null},
+    adapter_stage:'PREOPEN_PREP_RESEARCH_READY'
+  };
+  await sql`
+    update analysis_requests
+       set metadata=${JSON.stringify(next)}::jsonb,
+           updated_at=now()
+     where request_id=${requestId}
+  `;
+  return json({
+    ok:allReady,
+    status:record.status,
+    target_date:targetDate,
+    request_id:requestId,
+    adapter_stage:'PREOPEN_PREP_RESEARCH_READY',
+    research_manifest_complete:acquisition.research_manifest_complete,
+    missing_dimensions:acquisition.missing_dimensions,
+    retrieved_at:refreshedAt,
+    trading_enabled:false
+  },allReady?200:409);
+}
+
 async function visionReadiness(env:Env):Promise<Response>{
   if(!env.AI||typeof env.AI.run!=='function')return json({ok:false,status:'UNAVAILABLE',error:'Workers AI binding is not configured'},503);
   const result=await probeVisionReadiness(env.AI);
@@ -777,7 +874,7 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   if(exactRequest&&request.method==='GET')return exact5drRequest(request,env,decodeURIComponent(exactRequest[1]));
   const scopedRead=await scoped5drRead(request,env);if(scopedRead)return scopedRead;
   if(url.pathname==='/api/5dr/preopen-status'&&request.method==='GET')return preopenStatus(request,env);
-  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V1',research_authority:'CHATGPT',fresh_web_research_required:true,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
+  if(url.pathname==='/api/edge-stocks/health'&&request.method==='GET')return json({ok:true,service:'EDGE Console',edge_database_configured:Boolean(env.EDGE_DATABASE_URL),environment:env.APP_ENV??null,prompt_dispatch_configured:Boolean(env.EDGE_GITHUB_TOKEN),research_contract_version:'EDGE_RESEARCH_BUNDLE_V2',research_authority:'EDGE_SYSTEM',fresh_data_required:true,fresh_web_research_required:true,data_first_lifecycle:true,chat_scheduled_task_dependency:false,access_identity_mode:isAccessIdentityEnforced(env)?'ENFORCE':'AUDIT'});
   if(url.pathname==='/api/5dr/automated-runs'&&request.method==='POST')return createAutomatedRun(request,env);
   if(url.pathname==='/api/evidence/upload'&&request.method==='POST')return uploadCategorizedEvidence(request,env);
   const automatedMarket=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/automated-market-evidence$/);

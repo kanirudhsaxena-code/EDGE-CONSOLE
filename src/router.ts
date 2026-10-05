@@ -3,13 +3,25 @@ import app from './index';
 import { assessCompleteness, isNonEmptyString, isObject, validateNormalizedEvidence, type JsonRecord } from './normalization';
 import { assessEvidenceReadiness, REQUIRED_5DR_EVIDENCE_CATEGORIES } from './evidence-readiness';
 import { componentVerificationStatus, validateEdgeStocksResult } from './edge-stocks';
-import { checkEdgeWorkflowAccess, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
+import { checkEdgeWorkflowAccess, dispatchEdgeDataWorkflow, dispatchEdgeWorkflow, normalizeTickerCandidate, parseEdgeCommand } from './edge-command';
 import { EDGE_RESEARCH_BUNDLE_VERSION, researchBundleCanPublish, validateEdgeResearchBundle } from './edge-research';
 import { actorCanUseCanonicalEdge, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 import { buildFiveDrAssessmentFromDatabase } from './five-dr-assessment-builder';
+import {
+  ensureStockLifecycle,
+  getStockLifecycle,
+  markStockComputeDispatched,
+  markStockDataBlocked,
+  markStockResearchBlocked,
+  markStockResearchPending,
+  readMarketSnapshotPayload,
+} from './stock-lifecycle';
+import { produceStockSystemResearch } from './stock-system-research';
 
+type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
   ASSETS: Fetcher;
+  AI:AiBinding;
   EVIDENCE_BUCKET: R2Bucket;
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
@@ -70,31 +82,104 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number }> {
+export async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number; contractVersion?: string }> {
   if (!env.EDGE_DATABASE_URL) return { error: 'EDGE database is not configured', status: 503 };
   const assessment = researchBundleCanPublish(body);
   if (!assessment.ready || !isObject(body)) return { error: 'EDGE research bundle validation failed: ' + assessment.errors.join('; '), status: 422 };
+
   const ticker = String(body.ticker).toUpperCase();
   if (expectedTicker && ticker !== expectedTicker.toUpperCase()) return { error: 'research bundle ticker does not match resolved EDGE ticker', status: 422 };
+
   const bundleId = String(body.bundle_id);
+  const contractVersion = String(body.contract_version);
+  const authority = String(body.research_authority);
+  const lifecycleId = isNonEmptyString(body.lifecycle_id) ? String(body.lifecycle_id) : null;
+  const marketSnapshotId = isNonEmptyString(body.market_snapshot_id) ? String(body.market_snapshot_id) : null;
+  const researchFreshAt = String(body.research_fresh_at);
   const payloadText = JSON.stringify(body);
   const payloadHash = await sha256Hex(payloadText);
   const sql = neon(env.EDGE_DATABASE_URL);
-  const existing = await sql`select payload_hash from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+
+  if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION) {
+    if (!lifecycleId || !marketSnapshotId) return { error: 'V2 research lifecycle identity is missing', status: 422 };
+    const lineage = await sql`
+      select l.ticker,l.stage,l.market_snapshot_id,s.captured_at,s.status
+        from edge_run_lifecycles l
+        join edge_market_snapshots s
+          on s.lifecycle_id=l.lifecycle_id
+         and s.snapshot_id=${marketSnapshotId}
+       where l.lifecycle_id=${lifecycleId}
+       limit 1
+    `;
+    if (!lineage.length) return { error: 'V2 research market snapshot lineage was not found', status: 409 };
+    const row=lineage[0];
+    if (String(row.ticker).toUpperCase() !== ticker) return { error: 'V2 research lifecycle ticker mismatch', status: 409 };
+    if (String(row.market_snapshot_id ?? '') !== marketSnapshotId || String(row.status) !== 'DATA_READY') {
+      return { error: 'V2 research market snapshot is not DATA_READY', status: 409 };
+    }
+    if (!['DATA_READY','RESEARCH_PENDING','RESEARCH_READY'].includes(String(row.stage))) {
+      return { error: 'V2 research lifecycle is not eligible for research', status: 409 };
+    }
+    const capturedAt=Date.parse(String(row.captured_at));
+    const researchedAt=Date.parse(researchFreshAt);
+    if (!Number.isFinite(capturedAt) || !Number.isFinite(researchedAt) || researchedAt < capturedAt) {
+      return { error: 'V2 research must be produced after its immutable DATA snapshot', status: 409 };
+    }
+  }
+
+  const existing = await sql`
+    select payload_hash,contract_version,lifecycle_id,market_snapshot_id
+      from edge_research_bundles
+     where bundle_id=${bundleId}
+     limit 1
+  `;
   if (existing.length) {
     if (String(existing[0].payload_hash) !== payloadHash) return { error: 'research bundle_id already exists with different immutable content', status: 409 };
-    return { bundleId };
+    if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION) {
+      if (String(existing[0].lifecycle_id ?? '') !== lifecycleId || String(existing[0].market_snapshot_id ?? '') !== marketSnapshotId) {
+        return { error: 'existing V2 research bundle lineage mismatch', status: 409 };
+      }
+      await sql`
+        update edge_run_lifecycles
+           set stage='RESEARCH_READY',
+               research_bundle_id=${bundleId},
+               stage_detail='Lifecycle-bound independent web research ready',
+               updated_at=now()
+         where lifecycle_id=${lifecycleId}
+           and market_snapshot_id=${marketSnapshotId}
+           and stage in ('DATA_READY','RESEARCH_PENDING','RESEARCH_READY')
+      `;
+    }
+    return { bundleId, contractVersion };
   }
+
   await sql`
     insert into edge_research_bundles(
-      bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload,payload_hash,status
+      bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
+      payload,payload_hash,status,lifecycle_id,market_snapshot_id
     ) values(
-      ${bundleId},${ticker},${EDGE_RESEARCH_BUNDLE_VERSION},'CHATGPT',
-      ${String(body.research_fresh_at)},${String(body.created_at)},
-      ${payloadText}::jsonb,${payloadHash},'READY'
+      ${bundleId},${ticker},${contractVersion},${authority},
+      ${researchFreshAt},${String(body.created_at)},
+      ${payloadText}::jsonb,${payloadHash},'READY',${lifecycleId},${marketSnapshotId}
     )
   `;
-  return { bundleId };
+
+  if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION && lifecycleId && marketSnapshotId) {
+    const updated=await sql`
+      update edge_run_lifecycles
+         set stage='RESEARCH_READY',
+             research_bundle_id=${bundleId},
+             stage_detail='Lifecycle-bound independent web research ready',
+             updated_at=now()
+       where lifecycle_id=${lifecycleId}
+         and market_snapshot_id=${marketSnapshotId}
+         and stage in ('DATA_READY','RESEARCH_PENDING')
+       returning lifecycle_id
+    `;
+    if (!updated.length) return { error: 'research bundle stored but lifecycle did not transition to RESEARCH_READY', status: 409 };
+  }
+
+  return { bundleId, contractVersion };
 }
 
 async function saveEdgeResearchBundle(request: Request, env: Env): Promise<Response> {
@@ -104,14 +189,20 @@ async function saveEdgeResearchBundle(request: Request, env: Env): Promise<Respo
   if (errors.length) return json({ error: 'EDGE research bundle validation failed', details: errors }, 422);
   const saved = await persistEdgeResearchBundle(env, body);
   if (!saved.bundleId) return json({ error: saved.error }, saved.status ?? 422);
-  return json({ ok: true, status: 'READY', contract_version: EDGE_RESEARCH_BUNDLE_VERSION, bundle_id: saved.bundleId });
+  return json({ ok: true, status: 'READY', contract_version: saved.contractVersion, bundle_id: saved.bundleId });
 }
 
 async function getEdgeResearchBundle(env: Env, bundleId: string): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
   if (!/^[A-Za-z0-9._:-]{3,160}$/.test(bundleId)) return json({ error: 'Invalid research bundle id' }, 422);
   const sql = neon(env.EDGE_DATABASE_URL);
-  const rows = await sql`select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload_hash,status,payload,inserted_at from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+  const rows = await sql`
+    select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
+           payload_hash,status,payload,lifecycle_id,market_snapshot_id,inserted_at
+      from edge_research_bundles
+     where bundle_id=${bundleId}
+     limit 1
+  `;
   if (!rows.length) return json({ error: 'Research bundle not found' }, 404);
   return json({ research_bundle: rows[0] });
 }
@@ -444,34 +535,6 @@ async function latestEdgeRecommendation(env: Env, ticker: string): Promise<{ id:
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
 }
 
-async function latestFreshEdgeResearchBundle(
-  env: Env,
-  ticker: string,
-  maxAgeMinutes = 24 * 60,
-  notBefore?: string | null,
-): Promise<{ bundleId: string; researchFreshAt: unknown } | null> {
-  if (!env.EDGE_DATABASE_URL) return null;
-  const sql = neon(env.EDGE_DATABASE_URL);
-  const ageCutoff = new Date(Date.now() - Math.max(1, maxAgeMinutes) * 60_000);
-  const explicitCutoff = notBefore && !Number.isNaN(Date.parse(notBefore)) ? new Date(notBefore) : null;
-  const cutoffDate = explicitCutoff && explicitCutoff > ageCutoff ? explicitCutoff : ageCutoff;
-  const cutoff = cutoffDate.toISOString();
-  const rows = await sql`
-    select bundle_id,payload,research_fresh_at
-      from edge_research_bundles
-     where ticker = ${ticker}
-       and status = 'READY'
-       and research_fresh_at >= ${cutoff}
-     order by research_fresh_at desc, inserted_at desc
-     limit 10
-  `;
-  for (const row of rows) {
-    const payload = row.payload;
-    if (researchBundleCanPublish(payload).ready) return { bundleId: String(row.bundle_id), researchFreshAt: row.research_fresh_at };
-  }
-  return null;
-}
-
 async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise<{ id: string; runTimestamp: unknown } | null> {
   if (!env.EDGE_DATABASE_URL) return null;
   const sql = neon(env.EDGE_DATABASE_URL);
@@ -486,6 +549,145 @@ async function todaysAutonomousRecommendation(env: Env, ticker: string): Promise
      limit 1
   `;
   return rows.length ? { id: String(rows[0].recommendation_id), runTimestamp: rows[0].run_timestamp } : null;
+}
+
+
+function currentIstDate():string{
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-US',{
+    timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+  }).formatToParts(new Date()).filter(p=>p.type!=='literal').map(p=>[p.type,p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function newUserStockLifecycleId(ticker:string):string{
+  return `EDGE-LC-${currentIstDate()}-${ticker}-USER-${crypto.randomUUID()}`;
+}
+
+async function beginNormalStockLifecycle(env:Env,ticker:string):Promise<{
+  ok:boolean;lifecycle_id:string;status:string;dispatch_status?:number;error?:string
+}>{
+  const lifecycleId=newUserStockLifecycleId(ticker);
+  await ensureStockLifecycle(env,{
+    lifecycle_id:lifecycleId,
+    ticker,
+    trigger_type:'USER',
+    target_session:currentIstDate(),
+  });
+  const dispatched=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
+    ticker,lifecycle_id:lifecycleId,trigger_type:'USER',target_session:currentIstDate()
+  });
+  if(!dispatched.ok){
+    await markStockDataBlocked(env,lifecycleId,`DATA dispatch failed: ${dispatched.error??dispatched.status}`);
+    return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',dispatch_status:dispatched.status,error:dispatched.error};
+  }
+  return {ok:true,lifecycle_id:lifecycleId,status:'DATA_DISPATCHED',dispatch_status:dispatched.status};
+}
+
+export async function progressNormalStockLifecycle(
+  env:Env,
+  ticker:string,
+  lifecycleId:string
+):Promise<{
+  status:'RUNNING'|'COMPLETE'|'BLOCKED';
+  lifecycle_stage:string;
+  lifecycle_id:string;
+  run_id?:string|null;
+  detail?:string|null;
+}>{
+  let lifecycle=await getStockLifecycle(env,lifecycleId);
+  if(!lifecycle)return {status:'BLOCKED',lifecycle_stage:'MISSING',lifecycle_id:lifecycleId,detail:'lifecycle not found'};
+  if(lifecycle.ticker!==ticker.toUpperCase())return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'lifecycle ticker mismatch'};
+  if(lifecycle.trigger_type!=='USER')return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'normal-run progress requires USER lifecycle'};
+
+  if(lifecycle.stage==='DATA_READY'){
+    if(!lifecycle.market_snapshot_id)return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'DATA_READY without market_snapshot_id'};
+    const marketSnapshotId=lifecycle.market_snapshot_id;
+    await markStockResearchPending(env,lifecycleId,marketSnapshotId);
+    const snapshot=await readMarketSnapshotPayload(env,lifecycleId,marketSnapshotId);
+    if(!snapshot){
+      await markStockResearchBlocked(env,lifecycleId,'immutable DATA snapshot readback failed');
+      return {status:'BLOCKED',lifecycle_stage:'RESEARCH_BLOCKED',lifecycle_id:lifecycleId,detail:'immutable DATA snapshot readback failed'};
+    }
+    try{
+      const produced=await produceStockSystemResearch(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:marketSnapshotId,
+        data_captured_at:snapshot.captured_at,
+        market_payload:snapshot.payload,
+      },fetch);
+      const saved=await persistEdgeResearchBundle(env,produced.bundle,ticker);
+      if(!saved.bundleId)throw new Error(saved.error??'research persistence failed');
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      await markStockResearchBlocked(env,lifecycleId,detail);
+      return {status:'BLOCKED',lifecycle_stage:'RESEARCH_BLOCKED',lifecycle_id:lifecycleId,detail};
+    }
+    lifecycle=(await getStockLifecycle(env,lifecycleId))??lifecycle;
+  }
+
+  if(lifecycle.stage==='RESEARCH_READY'){
+    if(!lifecycle.market_snapshot_id||!lifecycle.research_bundle_id){
+      return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'RESEARCH_READY lineage is incomplete'};
+    }
+    const dispatch=await dispatchEdgeWorkflow(
+      env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
+      undefined,undefined,lifecycleId,lifecycle.market_snapshot_id,undefined
+    );
+    if(!dispatch.ok){
+      return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:dispatch.error??'compute dispatch failed'};
+    }
+    lifecycle=await markStockComputeDispatched(env,lifecycleId,'RESEARCH_READY');
+  }
+
+  if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+    return {
+      status:'COMPLETE',
+      lifecycle_stage:lifecycle.stage,
+      lifecycle_id:lifecycleId,
+      run_id:lifecycle.recommendation_id??null
+    };
+  }
+  if(['DATA_BLOCKED','RESEARCH_BLOCKED','COMPUTE_BLOCKED','AUCTION_BLOCKED'].includes(lifecycle.stage)){
+    return {
+      status:'BLOCKED',
+      lifecycle_stage:lifecycle.stage,
+      lifecycle_id:lifecycleId,
+      detail:lifecycle.stage_detail
+    };
+  }
+  return {
+    status:'RUNNING',
+    lifecycle_stage:lifecycle.stage,
+    lifecycle_id:lifecycleId,
+    run_id:lifecycle.recommendation_id??null,
+    detail:lifecycle.stage_detail
+  };
+}
+
+export async function progressPendingNormalStockLifecycles(env:Env,limit=12):Promise<JsonRecord[]>{
+  if(!env.EDGE_DATABASE_URL)return [];
+  const sql=neon(env.EDGE_DATABASE_URL);
+  const rows=await sql`
+    select lifecycle_id,ticker
+      from edge_run_lifecycles
+     where trigger_type='USER'
+       and stage in ('RUN_CREATED','DATA_PENDING','DATA_READY','RESEARCH_PENDING','RESEARCH_READY','COMPUTE_DISPATCHED','COMPUTE_PENDING')
+     order by created_at asc
+     limit ${Math.max(1,Math.min(50,limit))}
+  `;
+  const results:JsonRecord[]=[];
+  for(const row of rows){
+    const ticker=String(row.ticker).toUpperCase();
+    const lifecycleId=String(row.lifecycle_id);
+    try{
+      const result=await progressNormalStockLifecycle(env,ticker,lifecycleId);
+      results.push({ticker,...result});
+    }catch(error){
+      results.push({ticker,lifecycle_id:lifecycleId,status:'BLOCKED',detail:error instanceof Error?error.message:String(error)});
+    }
+  }
+  return results;
 }
 
 async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
@@ -509,11 +711,10 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   const forceNew = body.force_new === true;
   const canonicalAttempt = body.canonical_attempt === true;
   const canonicalAttemptSlot = typeof body.canonical_attempt_slot === 'string' ? body.canonical_attempt_slot.trim() : null;
-  const researchNotBefore = typeof body.research_not_before === 'string' && !Number.isNaN(Date.parse(body.research_not_before))
-    ? new Date(body.research_not_before).toISOString()
-    : null;
+  const lifecycleId = isNonEmptyString(body.lifecycle_id) ? String(body.lifecycle_id) : null;
+  let marketSnapshotId = isNonEmptyString(body.market_snapshot_id) ? String(body.market_snapshot_id) : null;
   const existingToday = await todaysAutonomousRecommendation(env, ticker);
-  if (existingToday && !forceNew && !isObject(body.research_bundle)) {
+  if (existingToday && !forceNew && !isObject(body.research_bundle) && !canonicalAttempt) {
     return json({
       ok: true,
       status: 'ALREADY_PUBLISHED_TODAY',
@@ -529,17 +730,30 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
   }
 
   let researchBundleId: string | undefined;
+  let researchContractVersion: string | undefined;
+  let auctionSnapshotIdForDispatch: string | undefined;
   if (isObject(body.research_bundle)) {
     const saved = await persistEdgeResearchBundle(env, body.research_bundle, ticker);
     if (!saved.bundleId) return json({ error: saved.error, code: 'EDGE_RESEARCH_BUNDLE_BLOCKED', ticker }, saved.status ?? 422);
     researchBundleId = saved.bundleId;
+    researchContractVersion = saved.contractVersion;
+
+    if (!researchOnly) {
+      return json({
+        error:'Externally supplied research bundles are compatibility/research-only artifacts and cannot launch a new production computation. Start a fresh lifecycle so DATA is acquired first.',
+        code:'EDGE_EXTERNAL_RESEARCH_COMPUTE_PROHIBITED',
+        ticker,
+        research_bundle_id:researchBundleId,
+        trading_enabled:false
+      },409);
+    }
 
     if (researchOnly) {
       if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
       const sql = neon(env.EDGE_DATABASE_URL);
       const rows = await sql`
         select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
-               payload_hash,status,payload
+               payload_hash,status,payload,lifecycle_id,market_snapshot_id
           from edge_research_bundles
          where bundle_id=${researchBundleId}
          limit 1
@@ -550,13 +764,20 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
       const row = rows[0] as Record<string, unknown>;
       const exactPayloadReadback = isObject(row.payload)
         && stableJson(row.payload) === stableJson(body.research_bundle);
+      const expectedVersion=String(body.research_bundle.contract_version);
+      const expectedAuthority=String(body.research_bundle.research_authority);
       const exactIdentity =
         String(row.bundle_id) === researchBundleId
         && String(row.ticker).toUpperCase() === ticker
-        && String(row.contract_version) === EDGE_RESEARCH_BUNDLE_VERSION
-        && String(row.research_authority) === 'CHATGPT'
+        && String(row.contract_version) === expectedVersion
+        && String(row.research_authority) === expectedAuthority
         && String(row.status) === 'READY'
-        && isNonEmptyString(row.payload_hash);
+        && isNonEmptyString(row.payload_hash)
+        && (expectedVersion!==EDGE_RESEARCH_BUNDLE_VERSION
+          || (
+            String(row.lifecycle_id??'')===String(body.research_bundle.lifecycle_id??'')
+            && String(row.market_snapshot_id??'')===String(body.research_bundle.market_snapshot_id??'')
+          ));
       if (!exactPayloadReadback || !exactIdentity) {
         return json({
           error: 'Immutable stored research readback mismatch',
@@ -570,7 +791,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         status: 'READY',
         mode: 'RESEARCH_ONLY',
         engine: 'EDGE_STOCKS',
-        research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+        research_contract_version: String(row.contract_version),
         ticker,
         command: command.raw,
         research_bundle_id: researchBundleId,
@@ -584,40 +805,117 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     }
   } else {
     if (!canonicalAttempt) {
-      return json({
-        error: 'A distinct new EDGE run requires a newly executed governed research bundle in this request; prior bundles cannot be reused by age alone',
-        code: 'EDGE_NEW_RUN_RESEARCH_REQUIRED',
-        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-        ticker,
-        fresh_run_requested: forceNew,
-        trading_enabled: false,
-      }, 409);
+      try{
+        const started=await beginNormalStockLifecycle(env,ticker);
+        return json({
+          ok:started.ok,
+          status:started.status,
+          engine:'EDGE_STOCKS',
+          contract_version:'EDGE_STOCKS_V1_3',
+          research_contract_version:EDGE_RESEARCH_BUNDLE_VERSION,
+          ticker,
+          command:command.raw,
+          lifecycle_id:started.lifecycle_id,
+          fresh_run:true,
+          reused_output:false,
+          data_first:true,
+          research_executed_this_run:false,
+          trading_enabled:false,
+          error:started.error??null,
+          next:`/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&lifecycle_id=${encodeURIComponent(started.lifecycle_id)}`
+        },started.ok?202:502);
+      }catch(error){
+        return json({
+          error:'Fresh EDGE lifecycle could not start',
+          detail:error instanceof Error?error.message:String(error),
+          code:'EDGE_LIFECYCLE_START_FAILED',
+          ticker,
+          trading_enabled:false
+        },503);
+      }
     }
-    if (!researchNotBefore) {
+    if (!lifecycleId) {
       return json({
-        error: 'Pre-open canonical EDGE requires the start timestamp of its own PREP research lifecycle',
-        code: 'EDGE_CANONICAL_RESEARCH_LIFECYCLE_REQUIRED',
+        error: 'Pre-open canonical EDGE requires its exact production lifecycle_id',
+        code: 'EDGE_CANONICAL_LIFECYCLE_REQUIRED',
         ticker,
         canonical_attempt: true,
         canonical_attempt_slot: canonicalAttemptSlot,
         trading_enabled: false,
       }, 409);
     }
-    const fresh = await latestFreshEdgeResearchBundle(env, ticker, 90, researchNotBefore);
-    researchBundleId = fresh?.bundleId;
-    if (!researchBundleId) {
-      return json({
-        error: 'A pre-open canonical EDGE run requires a complete five-dimension ChatGPT research bundle created during this PREP lifecycle and within the 90-minute ceiling',
-        code: 'EDGE_CANONICAL_RESEARCH_REFRESH_REQUIRED',
-        contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
-        ticker,
-        fresh_run_requested: forceNew,
-        canonical_attempt: canonicalAttempt,
-        canonical_attempt_slot: canonicalAttemptSlot,
-        research_not_before: researchNotBefore,
-        trading_enabled: false,
-      }, 409);
+    if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
+    const sql=neon(env.EDGE_DATABASE_URL);
+    const rows=await sql`
+      select ticker,stage,market_snapshot_id,research_bundle_id,auction_snapshot_id
+        from edge_run_lifecycles
+       where lifecycle_id=${lifecycleId}
+       limit 1
+    `;
+    if(!rows.length){
+      return json({error:'Pre-open stock lifecycle was not found',code:'EDGE_CANONICAL_LIFECYCLE_MISSING',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
     }
+    const lifecycle=rows[0];
+    if(String(lifecycle.ticker).toUpperCase()!==ticker||String(lifecycle.stage)!=='AUCTION_READY'){
+      return json({
+        error:'Pre-open stock lifecycle is not AUCTION_READY',
+        code:'EDGE_CANONICAL_AUCTION_NOT_READY',
+        ticker,
+        lifecycle_id:lifecycleId,
+        stage:String(lifecycle.stage),
+        trading_enabled:false,
+      },409);
+    }
+    marketSnapshotId=String(lifecycle.market_snapshot_id??'');
+    researchBundleId=String(lifecycle.research_bundle_id??'');
+    const auctionSnapshotId=String(lifecycle.auction_snapshot_id??'');
+    if(!marketSnapshotId||!researchBundleId){
+      return json({error:'Pre-open lifecycle lineage is incomplete',code:'EDGE_CANONICAL_LINEAGE_INCOMPLETE',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
+    }
+    const researchRows=await sql`
+      select contract_version,lifecycle_id,market_snapshot_id,status
+        from edge_research_bundles
+       where bundle_id=${researchBundleId}
+       limit 1
+    `;
+    if(
+      !researchRows.length
+      || String(researchRows[0].contract_version)!==EDGE_RESEARCH_BUNDLE_VERSION
+      || String(researchRows[0].lifecycle_id??'')!==lifecycleId
+      || String(researchRows[0].market_snapshot_id??'')!==marketSnapshotId
+      || String(researchRows[0].status)!=='READY'
+    ){
+      return json({error:'Lifecycle research bundle identity is not valid for this DATA snapshot',code:'EDGE_CANONICAL_RESEARCH_LINEAGE_MISMATCH',ticker,lifecycle_id:lifecycleId,trading_enabled:false},409);
+    }
+    researchContractVersion=String(researchRows[0].contract_version);
+    if(!auctionSnapshotId){
+      return json({
+        error:'Pre-open lifecycle does not yet contain a frozen auction snapshot',
+        code:'EDGE_CANONICAL_AUCTION_NOT_READY',
+        ticker,
+        lifecycle_id:lifecycleId,
+        trading_enabled:false,
+      },409);
+    }
+    const auctionRows=await sql`
+      select auction_snapshot_id,status,captured_at
+        from edge_auction_snapshots
+       where auction_snapshot_id=${auctionSnapshotId}
+         and lifecycle_id=${lifecycleId}
+         and ticker=${ticker}
+       limit 1
+    `;
+    if(!auctionRows.length||String(auctionRows[0].status)!=='AUCTION_READY'){
+      return json({
+        error:'Frozen pre-open auction snapshot identity is invalid',
+        code:'EDGE_CANONICAL_AUCTION_LINEAGE_MISMATCH',
+        ticker,
+        lifecycle_id:lifecycleId,
+        auction_snapshot_id:auctionSnapshotId,
+        trading_enabled:false,
+      },409);
+    }
+    auctionSnapshotIdForDispatch=auctionSnapshotId;
   }
 
   const baseline = await latestEdgeRecommendation(env, ticker);
@@ -631,7 +929,9 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
 
   const dispatch = await dispatchEdgeWorkflow(
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
-    canonicalRequestedAt, canonicalAttemptSlot ?? undefined
+    canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
+    lifecycleId ?? undefined, marketSnapshotId ?? undefined,
+    auctionSnapshotIdForDispatch
   );
   if (!dispatch.ok) {
     return json({
@@ -643,15 +943,22 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     }, dispatch.status === 401 || dispatch.status === 403 ? 502 : dispatch.status);
   }
 
+  if(canonicalAttempt&&lifecycleId){
+    await markStockComputeDispatched(env,lifecycleId,'AUCTION_READY');
+  }
+
   return json({
     ok: true,
     status: 'DISPATCHED',
     engine: 'EDGE_STOCKS',
     contract_version: 'EDGE_STOCKS_V1_3',
-    research_contract_version: EDGE_RESEARCH_BUNDLE_VERSION,
+    research_contract_version: researchContractVersion ?? EDGE_RESEARCH_BUNDLE_VERSION,
     ticker,
     command: command.raw,
     research_bundle_id: researchBundleId,
+    lifecycle_id: lifecycleId,
+    market_snapshot_id: marketSnapshotId,
+    auction_snapshot_id: auctionSnapshotIdForDispatch??null,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
@@ -659,7 +966,6 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     canonical_attempt: canonicalAttempt,
     canonical_attempt_slot: canonicalAttemptSlot,
     canonical_requested_at: canonicalRequestedAt ?? null,
-    research_not_before: researchNotBefore,
     research_executed_this_run: true,
     trading_enabled: false,
     next: `/api/edge-stocks/invoke/status?ticker=${encodeURIComponent(ticker)}&after=${encodeURIComponent(dispatchedAt)}`,
@@ -692,11 +998,38 @@ async function edgeStocksCanonicalTargets(env: Env): Promise<Response> {
   });
 }
 
-async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string): Promise<Response> {
+async function edgeStocksInvocationStatus(env: Env, tickerRaw: string, afterRaw: string, lifecycleIdRaw?:string|null): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured', code: 'EDGE_DATABASE_NOT_CONFIGURED' }, 503);
   const ticker = normalizeTickerCandidate(tickerRaw);
   if (!ticker) return json({ error: 'Invalid ticker' }, 422);
-  if (!isNonEmptyString(afterRaw) || Number.isNaN(Date.parse(afterRaw))) return json({ error: 'after must be a valid ISO timestamp' }, 422);
+  const lifecycleId=isNonEmptyString(lifecycleIdRaw)?String(lifecycleIdRaw):null;
+  if(lifecycleId){
+    const progressed=await progressNormalStockLifecycle(env,ticker,lifecycleId);
+    if(progressed.status==='COMPLETE'){
+      return json({
+        status:'COMPLETE',ticker,lifecycle_id:lifecycleId,
+        lifecycle_stage:progressed.lifecycle_stage,
+        run_id:progressed.run_id??null,
+        report_url:`/api/edge-stocks/report?ticker=${encodeURIComponent(ticker)}`,
+        trading_enabled:false
+      });
+    }
+    if(progressed.status==='BLOCKED'){
+      return json({
+        status:'BLOCKED',ticker,lifecycle_id:lifecycleId,
+        lifecycle_stage:progressed.lifecycle_stage,
+        detail:progressed.detail??null,
+        trading_enabled:false
+      },409);
+    }
+    return json({
+      status:'RUNNING',ticker,lifecycle_id:lifecycleId,
+      lifecycle_stage:progressed.lifecycle_stage,
+      detail:progressed.detail??null,
+      trading_enabled:false
+    });
+  }
+  if (!isNonEmptyString(afterRaw) || Number.isNaN(Date.parse(afterRaw))) return json({ error: 'after or lifecycle_id is required' }, 422);
   const after = new Date(afterRaw).toISOString();
   const sql = neon(env.EDGE_DATABASE_URL);
   const rows = await sql`
@@ -1456,7 +1789,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (url.pathname === '/api/edge-stocks/preopen-status' && request.method === 'GET') return edgeStocksPreopenStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('date') || '');
   if (url.pathname === '/api/edge-stocks/canonical-targets' && request.method === 'GET') return edgeStocksCanonicalTargets(env);
   if (url.pathname === '/api/edge-stocks/invoke' && request.method === 'POST') return invokeEdgeStocks(request, env);
-  if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '');
+  if (url.pathname === '/api/edge-stocks/invoke/status' && request.method === 'GET') return edgeStocksInvocationStatus(env, url.searchParams.get('ticker') || '', url.searchParams.get('after') || '', url.searchParams.get('lifecycle_id'));
   if (url.pathname === '/api/edge-stocks/report' && request.method === 'GET') return edgeStocksReport(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/history' && request.method === 'GET') return edgeStocksHistory(env, url.searchParams.get('ticker') || '');
   if (url.pathname === '/api/edge-stocks/master' && request.method === 'GET') return edgeStocksMaster(env);
