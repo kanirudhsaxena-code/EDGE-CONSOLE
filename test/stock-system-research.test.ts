@@ -80,3 +80,95 @@ test('system stock research fails closed before AI when independent source retri
   );
   assert.equal(aiCalls,0);
 });
+
+
+const validClaims=()=>[
+  {evidence_category:'BUSINESS_FUNDAMENTALS',statement:'Fresh independent sources support reported operating context.',materiality:'MODERATE',direction:'POSITIVE',source_ids:['LTF_OFFICIAL_INVESTORS'],verification_status:'VERIFIED',independent_validation:true},
+  {evidence_category:'INSTITUTIONAL_BEHAVIOUR',statement:'Fresh independent sources support bounded ownership context.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['LTF_SCREENER'],verification_status:'VERIFIED',independent_validation:true},
+  {evidence_category:'NEWS_EVENTS_CATALYSTS',statement:'Fresh independent sources support the bounded catalyst assessment.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['LTF_OFFICIAL_NEWSROOM'],verification_status:'VERIFIED',independent_validation:true},
+  {evidence_category:'VALUATION',statement:'Fresh independent sources support bounded valuation context.',materiality:'MODERATE',direction:'NEUTRAL',source_ids:['LTF_SCREENER'],verification_status:'VERIFIED',independent_validation:true},
+  {evidence_category:'EVENT_SHOCK',statement:'No material event shock is identified in the bounded independent source set.',materiality:'HIGH',direction:'NEUTRAL',source_ids:['LTF_OFFICIAL_NEWSROOM','LTF_SCREENER'],verification_status:'VERIFIED',independent_validation:true},
+];
+
+const allLtfSources:any=async(url:string)=>{
+  if(url.includes('ltfinance.com/news-room'))return html('Official newsroom current company updates.');
+  if(url.includes('ltfinance.com/investors'))return html('Official investor results and disclosures.');
+  if(url.includes('screener.in'))return html('Independent consolidated financial valuation and ownership snapshot.');
+  if(url.includes('nseindia.com'))return html('NSE issuer and market page.');
+  if(url.includes('news.google.com'))return html('Bounded recent news discovery feed.');
+  return new Response('',{status:404});
+};
+
+test('system research repairs one malformed AI source reference without weakening source validation',async()=>{
+  let aiCalls=0;
+  const seenInputs:any[]=[];
+  const env:any={AI:{run:async(_model:string,input:any)=>{
+    aiCalls++; seenInputs.push(input);
+    const claims=validClaims();
+    if(aiCalls===1)claims[2]={...claims[2],source_ids:['INVENTED_SOURCE_ID']};
+    return {response:JSON.stringify({claims,limitations:[]})};
+  }}};
+  const result=await produceStockSystemResearch(env,{
+    ticker:'LTF',
+    lifecycle_id:'EDGE-LC-2026-10-05-LTF-REPAIR',
+    market_snapshot_id:'EDGE-MKT-LTF-20261005-100000-repair123456',
+    data_captured_at:'2026-10-05T10:00:00.000Z',
+    market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+  },allLtfSources);
+  assert.equal(aiCalls,2);
+  assert.ok(JSON.stringify(seenInputs[1]).includes('STOCK_RESEARCH_AI_INVALID_SOURCE_REF'));
+  assert.ok(JSON.stringify(seenInputs[1]).includes('LTF_OFFICIAL_NEWSROOM'));
+  assert.ok(result.bundle.claims.every(claim=>claim.source_ids.every(id=>result.bundle.sources.some(source=>source.source_id===id))));
+});
+
+test('provider DATA claims are supplied only as claims-to-test while research citations remain independent',async()=>{
+  let captured='';
+  const env:any={AI:{run:async(_model:string,input:any)=>{
+    captured=JSON.stringify(input);
+    return {response:JSON.stringify({claims:validClaims(),limitations:[]})};
+  }}};
+  const result=await produceStockSystemResearch(env,{
+    ticker:'LTF',
+    lifecycle_id:'EDGE-LC-2026-10-05-LTF-CONTEXT',
+    market_snapshot_id:'EDGE-MKT-LTF-20261005-101000-context1234',
+    data_captured_at:'2026-10-05T10:10:00.000Z',
+    market_payload:{
+      market:{observations:[],payloads:{}},
+      provider_research:{
+        observations:[],
+        payloads:{
+          'upstox:/v2/news#sha256=test':{
+            status:'success',
+            data:[{heading:'Provider warning headline',summary:'Provider-only event flag to test independently'}]
+          }
+        }
+      }
+    }
+  },allLtfSources);
+  assert.match(captured,/provider_claims_to_test/);
+  assert.match(captured,/Provider warning headline/);
+  assert.match(captured,/NOT independent evidence/);
+  assert.ok(result.bundle.sources.every(source=>source.provider==='SYSTEM_WEB'));
+  assert.ok(result.bundle.claims.flatMap(claim=>claim.source_ids).every(id=>!id.startsWith('upstox:')));
+});
+
+test('EVENT_SHOCK cannot be labelled POSITIVE and remains fail-closed after bounded repair',async()=>{
+  let aiCalls=0;
+  const env:any={AI:{run:async()=>{
+    aiCalls++;
+    const claims=validClaims();
+    claims[4]={...claims[4],direction:'POSITIVE'};
+    return {response:JSON.stringify({claims,limitations:[]})};
+  }}};
+  await assert.rejects(
+    produceStockSystemResearch(env,{
+      ticker:'LTF',
+      lifecycle_id:'EDGE-LC-2026-10-05-LTF-EVENT',
+      market_snapshot_id:'EDGE-MKT-LTF-20261005-102000-event123456',
+      data_captured_at:'2026-10-05T10:20:00.000Z',
+      market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+    },allLtfSources),
+    /STOCK_RESEARCH_AI_INVALID_EVENT_SHOCK_DIRECTION/
+  );
+  assert.equal(aiCalls,2);
+});
