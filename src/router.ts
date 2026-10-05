@@ -70,31 +70,104 @@ const stableJson = (value: unknown): string => {
   return JSON.stringify(value);
 };
 
-async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number }> {
+async function persistEdgeResearchBundle(env: Env, body: unknown, expectedTicker?: string): Promise<{ bundleId?: string; error?: string; status?: number; contractVersion?: string }> {
   if (!env.EDGE_DATABASE_URL) return { error: 'EDGE database is not configured', status: 503 };
   const assessment = researchBundleCanPublish(body);
   if (!assessment.ready || !isObject(body)) return { error: 'EDGE research bundle validation failed: ' + assessment.errors.join('; '), status: 422 };
+
   const ticker = String(body.ticker).toUpperCase();
   if (expectedTicker && ticker !== expectedTicker.toUpperCase()) return { error: 'research bundle ticker does not match resolved EDGE ticker', status: 422 };
+
   const bundleId = String(body.bundle_id);
+  const contractVersion = String(body.contract_version);
+  const authority = String(body.research_authority);
+  const lifecycleId = isNonEmptyString(body.lifecycle_id) ? String(body.lifecycle_id) : null;
+  const marketSnapshotId = isNonEmptyString(body.market_snapshot_id) ? String(body.market_snapshot_id) : null;
+  const researchFreshAt = String(body.research_fresh_at);
   const payloadText = JSON.stringify(body);
   const payloadHash = await sha256Hex(payloadText);
   const sql = neon(env.EDGE_DATABASE_URL);
-  const existing = await sql`select payload_hash from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+
+  if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION) {
+    if (!lifecycleId || !marketSnapshotId) return { error: 'V2 research lifecycle identity is missing', status: 422 };
+    const lineage = await sql`
+      select l.ticker,l.stage,l.market_snapshot_id,s.captured_at,s.status
+        from edge_run_lifecycles l
+        join edge_market_snapshots s
+          on s.lifecycle_id=l.lifecycle_id
+         and s.snapshot_id=${marketSnapshotId}
+       where l.lifecycle_id=${lifecycleId}
+       limit 1
+    `;
+    if (!lineage.length) return { error: 'V2 research market snapshot lineage was not found', status: 409 };
+    const row=lineage[0];
+    if (String(row.ticker).toUpperCase() !== ticker) return { error: 'V2 research lifecycle ticker mismatch', status: 409 };
+    if (String(row.market_snapshot_id ?? '') !== marketSnapshotId || String(row.status) !== 'DATA_READY') {
+      return { error: 'V2 research market snapshot is not DATA_READY', status: 409 };
+    }
+    if (!['DATA_READY','RESEARCH_PENDING','RESEARCH_READY'].includes(String(row.stage))) {
+      return { error: 'V2 research lifecycle is not eligible for research', status: 409 };
+    }
+    const capturedAt=Date.parse(String(row.captured_at));
+    const researchedAt=Date.parse(researchFreshAt);
+    if (!Number.isFinite(capturedAt) || !Number.isFinite(researchedAt) || researchedAt < capturedAt) {
+      return { error: 'V2 research must be produced after its immutable DATA snapshot', status: 409 };
+    }
+  }
+
+  const existing = await sql`
+    select payload_hash,contract_version,lifecycle_id,market_snapshot_id
+      from edge_research_bundles
+     where bundle_id=${bundleId}
+     limit 1
+  `;
   if (existing.length) {
     if (String(existing[0].payload_hash) !== payloadHash) return { error: 'research bundle_id already exists with different immutable content', status: 409 };
-    return { bundleId };
+    if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION) {
+      if (String(existing[0].lifecycle_id ?? '') !== lifecycleId || String(existing[0].market_snapshot_id ?? '') !== marketSnapshotId) {
+        return { error: 'existing V2 research bundle lineage mismatch', status: 409 };
+      }
+      await sql`
+        update edge_run_lifecycles
+           set stage='RESEARCH_READY',
+               research_bundle_id=${bundleId},
+               stage_detail='Lifecycle-bound independent web research ready',
+               updated_at=now()
+         where lifecycle_id=${lifecycleId}
+           and market_snapshot_id=${marketSnapshotId}
+           and stage in ('DATA_READY','RESEARCH_PENDING','RESEARCH_READY')
+      `;
+    }
+    return { bundleId, contractVersion };
   }
+
   await sql`
     insert into edge_research_bundles(
-      bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload,payload_hash,status
+      bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
+      payload,payload_hash,status,lifecycle_id,market_snapshot_id
     ) values(
-      ${bundleId},${ticker},${EDGE_RESEARCH_BUNDLE_VERSION},'CHATGPT',
-      ${String(body.research_fresh_at)},${String(body.created_at)},
-      ${payloadText}::jsonb,${payloadHash},'READY'
+      ${bundleId},${ticker},${contractVersion},${authority},
+      ${researchFreshAt},${String(body.created_at)},
+      ${payloadText}::jsonb,${payloadHash},'READY',${lifecycleId},${marketSnapshotId}
     )
   `;
-  return { bundleId };
+
+  if (contractVersion === EDGE_RESEARCH_BUNDLE_VERSION && lifecycleId && marketSnapshotId) {
+    const updated=await sql`
+      update edge_run_lifecycles
+         set stage='RESEARCH_READY',
+             research_bundle_id=${bundleId},
+             stage_detail='Lifecycle-bound independent web research ready',
+             updated_at=now()
+       where lifecycle_id=${lifecycleId}
+         and market_snapshot_id=${marketSnapshotId}
+         and stage in ('DATA_READY','RESEARCH_PENDING')
+       returning lifecycle_id
+    `;
+    if (!updated.length) return { error: 'research bundle stored but lifecycle did not transition to RESEARCH_READY', status: 409 };
+  }
+
+  return { bundleId, contractVersion };
 }
 
 async function saveEdgeResearchBundle(request: Request, env: Env): Promise<Response> {
@@ -104,14 +177,20 @@ async function saveEdgeResearchBundle(request: Request, env: Env): Promise<Respo
   if (errors.length) return json({ error: 'EDGE research bundle validation failed', details: errors }, 422);
   const saved = await persistEdgeResearchBundle(env, body);
   if (!saved.bundleId) return json({ error: saved.error }, saved.status ?? 422);
-  return json({ ok: true, status: 'READY', contract_version: EDGE_RESEARCH_BUNDLE_VERSION, bundle_id: saved.bundleId });
+  return json({ ok: true, status: 'READY', contract_version: saved.contractVersion, bundle_id: saved.bundleId });
 }
 
 async function getEdgeResearchBundle(env: Env, bundleId: string): Promise<Response> {
   if (!env.EDGE_DATABASE_URL) return json({ error: 'EDGE database is not configured' }, 503);
   if (!/^[A-Za-z0-9._:-]{3,160}$/.test(bundleId)) return json({ error: 'Invalid research bundle id' }, 422);
   const sql = neon(env.EDGE_DATABASE_URL);
-  const rows = await sql`select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,payload_hash,status,payload,inserted_at from edge_research_bundles where bundle_id=${bundleId} limit 1`;
+  const rows = await sql`
+    select bundle_id,ticker,contract_version,research_authority,research_fresh_at,created_at,
+           payload_hash,status,payload,lifecycle_id,market_snapshot_id,inserted_at
+      from edge_research_bundles
+     where bundle_id=${bundleId}
+     limit 1
+  `;
   if (!rows.length) return json({ error: 'Research bundle not found' }, 404);
   return json({ research_bundle: rows[0] });
 }
