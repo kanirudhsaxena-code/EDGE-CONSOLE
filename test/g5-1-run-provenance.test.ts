@@ -28,3 +28,11 @@ test('presentation keeps benchmark and all-run semantics visibly separate',()=>{
   assert.match(renderer,/Run provenance/);
   assert.match(renderer,/valid user canonical snapshot/);
 });
+
+
+test('normal stock invocation status exposes bounded immutable lifecycle lineage',()=>{
+  assert.match(router,/market_snapshot_id:progressed\.market_snapshot_id\?\?null/);
+  assert.match(router,/research_bundle_id:progressed\.research_bundle_id\?\?null/);
+  assert.match(router,/auction_snapshot_id:progressed\.auction_snapshot_id\?\?null/);
+  assert.match(router,/run_id:progressed\.run_id\?\?null/);
+});
