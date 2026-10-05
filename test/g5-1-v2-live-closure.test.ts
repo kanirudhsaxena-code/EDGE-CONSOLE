@@ -32,3 +32,9 @@ test('normal lifecycle status provides the bounded identities required for exact
   assert.match(router,/auction_snapshot_id:progressed\.auction_snapshot_id\?\?null/);
   assert.match(router,/report_url:/);
 });
+
+test('live closure proof preserves canonical Active Calls while validating the latest user outcome separately',()=>{
+  assert.doesNotMatch(proof,/active calls output missing current ticker/);
+  assert.match(proof,/user-anytime result leaked into canonical Active Calls/);
+  assert.match(proof,/active_calls_scope":"CANONICAL_ONLY"/);
+});

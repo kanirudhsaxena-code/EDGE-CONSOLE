@@ -246,8 +246,7 @@ def validate_stock_report(ticker,run_id,report):
 
     require(isinstance(report.get("master_assessment"),dict),f"{ticker} assessment missing",report)
     active=report.get("active_calls") or []
-    require(isinstance(active,list) and any(str(row.get("ticker") or "")==ticker for row in active if isinstance(row,dict)),
-            f"{ticker} active calls output missing current ticker",active)
+    require(isinstance(active,list),f"{ticker} canonical active calls output is not an array",active)
     outcome=report.get("current_stock_outcome") or {}
     require(outcome.get("forecast_horizon")=="D:D+4",f"{ticker} current outcome is not D:D+4",outcome)
     sessions=outcome.get("forecast_sessions") or []
@@ -357,6 +356,12 @@ def run_stock(ticker,proof):
     require(prov.get("benchmark_role")=="NONE",f"{ticker} user run incorrectly claims benchmark role",prov)
     require(prov.get("candidate_type")=="USER_CANONICAL_SNAPSHOT",
             f"{ticker} user run classification mismatch",prov)
+    active=report.get("active_calls") or []
+    require(
+        not any(str(row.get("recommendation_id") or "")==run_id for row in active if isinstance(row,dict)),
+        f"{ticker} user-anytime result leaked into canonical Active Calls",
+        {"run_id":run_id,"active_calls":active},
+    )
 
     proof["stocks"][ticker]={
         "status":"PASS",
@@ -370,6 +375,7 @@ def run_stock(ticker,proof):
         "research_coverage":"5/5 VERIFIED",
         "fresh_source_count":len(sources),
         "presentation_contract":"EFFICACY_V2",
+        "active_calls_scope":"CANONICAL_ONLY",
         "standard_tables":[
             "EDGE_MASTER_ASSESSMENT","ACTIVE_CALLS","CURRENT_STOCK_OUTCOME","DRILLDOWN"
         ],

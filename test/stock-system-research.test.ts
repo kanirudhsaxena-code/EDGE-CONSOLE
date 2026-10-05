@@ -121,6 +121,27 @@ test('system research repairs one malformed AI source reference without weakenin
   assert.ok(result.bundle.claims.every(claim=>claim.source_ids.every(id=>result.bundle.sources.some(source=>source.source_id===id))));
 });
 
+test('system research falls back to deterministic source-grounded claims when repaired AI still invents source refs',async()=>{
+  let aiCalls=0;
+  const env:any={AI:{run:async()=>{
+    aiCalls++;
+    const claims=validClaims();
+    claims[2]={...claims[2],source_ids:['INVENTED_SOURCE_ID']};
+    return {response:JSON.stringify({claims,limitations:[]})};
+  }}};
+  const result=await produceStockSystemResearch(env,{
+    ticker:'LTF',
+    lifecycle_id:'EDGE-LC-2026-10-05-LTF-REPAIR-FALLBACK',
+    market_snapshot_id:'EDGE-MKT-LTF-20261005-100500-repairfallbk',
+    data_captured_at:'2026-10-05T10:05:00.000Z',
+    market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+  },allLtfSources);
+  assert.equal(aiCalls,2);
+  assert.equal(result.model,'DETERMINISTIC_SOURCE_GROUNDED_V1');
+  assert.ok(result.bundle.claims.every(claim=>claim.source_ids.every(id=>result.bundle.sources.some(source=>source.source_id===id))));
+  assert.ok(result.bundle.limitations.some(x=>x.includes('source references remained invalid after one bounded repair')));
+});
+
 test('provider DATA claims are supplied only as claims-to-test while research citations remain independent',async()=>{
   let captured='';
   const env:any={AI:{run:async(_model:string,input:any)=>{

@@ -559,6 +559,7 @@ Return exactly:
   let validated:{claims:EdgeResearchClaim[];limitations:string[]};
   const allowedSourceIds=new Set(sources.map(x=>x.source_id));
   let deterministicFallbackReason:string|null=null;
+  let deterministicFallbackCause:'AI_CAPACITY'|'AI_INVALID_OUTPUT'|null=null;
   try{
     inference=await runInference(env.AI,{
       messages:[{role:'system',content:system},{role:'user',content:prompt}],
@@ -585,12 +586,22 @@ Return exactly:
         chat_template_kwargs:{enable_thinking:false},
       });
       parsed=parseAi(repaired.raw);
-      validated=validateClaims(parsed,allowedSourceIds);
-      inference=repaired;
+      try{
+        validated=validateClaims(parsed,allowedSourceIds);
+        inference=repaired;
+      }catch(repairError){
+        const repairCode=repairError instanceof Error?repairError.message:String(repairError);
+        if(repairCode!=='STOCK_RESEARCH_AI_INVALID_SOURCE_REF')throw repairError;
+        deterministicFallbackReason=('Governed AI source references remained invalid after one bounded repair: '+repairCode).slice(0,500);
+        deterministicFallbackCause='AI_INVALID_OUTPUT';
+        validated=deterministicSourceGroundedClaims(ticker,sources);
+        inference={raw:null,model:'DETERMINISTIC_SOURCE_GROUNDED_V1'};
+      }
     }
   }catch(error){
     if(!isAiCapacityFailure(error))throw error;
     deterministicFallbackReason=(error instanceof Error?error.message:String(error)).slice(0,500);
+    deterministicFallbackCause='AI_CAPACITY';
     validated=deterministicSourceGroundedClaims(ticker,sources);
     inference={raw:null,model:'DETERMINISTIC_SOURCE_GROUNDED_V1'};
   }
@@ -614,7 +625,9 @@ Return exactly:
       `Research is bound to DATA snapshot ${input.market_snapshot_id} captured at ${input.data_captured_at}.`,
       ...failures,
       ...(deterministicFallbackReason?[
-        'Workers AI capacity was unavailable; governed deterministic source-grounded research fallback was used.',
+        deterministicFallbackCause==='AI_CAPACITY'
+          ?'Workers AI capacity was unavailable; governed deterministic source-grounded research fallback was used.'
+          :'Governed AI source references remained invalid after one bounded repair; governed deterministic source-grounded research fallback was used.',
         'Deterministic fallback is conservative and does not infer facts beyond bounded retrieved source excerpts.',
         deterministicFallbackReason,
       ]:[]),
