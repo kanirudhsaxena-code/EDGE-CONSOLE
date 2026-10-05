@@ -196,7 +196,7 @@ export async function dispatchEdgeCalendarWorkflow(
     {
       method:'POST',
       headers:{
-        authorization:\`Bearer \${token}\`,
+        authorization:`Bearer ${token}`,
         accept:'application/vnd.github+json',
         'x-github-api-version':'2022-11-28',
         'user-agent':'EDGE-CONSOLE',
