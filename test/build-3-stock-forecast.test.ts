@@ -24,7 +24,7 @@ const rows=labels.map((horizon,index)=>({
 
 test('EDGE Stocks governed G5 path maps exactly into Build 3.0 D through D+4 contract',()=>{
   const forecast=buildStockBuild3Forecast({
-    ticker:'LTF',source_run_id:'EDGE-LTF-20261006-AUTO',
+    ticker:'LTF',source_id:'EDGE-LTF-20261006-AUTO',
     path_version:'EDGE_STOCK_FORECAST_PATH_V1',issued_at:'2026-10-06T04:00:00Z',
     target_sessions:targetSessions,rows,
     evidence_snapshot_id:'b3es_stock',evidence_hash:'c'.repeat(64)
@@ -52,7 +52,7 @@ test('stock adapter rejects unverified rows and inconsistent frozen P0 lineage',
   const unverified=rows.map(row=>({...row,lineage:{...row.lineage}}));
   unverified[1].verification_state='UNVERIFIED';
   assert.throws(()=>buildStockBuild3Forecast({
-    ticker:'LTF',source_run_id:'EDGE-LTF-1',path_version:'EDGE_STOCK_FORECAST_PATH_V1',
+    ticker:'LTF',source_id:'EDGE-LTF-1',path_version:'EDGE_STOCK_FORECAST_PATH_V1',
     issued_at:'2026-10-06T04:00:00Z',target_sessions:targetSessions,rows:unverified,
     evidence_snapshot_id:'b3es_stock',evidence_hash:'d'.repeat(64)
   }),/BUILD3_STOCK_ROW_NOT_VERIFIED/);
@@ -60,7 +60,7 @@ test('stock adapter rejects unverified rows and inconsistent frozen P0 lineage',
   const p0Mismatch=rows.map(row=>({...row,lineage:{...row.lineage}}));
   p0Mismatch[4].lineage.p0=269;
   assert.throws(()=>buildStockBuild3Forecast({
-    ticker:'LTF',source_run_id:'EDGE-LTF-2',path_version:'EDGE_STOCK_FORECAST_PATH_V1',
+    ticker:'LTF',source_id:'EDGE-LTF-2',path_version:'EDGE_STOCK_FORECAST_PATH_V1',
     issued_at:'2026-10-06T04:00:00Z',target_sessions:targetSessions,rows:p0Mismatch,
     evidence_snapshot_id:'b3es_stock',evidence_hash:'e'.repeat(64)
   }),/BUILD3_STOCK_P0_LINEAGE_MISMATCH/);
