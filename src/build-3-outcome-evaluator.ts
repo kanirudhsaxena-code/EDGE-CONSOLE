@@ -114,6 +114,17 @@ export async function evaluateMaturedBuild3Outcomes(
       results.push({...identity,status:'SOURCE_NOT_AVAILABLE',detail:'IMMUTABLE_DAILY_CACHE_SESSION_NOT_AVAILABLE'});
       continue;
     }
+    if(source.engine==='EDGE_STOCKS'&&['UNKNOWN','CONFLICT'].includes(source.corporate_action_state)){
+      const detail=source.corporate_action_state==='CONFLICT'
+        ?source.adjustment_basis
+        :'CORPORATE_ACTION_TRUTH_NOT_YET_AVAILABLE';
+      if(source.corporate_action_state==='CONFLICT'){
+        await persistBuild3SessionOhlcSource(databaseUrl,source);
+      }
+      await recordAttempt(databaseUrl,identity,'BLOCKED_CORPORATE_ACTION',source.source_ref,detail);
+      results.push({...identity,status:'BLOCKED_CORPORATE_ACTION',detail});
+      continue;
+    }
     const persistedSource=await persistBuild3SessionOhlcSource(databaseUrl,source);
     const forecastRow=raw.forecast_payload as Build3ForecastHorizon;
     const precision=raw.precision_payload as Build3PrecisionIssuance;
@@ -127,12 +138,8 @@ export async function evaluateMaturedBuild3Outcomes(
       source:persistedSource,
     });
     await persistBuild3HorizonOutcome(databaseUrl,outcome);
-    const blocked=outcome.scorability_state==='NOT_SCORABLE'&&
-      ['UNKNOWN','CONFLICT'].includes(outcome.corporate_action_state);
-    const status=blocked?'BLOCKED_CORPORATE_ACTION':'SCORED';
-    const detail=blocked?outcome.scorability_reason??'CORPORATE_ACTION_NOT_SCORABLE':undefined;
-    await recordAttempt(databaseUrl,identity,status,persistedSource.source_ref,detail??null);
-    results.push({...identity,status,detail});
+    await recordAttempt(databaseUrl,identity,'SCORED',persistedSource.source_ref,null);
+    results.push({...identity,status:'SCORED'});
   }
   return results;
 }

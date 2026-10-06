@@ -52,6 +52,89 @@ const istSessionDate=(value:unknown):string=>{
   return new Date(d.getTime()+330*60_000).toISOString().slice(0,10);
 };
 
+const upstoxMonths:Record<string,string>={
+  Jan:'01',Feb:'02',Mar:'03',Apr:'04',May:'05',Jun:'06',
+  Jul:'07',Aug:'08',Sep:'09',Oct:'10',Nov:'11',Dec:'12',
+};
+const upstoxCorporateDate=(value:unknown):string|null=>{
+  const text=String(value??'').trim();
+  if(/^\d{4}-\d{2}-\d{2}$/.test(text))return text;
+  const match=text.match(/^(\d{1,2})\s+([A-Za-z]{3})\s+(\d{4})$/);
+  if(!match)return null;
+  const month=upstoxMonths[match[2][0].toUpperCase()+match[2].slice(1).toLowerCase()];
+  if(!month)return null;
+  const day=String(Number(match[1])).padStart(2,'0');
+  const normalized=`${match[3]}-${month}-${day}`;
+  const parsed=new Date(normalized+'T00:00:00.000Z');
+  return Number.isNaN(parsed.getTime())?null:normalized;
+};
+async function sha256Text(value:string):Promise<string>{
+  const digest=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(value));
+  return [...new Uint8Array(digest)].map(byte=>byte.toString(16).padStart(2,'0')).join('');
+}
+
+export type Build3StockCorporateActionEvidence={
+  snapshot_id:string;
+  captured_at:string;
+  payload_hash:string;
+  source_ref:string;
+  payload:Record<string,unknown>;
+};
+
+export async function bindBuild3StockCorporateActionTruth(
+  source:Build3SessionOhlcSource,
+  evidence:Build3StockCorporateActionEvidence,
+):Promise<Build3SessionOhlcSource>{
+  if(source.engine!=='EDGE_STOCKS')throw new Error('BUILD3_CORPORATE_ACTION_STOCK_SOURCE_REQUIRED');
+  if(!evidence.snapshot_id?.trim()||!hex64(evidence.payload_hash)){
+    throw new Error('BUILD3_CORPORATE_ACTION_SNAPSHOT_IDENTITY_INVALID');
+  }
+  const providerHash=String(evidence.source_ref.match(/#sha256=([0-9a-f]{64})/i)?.[1]??'').toLowerCase();
+  if(!hex64(providerHash))throw new Error('BUILD3_CORPORATE_ACTION_PROVIDER_HASH_INVALID');
+  if(evidence.payload.status!=='success'||!Array.isArray(evidence.payload.data)){
+    throw new Error('BUILD3_CORPORATE_ACTION_PAYLOAD_INVALID');
+  }
+  const actions=evidence.payload.data as unknown[];
+  const parsed=actions.map((raw,index)=>{
+    if(!isObject(raw))return {valid:false,index,name:'UNKNOWN',date:null as string|null};
+    const name=String(raw.name??'UNKNOWN').trim()||'UNKNOWN';
+    const date=upstoxCorporateDate(raw.expiry_date);
+    return {valid:date!==null,index,name,date};
+  });
+  const allDatesValid=parsed.every(row=>row.valid);
+  const onTarget=parsed.filter(row=>row.date===source.session_date);
+  const state:Build3SessionOhlcSource['corporate_action_state']=!allDatesValid
+    ?'UNKNOWN'
+    :onTarget.length?'CONFLICT':'CLEAR';
+  const basis=!allDatesValid
+    ?'UPSTOX_POST_SESSION_CORPORATE_ACTION_DATES_UNVERIFIED'
+    :onTarget.length
+      ?`RAW_OHLC_BLOCKED_BY_CORPORATE_ACTION:${[...new Set(onTarget.map(row=>row.name))].join(',')}`
+      :'UPSTOX_POST_SESSION_CORPORATE_ACTIONS_CLEAR';
+  const capturedAt=[source.captured_at,evidence.captured_at]
+    .map(value=>new Date(value))
+    .sort((a,b)=>b.getTime()-a.getTime())[0];
+  if(Number.isNaN(capturedAt.getTime()))throw new Error('BUILD3_CORPORATE_ACTION_CAPTURED_AT_INVALID');
+  const compositeHash=await sha256Text(canonicalBuild3EvidenceJson({
+    price_provider_hash:source.provider_hash,
+    corporate_action_provider_hash:providerHash,
+    corporate_action_snapshot_hash:evidence.payload_hash.toLowerCase(),
+    corporate_action_state:state,
+    target_session:source.session_date,
+  }));
+  const bound:Build3SessionOhlcSource={
+    ...source,
+    captured_at:capturedAt.toISOString(),
+    source_ref:`${source.source_ref}|${evidence.source_ref};snapshot=${evidence.snapshot_id}`,
+    provider_hash:compositeHash,
+    corporate_action_state:state,
+    adjustment_basis:basis,
+  };
+  const errors=validateBuild3SessionOhlc(bound);
+  if(errors.length)throw new Error('BUILD3_OUTCOME_SOURCE_INVALID:'+errors.join(','));
+  return bound;
+}
+
 function parseDocument(value:unknown):Record<string,unknown>{
   if(isObject(value))return value;
   if(typeof value==='string'){
@@ -208,6 +291,44 @@ async function readCacheRow(databaseUrl:string,seriesId:string):Promise<CacheRow
   return rows.length?rows[0] as CacheRow:null;
 }
 
+async function readStockCorporateActionEvidence(
+  databaseUrl:string,
+  request:OutcomeSourceRequest,
+):Promise<Build3StockCorporateActionEvidence|null>{
+  const edge=neon(databaseUrl);
+  const postClose=`${request.target_session}T10:30:00.000Z`;
+  const rows=await edge`
+    select snapshot_id,captured_at,payload_hash,payload
+      from edge_market_snapshots
+     where upper(ticker)=${request.instrument.trim().toUpperCase()}
+       and status='DATA_READY'
+       and captured_at >= ${postClose}::timestamptz
+     order by captured_at asc,snapshot_id asc
+     limit 20
+  `;
+  for(const row of rows){
+    const payload=isObject(row.payload)?row.payload:null;
+    const research=payload&&isObject(payload.provider_research)?payload.provider_research:null;
+    const payloads=research&&isObject(research.payloads)?research.payloads:null;
+    if(!payloads)continue;
+    const entries=Object.entries(payloads).filter(([ref])=>/\/v2\/fundamentals\/[^/]+\/corporate-actions(?:\?|#)/.test(ref));
+    if(entries.length>1)throw new Error('BUILD3_CORPORATE_ACTION_SOURCE_AMBIGUOUS');
+    if(entries.length!==1)continue;
+    const [sourceRef,rawPayload]=entries[0];
+    if(!isObject(rawPayload))throw new Error('BUILD3_CORPORATE_ACTION_PAYLOAD_INVALID');
+    const payloadHash=String(row.payload_hash??'').trim().toLowerCase();
+    if(!hex64(payloadHash))throw new Error('BUILD3_CORPORATE_ACTION_SNAPSHOT_HASH_INVALID');
+    return {
+      snapshot_id:String(row.snapshot_id),
+      captured_at:iso(row.captured_at,'BUILD3_CORPORATE_ACTION_CAPTURED_AT_INVALID'),
+      payload_hash:payloadHash,
+      source_ref:sourceRef,
+      payload:rawPayload,
+    };
+  }
+  return null;
+}
+
 export async function readBuild3OutcomeSource(
   env:Build3OutcomeSourceEnv,
   request:OutcomeSourceRequest,
@@ -232,7 +353,11 @@ export async function readBuild3OutcomeSource(
   if(!databaseUrl?.trim())throw new Error('BUILD3_OUTCOME_SOURCE_5DR_DATABASE_NOT_CONFIGURED');
   const row=await readCacheRow(databaseUrl,seriesId);
   if(!row)return null;
-  return buildBuild3SessionOhlcFromCache(row,normalized,seriesId);
+  const base=buildBuild3SessionOhlcFromCache(row,normalized,seriesId);
+  if(!base||normalized.engine==='5DR')return base;
+  const corporateActionEvidence=await readStockCorporateActionEvidence(databaseUrl,normalized);
+  if(!corporateActionEvidence)return base;
+  return bindBuild3StockCorporateActionTruth(base,corporateActionEvidence);
 }
 
 export async function persistBuild3SessionOhlcSource(
