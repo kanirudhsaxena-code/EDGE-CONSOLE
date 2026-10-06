@@ -20,6 +20,7 @@ import { produceStockSystemResearch } from './stock-system-research';
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
 import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
+import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -706,6 +707,21 @@ export async function progressNormalStockLifecycle(
   }
 
   if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+    let build3Forecast;
+    try{
+      build3Forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
+    }catch(error){
+      return {
+        status:'BLOCKED',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        run_id:lifecycle.recommendation_id??null,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        auction_snapshot_id:lifecycle.auction_snapshot_id,
+        detail:`Build 3.0 stock forecast materialization failed: ${error instanceof Error?error.message:String(error)}`
+      };
+    }
     return {
       status:'COMPLETE',
       lifecycle_stage:lifecycle.stage,
@@ -713,7 +729,9 @@ export async function progressNormalStockLifecycle(
       run_id:lifecycle.recommendation_id??null,
       market_snapshot_id:lifecycle.market_snapshot_id,
       research_bundle_id:lifecycle.research_bundle_id,
-      auction_snapshot_id:lifecycle.auction_snapshot_id
+      auction_snapshot_id:lifecycle.auction_snapshot_id,
+      build3_forecast_version:build3Forecast.forecast_version,
+      build3_forecast_horizons:build3Forecast.horizons.length
     };
   }
   if(['DATA_BLOCKED','RESEARCH_BLOCKED','COMPUTE_BLOCKED','AUCTION_BLOCKED'].includes(lifecycle.stage)){
