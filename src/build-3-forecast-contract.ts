@@ -5,6 +5,7 @@ import { canonicalBuild3EvidenceJson } from './build-3-evidence-snapshot';
 export const BUILD3_FORECAST_VERSION='MDOS_BUILD_3_FORECAST_V1' as const;
 export type Build3Direction='BULL'|'RANGE'|'BEAR';
 export type Build3Regime='TREND'|'RANGE'|'TRANSITION'|'EVENT_SHOCK';
+export type Build3CoreZoneKind='CALIBRATED'|'CENTRE_ONLY';
 
 export type Build3ProbabilityVector={BULL:number;RANGE:number;BEAR:number};
 export type Build3Zone={low:number;high:number};
@@ -17,6 +18,7 @@ export type Build3ForecastHorizon={
   regime:Build3Regime;
   reasoning:string;
   expected_centre:number;
+  core_zone_kind:Build3CoreZoneKind;
   core_zone:Build3Zone;
   outer_zone:Build3Zone;
 };
@@ -87,6 +89,7 @@ export function validateBuild3Forecast(value:Build3Forecast):string[]{
     }
     const centre=row.expected_centre;
     const core=row.core_zone;
+    if(row.core_zone_kind!=='CALIBRATED'&&row.core_zone_kind!=='CENTRE_ONLY')errors.push(`${prefix}.core_zone_kind is invalid`);
     const outer=row.outer_zone;
     if(!isFinitePositive(centre)||!isFinitePositive(core?.low)||!isFinitePositive(core?.high)||!isFinitePositive(outer?.low)||!isFinitePositive(outer?.high)){
       errors.push(`${prefix}.geometry must contain positive finite values`);
@@ -94,6 +97,10 @@ export function validateBuild3Forecast(value:Build3Forecast):string[]{
       errors.push(`${prefix}.geometry must satisfy outer.low <= core.low <= centre <= core.high <= outer.high`);
     }else if((core.high-core.low)>=(outer.high-outer.low)){
       errors.push(`${prefix}.Core Zone must be narrower than Outer Zone`);
+    }else if(row.core_zone_kind==='CENTRE_ONLY'&&(Math.abs(core.low-centre)>1e-9||Math.abs(core.high-centre)>1e-9)){
+      errors.push(`${prefix}.CENTRE_ONLY Core Zone must equal expected_centre exactly`);
+    }else if(row.core_zone_kind==='CALIBRATED'&&!(core.low<core.high)){
+      errors.push(`${prefix}.CALIBRATED Core Zone must have positive width`);
     }
   });
   return errors;
