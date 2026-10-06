@@ -15,6 +15,7 @@ import {
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
 import { classifyGovernedNseSession } from './nse-trading-calendar';
+import { buildBuild3RunRegistryRecord, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 
 type JsonRecord=Record<string,unknown>;
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -100,6 +101,11 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
         trigger_type:'SCHEDULED',
         target_session:clock.date,
       });
+      const build3Run=buildBuild3RunRegistryRecord({
+        engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
+        run_timestamp:now,trigger_type:'AUTOMATIC',market_phase:'PRE_OPEN'
+      });
+      await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
       let dispatch:JsonRecord|null=null;
       if(['RUN_CREATED','DATA_BLOCKED'].includes(lifecycle.stage)){
         const started=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
@@ -122,11 +128,13 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
         data_dispatch:dispatch,
       });
     }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      try{await markStockDataBlocked(env,lifecycleId,detail)}catch{}
       stocks.push({
         ticker,
         lifecycle_id:lifecycleId,
         lifecycle_stage:'DATA_BLOCKED',
-        error:error instanceof Error?error.message:String(error),
+        error:detail,
       });
     }
   }

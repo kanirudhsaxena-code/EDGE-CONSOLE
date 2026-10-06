@@ -17,6 +17,7 @@ import {
   readMarketSnapshotPayload,
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
+import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -588,6 +589,18 @@ async function beginNormalStockLifecycle(env:Env,ticker:string):Promise<{
     trigger_type:'USER',
     target_session:currentIstDate(),
   });
+  const build3RunTimestamp=new Date();
+  const build3Run=buildBuild3RunRegistryRecord({
+    engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
+    run_timestamp:build3RunTimestamp,trigger_type:'MANUAL',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
+  });
+  try{
+    await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    await markStockDataBlocked(env,lifecycleId,`Build 3.0 run registry blocked: ${detail}`);
+    return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',error:detail};
+  }
   const dispatched=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
     ticker,lifecycle_id:lifecycleId,trigger_type:'USER',target_session:currentIstDate()
   });

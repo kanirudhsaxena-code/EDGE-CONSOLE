@@ -9,6 +9,7 @@ import { produceIntelligence } from './intelligence-producer';
 import { assessAutomatedMarketEvidence } from './automated-market-evidence';
 import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -227,6 +228,11 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   }
   const requestId=`5drreq_${crypto.randomUUID()}`;
   const batchId=`auto_${crypto.randomUUID()}`;
+  const build3RunTimestamp=new Date();
+  const build3Run=buildBuild3RunRegistryRecord({
+    engine:'5DR',instrument:'NIFTY',source_id:requestId,model_version:'5DR_V2_1',
+    run_timestamp:build3RunTimestamp,trigger_type:'AUTOMATIC',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
+  });
   let metadata:Record<string,unknown>={
     actor:actorMetadata(runActor),
     identity_enforced:isAccessIdentityEnforced(env),
@@ -237,6 +243,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot,prep_only:prepOnly},
     preopen_prep_only:prepOnly,
+    build3_run:build3Run,
     run_provenance:{
       trigger_type:prepOnly?'SCHEDULED_PREP':canonicalAttempt?'SCHEDULED':'USER',
       evidence_mode:prepOnly?'PREOPEN_PREP':canonicalAttempt?'PREOPEN':null,
@@ -250,6 +257,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
+  await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
   const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
