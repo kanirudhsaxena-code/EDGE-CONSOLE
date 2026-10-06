@@ -89,6 +89,27 @@ export function buildBuild3RunRegistryRecord(input:{
   return record;
 }
 
+export async function readBuild3RunRegistryRecord(
+  databaseUrl:string|undefined,
+  engine:Build3Engine,
+  sourceId:string,
+):Promise<Build3RunRegistryRecord|null>{
+  if(!databaseUrl?.trim())throw new Error('BUILD3_RUN_REGISTRY_DATABASE_NOT_CONFIGURED');
+  if(!nonEmpty(sourceId))throw new Error('BUILD3_RUN_REGISTRY_SOURCE_ID_REQUIRED');
+  const sql=neon(databaseUrl);
+  const rows=await sql`
+    select payload from build3_run_registry
+     where engine=${engine} and source_id=${sourceId}
+     limit 1
+  `;
+  if(!rows.length||!rows[0].payload||typeof rows[0].payload!=='object'||Array.isArray(rows[0].payload))return null;
+  const record=rows[0].payload as Build3RunRegistryRecord;
+  const errors=validateBuild3RunRegistryRecord(record);
+  if(errors.length)throw new Error(`BUILD3_RUN_REGISTRY_STORED_INVALID:${errors.join('|')}`);
+  if(record.engine!==engine||record.source_id!==sourceId)throw new Error('BUILD3_RUN_REGISTRY_READBACK_IDENTITY_MISMATCH');
+  return record;
+}
+
 export async function persistBuild3RunRegistryRecord(
   databaseUrl:string|undefined,
   record:Build3RunRegistryRecord,
