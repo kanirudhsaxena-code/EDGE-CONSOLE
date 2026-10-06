@@ -49,3 +49,18 @@ test('Build 3.0 forecast rejects oversized Core Zone and session disorder',()=>{
   assert.ok(errors.some(error=>error.includes('Core Zone must be narrower')));
   assert.ok(errors.some(error=>error.includes('strictly increasing')));
 });
+
+
+test('NIFTY Build 3.0 live-path fallback preserves outer zone and uses centre-only Core geometry',()=>{
+  const forecast=buildNiftyBuild3Forecast({
+    source_id:'5drreq-live',model_version:'5DR_V2_1',issued_at:'2026-10-06T06:00:00Z',
+    result:{regime:'TREND',horizon_slots:legacySlots},
+    target_sessions:targetSessions,reference_price_p0:105,
+    evidence_snapshot_id:'b3es_live',evidence_hash:'f'.repeat(64)
+  });
+  assert.equal(forecast.horizons[0].core_zone_kind,'CENTRE_ONLY');
+  assert.deepEqual(forecast.horizons[0].outer_zone,{low:100,high:110});
+  assert.equal(forecast.horizons[0].expected_centre,105);
+  assert.deepEqual(forecast.horizons[0].core_zone,{low:105,high:105});
+  assert.deepEqual(validateBuild3Forecast(forecast),[]);
+});
