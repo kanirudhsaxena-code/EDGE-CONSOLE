@@ -1,8 +1,10 @@
 {
   "point_12": {
     "status": "FAIL",
+    "session_state": "TRADING_DAY",
+    "verification_required": true,
     "acceptance": "genuine persisted NSE pre-open evidence; no backdating or timing inference",
-    "checked_at": "2026-10-05T04:01:22.802486Z"
+    "checked_at": "2026-10-06T03:58:24.547407Z"
   },
   "errors": [
     {
