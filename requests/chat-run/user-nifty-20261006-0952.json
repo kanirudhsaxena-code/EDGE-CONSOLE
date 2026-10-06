@@ -1,0 +1,9 @@
+{
+  "module": "EDGE_NIFTY",
+  "client_invocation_id": "user-nifty-20261006-0952",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  }
+}
