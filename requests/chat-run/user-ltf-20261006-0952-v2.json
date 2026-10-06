@@ -1,0 +1,122 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "user-ltf-20261006-0952-v2",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-06T04:22:44Z",
+    "research_fresh_at": "2026-10-06T04:22:44Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ltf-fund",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/LTF/financials/ratios/",
+        "title": "L&T Finance financial ratios and metrics",
+        "retrieved_at": "2026-10-06T04:22:44Z"
+      },
+      {
+        "source_id": "ltf-inst",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/777/LTF/Q2-2026/l-t-finance-ltd/",
+        "title": "L&T Finance shareholding pattern Jun 2026",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-06-30T00:00:00Z",
+        "event_date": "2026-06-30T00:00:00Z"
+      },
+      {
+        "source_id": "ltf-news",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://economictimes.indiatimes.com/L%26T-Finance-Holdings-Ltd/stocksupdate/companyid-30050.cms?from=mdr",
+        "title": "L&T Finance latest announcements",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-03T13:04:00Z",
+        "event_date": "2026-10-03T13:04:00Z"
+      },
+      {
+        "source_id": "ltf-shock",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://bfsi.economictimes.indiatimes.com/articles/bajaj-finance-lt-finance-hdb-among-nbfcs-facing-higher-funding-costs-eps-cuts-could-reach-12/134646640",
+        "title": "NBFC funding cost pressure including L&T Finance",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-03T00:00:00Z",
+        "event_date": "2026-10-03T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Current S&P Global-derived ratios show L&T Finance FY2026 ROE near 11.12% and debt/equity near 3.93, providing the current profitability and leverage context.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-fund"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-inst-claim",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Jun-2026 institutional ownership rose slightly to about 22.61%, with FII/FPI and mutual-fund holdings both increasing versus Mar-2026.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ltf-inst"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-news-claim",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "L&T Finance disclosed its Q2 FY2026-27 company business update on 3 October 2026.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-news"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Current valuation data show L&T Finance around 20.82x trailing earnings and 2.35x book value.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ltf-fund"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Recent sector analysis flags higher funding costs as a near-term earnings risk for L&T Finance and peer NBFCs.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ltf-shock"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "External research is context only; live price/volume/derivatives and forecast computation must come from the governed EDGE market-data path."
+    ]
+  }
+}
