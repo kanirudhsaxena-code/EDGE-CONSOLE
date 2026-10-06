@@ -1,0 +1,133 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "user-reliance-20261006-0952-v2",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-06T04:22:44Z",
+    "research_fresh_at": "2026-10-06T04:22:44Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-fund",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.financialexpress.com/market/nuvama-bullish-on-ril-predicts-45-upside-as-golden-refining-era-drives-q2-earnings-4351380/",
+        "title": "RIL Q2 outlook and segment earnings expectations",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-02T00:00:00Z",
+        "event_date": "2026-10-02T00:00:00Z"
+      },
+      {
+        "source_id": "ril-inst",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://trendlyne.com/equity/share-holding/1127/RELIANCE/Q2-2026/reliance-industries-ltd/",
+        "title": "Reliance Industries shareholding pattern Jun 2026",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-06-30T00:00:00Z",
+        "event_date": "2026-06-30T00:00:00Z"
+      },
+      {
+        "source_id": "ril-val",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://stockanalysis.com/quote/nse/RELIANCE/financials/ratios/",
+        "title": "Reliance Industries financial ratios and valuation",
+        "retrieved_at": "2026-10-06T04:22:44Z"
+      },
+      {
+        "source_id": "ril-jio",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/ambanis-jio-platforms-plans-launch-ipo-october-21-sources-say-2026-10-05/",
+        "title": "Jio Platforms plans October 21 IPO",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-05T00:00:00Z",
+        "event_date": "2026-10-05T00:00:00Z"
+      },
+      {
+        "source_id": "ril-fuel",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/business/energy/india-will-ask-private-fuel-retailers-end-sales-rationing-2026-10-01/",
+        "title": "India asks private fuel retailers to end sales rationing",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-01T00:00:00Z",
+        "event_date": "2026-10-01T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Ahead of Q2 FY27 results, broker estimates cited by Financial Express expect consolidated EBITDA growth near 17% year-on-year, led by stronger O2C performance, with digital also expected to grow.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-fund"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-inst-claim",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Jun-2026 shareholding data show FII/FPI ownership lower versus Mar-2026 while mutual-fund ownership increased, leaving institutional behaviour mixed rather than uniformly bullish.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-inst"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Jio Platforms is reported to plan an October 21 IPO of about $3.8 billion, creating a major near-term catalyst for Reliance Industries.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-jio"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Current valuation data show Reliance around 21.15x trailing earnings, 17.74x forward earnings and 1.46x book value.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "ril-val"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Reliance faces opposing event risks: the Jio IPO is a positive valuation catalyst, while the government's move against fuel-sales rationing creates pressure for the retail-fuels business under elevated global fuel costs.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "ril-jio",
+          "ril-fuel"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The live EDGE market-data path is authoritative for forecast direction, zones and recommendation; external research supplies verified event and valuation context."
+    ]
+  }
+}
