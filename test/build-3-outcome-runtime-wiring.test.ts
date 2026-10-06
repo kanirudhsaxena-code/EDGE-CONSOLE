@@ -14,4 +14,7 @@ test('production entry routes the Truth cron before unrelated scheduled work',()
   assert.match(source,/cron===BUILD3_TRUTH_CRON/);
   assert.match(source,/runBuild3TruthScheduledTick\(env,controller\.scheduledTime\)/);
   assert.match(source,/trading_enabled:false/);
+  const scheduler=readFileSync(new URL('../src/build-3-outcome-scheduler.ts',import.meta.url),'utf8');
+  assert.match(scheduler,/readBuild3TruthMetrics\(env\.DATABASE_URL\)/);
+  assert.match(scheduler,/truth_metrics:truthMetrics/);
 });
