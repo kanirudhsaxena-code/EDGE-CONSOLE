@@ -662,11 +662,31 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
   let evidenceSnapshot;
   try{
+    const issuanceContext={
+      build3_run:isObject(metadata.build3_run)?metadata.build3_run:null,
+      run_provenance:isObject(metadata.run_provenance)?metadata.run_provenance:null,
+      invocation:isObject(metadata.invocation)?metadata.invocation:null,
+      automated_market_evidence:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence:null,
+      screenshot_intelligence:isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:null,
+      system_research_acquisition:isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:null,
+      intelligence_handoff:isObject(metadata.intelligence_handoff)?metadata.intelligence_handoff:null,
+      normalization_assessment:isObject(metadata.normalization_assessment)?metadata.normalization_assessment:null,
+      decision_setup:isObject(metadata.decision_setup)?metadata.decision_setup:null,
+      evidence_readiness:isObject(metadata.evidence_readiness)?metadata.evidence_readiness:null,
+      canonical_attempt:isObject(metadata.canonical_attempt)?metadata.canonical_attempt:null,
+      freshness_at:metadata.freshness_at??null,
+      evidence_file_count:metadata.evidence_file_count??null,
+      evidence_mime_types:Array.isArray(metadata.evidence_mime_types)?metadata.evidence_mime_types:null,
+      preopen_prep_only:metadata.preopen_prep_only===true,
+    };
     evidenceSnapshot=await freezeBuild3EvidenceSnapshot(env.DATABASE_URL,{
       engine:'5DR',
       instrument:'NIFTY',
       source_id:requestId,
-      evidence:{engine_input:executionPacket},
+      evidence:{
+        engine_input:executionPacket,
+        issuance_context:issuanceContext,
+      },
     });
   }catch(error){
     const detail=error instanceof Error?error.message:String(error);
