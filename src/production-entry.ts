@@ -11,7 +11,7 @@ import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 import { runPreopenScheduledTick } from './preopen-scheduler';
 import { progressPendingNormalStockLifecycles } from './router';
 import { materializePendingBuild3StockForecasts } from './build-3-stock-materializer';
-import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';\
+import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';
 import { BUILD3_TRUTH_CRON, runBuild3TruthScheduledTick } from './build-3-outcome-scheduler';
 
 /**
