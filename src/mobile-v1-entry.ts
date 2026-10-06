@@ -896,6 +896,64 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
   return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
 
+
+export async function progressPendingBuild3NiftyRuns(
+  env:Env,
+  limit=12
+):Promise<Record<string,unknown>[]>{
+  if(!env.DATABASE_URL?.trim())return [];
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`
+    select req.request_id,req.status,req.updated_at
+      from analysis_requests req
+     where req.engine='5DR'
+       and req.metadata ? 'build3_run'
+       and (
+         req.status='PROCESSING'
+         or (
+           req.status='COMPLETED'
+           and not exists (
+             select 1 from build3_forecast_horizons f
+              where f.engine='5DR' and f.source_id=req.request_id
+           )
+         )
+       )
+     order by req.updated_at asc
+     limit ${Math.max(1,Math.min(50,limit))}
+  `;
+  const results:Record<string,unknown>[]=[];
+  for(const row of rows){
+    const requestId=String(row.request_id);
+    try{
+      if(String(row.status)==='COMPLETED'){
+        const forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+        results.push({
+          request_id:requestId,status:'MATERIALIZED',
+          forecast_version:forecast.forecast_version,horizon_count:forecast.horizons.length
+        });
+        continue;
+      }
+      const retry=new Request(
+        `https://edge-console.internal/api/5dr/run-requests/${encodeURIComponent(requestId)}/resume-processing`,
+        {method:'POST',headers:{'content-type':'application/json'},body:'{}'}
+      );
+      const response=await resumeProcessing(retry,env,requestId);
+      const body=await responseJson(response);
+      results.push({
+        request_id:requestId,status:String(body.status??'UNKNOWN'),
+        adapter_stage:body.adapter_stage??null,http_status:response.status,
+        build3_forecast:body.build3_forecast??null,next_step:body.next_step??null
+      });
+    }catch(error){
+      results.push({
+        request_id:requestId,status:'BLOCKED',
+        detail:error instanceof Error?error.message:String(error)
+      });
+    }
+  }
+  return results;
+}
+
 async function preopenStatus(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const url=new URL(request.url);
