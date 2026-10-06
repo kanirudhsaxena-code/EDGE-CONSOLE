@@ -30,6 +30,7 @@ test('EDGE Stocks governed G5 path maps exactly into Build 3.0 D through D+4 con
     evidence_snapshot_id:'b3es_stock',evidence_hash:'c'.repeat(64)
   });
   assert.equal(forecast.engine,'EDGE_STOCKS');
+  assert.equal(forecast.source_id,'EDGE-LTF-20261006-AUTO');
   assert.equal(forecast.reference_price_p0,268);
   assert.equal(forecast.model_version,'G5_STOCK_DD4_V1.0');
   assert.equal(forecast.horizons[0].direction,'BULL');
