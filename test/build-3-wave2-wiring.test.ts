@@ -43,6 +43,6 @@ test('Stocks completion uses factor-driven SHADOW precision and exact persisted 
 
 test('Wave 2 stock calibration never imports NIFTY numerical calibration constants',()=>{
   const precision=read('src/build-3-precision.ts');
-  const stockSection=precision.slice(precision.indexOf('const STOCK_HORIZON_ATR_MULTIPLIER'));
+  const stockSection=precision.slice(precision.indexOf('export function buildStockPrecisionPlan'));
   assert.doesNotMatch(stockSection,/NIFTY_HALF_WIDTH_PERCENT\[/);
 });
