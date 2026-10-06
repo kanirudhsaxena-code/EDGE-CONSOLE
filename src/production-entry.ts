@@ -11,7 +11,7 @@ import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 import { runPreopenScheduledTick } from './preopen-scheduler';
 import { progressPendingNormalStockLifecycles } from './router';
 import { materializePendingBuild3StockForecasts } from './build-3-stock-materializer';
-import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';
+import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';\nimport { BUILD3_TRUTH_CRON, runBuild3TruthScheduledTick } from './build-3-outcome-scheduler';
 
 /**
  * Production entrypoint shim.
@@ -95,6 +95,13 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
     const cron=String((controller as any).cron??'');
+    if(cron===BUILD3_TRUTH_CRON){
+      ctx.waitUntil((async()=>{
+        const result=await runBuild3TruthScheduledTick(env,controller.scheduledTime);
+        console.log(JSON.stringify(result));
+      })());
+      return;
+    }
     if(cron==='7,22,37,52 * * * 1-5'){
       ctx.waitUntil((async()=>{
         const [normalResults,stockBuild3,niftyBuild3]=await Promise.all([
