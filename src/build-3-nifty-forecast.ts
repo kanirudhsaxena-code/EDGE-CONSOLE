@@ -115,6 +115,7 @@ export function buildNiftyBuild3Forecast(input:{
       regime:regime as Build3Regime,
       reasoning:String(slot.basis??'').trim(),
       expected_centre:geometry.expected_centre,
+      core_zone_kind:'CALIBRATED',
       core_zone:geometry.core_zone,
       outer_zone:geometry.outer_zone,
     };
