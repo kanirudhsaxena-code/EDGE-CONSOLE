@@ -53,7 +53,7 @@ export async function materializePersistedNiftyBuild3Forecast(
     model_version:registry.model_version,
     issued_at:new Date(String(row.generated_at)).toISOString(),
     result:row.result as Record<string,unknown>,
-    target_sessions:resolveBuild3TargetSessions(registry.run_timestamp),
+    target_sessions:resolveBuild3TargetSessions(new Date(String(row.generated_at)).toISOString()),
     reference_price_p0:referencePrice,
     evidence_snapshot_id:evidence.snapshot_id,
     evidence_hash:evidence.evidence_hash,
