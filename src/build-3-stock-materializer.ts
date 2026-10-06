@@ -98,7 +98,7 @@ export async function materializePersistedStockBuild3Forecast(
     source_id:lifecycleId,
     path_version:String(header.path_version),
     issued_at:new Date(String(header.issued_at)).toISOString(),
-    target_sessions:resolveBuild3TargetSessions(registry.run_timestamp),
+    target_sessions:resolveBuild3TargetSessions(new Date(String(header.issued_at)).toISOString()),
     rows,
     evidence_snapshot_id:evidence.snapshot_id,
     evidence_hash:evidence.evidence_hash,
