@@ -50,7 +50,7 @@ jobs:
       - name: Apply Build 3.0 Foundation migrations in order
         run: |
           set -euo pipefail
-          for migration in             database/0005_build3_run_registry.sql             database/0006_build3_evidence_snapshots.sql             database/0007_build3_data_quality.sql             database/0008_build3_forecast_horizons.sql
+          for migration in             database/0005_build3_run_registry.sql             database/0006_build3_evidence_snapshots.sql             database/0007_build3_data_quality.sql             database/0008_build3_forecast_horizons.sql             database/0009_build3_precision_decisions.sql
           do
             echo "applying $migration"
             psql -h 127.0.0.1 -U postgres -d edge_console_ci -v ON_ERROR_STOP=1 -f "$migration"
@@ -66,10 +66,13 @@ jobs:
                  'build3_run_registry',
                  'build3_evidence_snapshots',
                  'build3_data_quality_assessments',
-                 'build3_forecast_horizons'
+                 'build3_forecast_horizons',
+                 'build3_precision_issuance',
+                 'build3_precision_outcomes',
+                 'build3_decisions'
                );
           ")"
-          test "$TABLES" = "build3_data_quality_assessments,build3_evidence_snapshots,build3_forecast_horizons,build3_run_registry"
+          test "$TABLES" = "build3_data_quality_assessments,build3_decisions,build3_evidence_snapshots,build3_forecast_horizons,build3_precision_issuance,build3_precision_outcomes,build3_run_registry"
           psql -h 127.0.0.1 -U postgres -d edge_console_ci -v ON_ERROR_STOP=1 -c "
             select
               (select count(*) from build3_run_registry) as registry_rows,

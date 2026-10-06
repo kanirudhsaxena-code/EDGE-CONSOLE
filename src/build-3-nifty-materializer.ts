@@ -1,8 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 import { readBuild3DataQuality } from './build-3-data-quality';
+import { buildNiftyBuild3Decision, persistBuild3Decision } from './build-3-decision';
 import { readBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
 import { persistBuild3Forecast, type Build3Forecast } from './build-3-forecast-contract';
 import { buildNiftyBuild3Forecast, extractNiftyReferencePrice } from './build-3-nifty-forecast';
+import { buildNiftyPrecisionPlan, persistBuild3PrecisionIssuance } from './build-3-precision';
 import { readBuild3RunRegistryRecord } from './build-3-run-registry';
 import { resolveBuild3TargetSessions } from './build-3-session-resolver';
 
@@ -48,7 +50,7 @@ export async function materializePersistedNiftyBuild3Forecast(
     throw new Error('BUILD3_NIFTY_REFERENCE_PRICE_MISSING');
   }
 
-  const forecast=buildNiftyBuild3Forecast({
+  let forecast=buildNiftyBuild3Forecast({
     source_id:requestId,
     model_version:registry.model_version,
     issued_at:new Date(String(row.generated_at)).toISOString(),
@@ -58,5 +60,11 @@ export async function materializePersistedNiftyBuild3Forecast(
     evidence_snapshot_id:evidence.snapshot_id,
     evidence_hash:evidence.evidence_hash,
   });
-  return persistBuild3Forecast(databaseUrl,forecast);
+  const precision=buildNiftyPrecisionPlan(forecast);
+  forecast=precision.forecast;
+  forecast=await persistBuild3Forecast(databaseUrl,forecast);
+  await persistBuild3PrecisionIssuance(databaseUrl,precision.issuance);
+  const decision=buildNiftyBuild3Decision(forecast,row.result as Record<string,unknown>);
+  await persistBuild3Decision(databaseUrl,decision);
+  return forecast;
 }

@@ -1,8 +1,10 @@
 import { neon } from '@neondatabase/serverless';
 import { readBuild3DataQuality } from './build-3-data-quality';
+import { buildStockBuild3Decision, persistBuild3Decision } from './build-3-decision';
 import { readBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
 import { persistBuild3Forecast, type Build3Forecast } from './build-3-forecast-contract';
 import { buildStockBuild3Forecast, BUILD3_STOCK_SOURCE_PATH_VERSION, type Build3StockPathRow } from './build-3-stock-forecast';
+import { buildStockPrecisionPlan, persistBuild3PrecisionIssuance } from './build-3-precision';
 import { readBuild3RunRegistryRecord } from './build-3-run-registry';
 import { resolveBuild3TargetSessions } from './build-3-session-resolver';
 import { getStockLifecycle } from './stock-lifecycle';
@@ -93,7 +95,18 @@ export async function materializePersistedStockBuild3Forecast(
     };
   });
 
-  const forecast=buildStockBuild3Forecast({
+  const decisionRows=await edge`
+    select r.definitive_forecast,r.definitive_recommendation,r.des,r.market_trust_score,
+           r.bot_grade,r.decision_ladder,r.evidence_gate_status,r.event_shock_level,
+           r.active_override,r.rationale,to_jsonb(ep) as execution_plan
+      from recommendations r
+      left join execution_plans ep on ep.recommendation_id=r.recommendation_id
+     where r.recommendation_id=${lifecycle.recommendation_id}
+     limit 1
+  `;
+  if(!decisionRows.length)throw new Error('BUILD3_STOCK_DECISION_SOURCE_MISSING');
+
+  let forecast=buildStockBuild3Forecast({
     ticker:lifecycle.ticker,
     source_id:lifecycleId,
     path_version:String(header.path_version),
@@ -103,7 +116,26 @@ export async function materializePersistedStockBuild3Forecast(
     evidence_snapshot_id:evidence.snapshot_id,
     evidence_hash:evidence.evidence_hash,
   });
-  return persistBuild3Forecast(env.DATABASE_URL,forecast);
+  const precision=buildStockPrecisionPlan(forecast,rows);
+  forecast=precision.forecast;
+  forecast=await persistBuild3Forecast(env.DATABASE_URL,forecast);
+  await persistBuild3PrecisionIssuance(env.DATABASE_URL,precision.issuance);
+  const decisionRow=decisionRows[0];
+  const decision=buildStockBuild3Decision(forecast,{
+    definitive_forecast:decisionRow.definitive_forecast,
+    definitive_recommendation:decisionRow.definitive_recommendation,
+    des:decisionRow.des,
+    market_trust_score:decisionRow.market_trust_score,
+    bot_grade:decisionRow.bot_grade,
+    decision_ladder:decisionRow.decision_ladder,
+    evidence_gate_status:decisionRow.evidence_gate_status,
+    event_shock_level:decisionRow.event_shock_level,
+    active_override:decisionRow.active_override,
+    rationale:decisionRow.rationale,
+    execution_plan:isObject(decisionRow.execution_plan)?decisionRow.execution_plan:null,
+  });
+  await persistBuild3Decision(env.DATABASE_URL,decision);
+  return forecast;
 }
 
 
