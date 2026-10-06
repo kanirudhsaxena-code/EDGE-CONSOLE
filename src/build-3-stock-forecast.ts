@@ -89,7 +89,7 @@ function modelVersion(rows:Build3StockPathRow[]):string{
 
 export function buildStockBuild3Forecast(input:{
   ticker:string;
-  source_run_id:string;
+  source_id:string;
   path_version:string;
   issued_at:string;
   target_sessions:Build3TargetSession[];
@@ -98,7 +98,7 @@ export function buildStockBuild3Forecast(input:{
   evidence_hash:string;
 }):Build3Forecast{
   if(input.path_version!==BUILD3_STOCK_SOURCE_PATH_VERSION)throw new Error('BUILD3_STOCK_PATH_VERSION_INVALID');
-  if(!nonEmpty(input.ticker)||!nonEmpty(input.source_run_id))throw new Error('BUILD3_STOCK_IDENTITY_INVALID');
+  if(!nonEmpty(input.ticker)||!nonEmpty(input.source_id))throw new Error('BUILD3_STOCK_IDENTITY_INVALID');
   if(Number.isNaN(Date.parse(input.issued_at)))throw new Error('BUILD3_STOCK_ISSUED_AT_INVALID');
   if(input.target_sessions.length!==5||input.rows.length!==5)throw new Error('BUILD3_STOCK_REQUIRES_FIVE_HORIZONS');
 
@@ -140,7 +140,7 @@ export function buildStockBuild3Forecast(input:{
     forecast_version:BUILD3_FORECAST_VERSION,
     engine:'EDGE_STOCKS',
     instrument:input.ticker.trim().toUpperCase(),
-    source_id:input.source_run_id.trim(),
+    source_id:input.source_id.trim(),
     model_version:model,
     issued_at:new Date(input.issued_at).toISOString(),
     reference_price_p0:p0,
