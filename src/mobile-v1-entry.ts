@@ -12,6 +12,7 @@ import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveA
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
 import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
+import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materializer';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -747,6 +748,27 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
     const runRows=runId?await sql`select published,learning_eligible from analysis_runs where run_id=${runId} and engine='5DR' limit 1`:[];
     const completion=isObject(metadata.completion)?metadata.completion:{};
     const sandbox=completion.sandbox===true;
+    let build3Forecast:Record<string,unknown>|null=null;
+    if(isObject(metadata.build3_run)){
+      try{
+        const forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+        build3Forecast={
+          forecast_version:forecast.forecast_version,
+          engine:forecast.engine,
+          source_id:forecast.source_id,
+          issued_at:forecast.issued_at,
+          evidence_snapshot_id:forecast.evidence_snapshot_id,
+          horizon_count:forecast.horizons.length
+        };
+      }catch(error){
+        return json({
+          ok:false,request_id:requestId,status:'COMPLETED',adapter_stage:stage||'COMPLETED',
+          run_id:runId,error:'Build 3.0 NIFTY forecast materialization failed',
+          detail:error instanceof Error?error.message:String(error),
+          next_step:'RETRY_BUILD3_FORECAST_MATERIALIZATION'
+        },409);
+      }
+    }
     return json({
       ok:true,
       request_id:requestId,
@@ -756,6 +778,7 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
       published:runRows.length?runRows[0].published===true:false,
       learning_eligible:runRows.length?runRows[0].learning_eligible===true:false,
       sandbox,
+      build3_forecast:build3Forecast,
       idempotent:true
     });
   }
@@ -782,10 +805,24 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
       const body=await responseJson(published);
       if(!published.ok)return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_sync:sync,error:'validated engine result could not be persisted',publish_gate:body},409);
       const completedDispatch={...dispatch,ok:true,status:'RESULT_SYNCED',workflow_run_id:sync.workflow_run_id,result_synced_at:new Date().toISOString()};
+      let build3Forecast;
+      try{
+        build3Forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+      }catch(error){
+        const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
+        const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
+        const build3Blocked={status:'BLOCKED',detail:error instanceof Error?error.message:String(error),blocked_at:new Date().toISOString()};
+        await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch,build3_forecast:build3Blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+        return json({...body,ok:false,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch,build3_forecast:build3Blocked,error:'Build 3.0 NIFTY forecast materialization failed',next_step:'RETRY_BUILD3_FORECAST_MATERIALIZATION'},409);
+      }
+      const build3Ref={
+        forecast_version:build3Forecast.forecast_version,engine:build3Forecast.engine,source_id:build3Forecast.source_id,
+        issued_at:build3Forecast.issued_at,evidence_snapshot_id:build3Forecast.evidence_snapshot_id,horizon_count:build3Forecast.horizons.length
+      };
       const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
       const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
-      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-      return json({...body,ok:true,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch});
+      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch,build3_forecast:build3Ref})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({...body,ok:true,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch,build3_forecast:build3Ref});
     }
     return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
   }
