@@ -6,7 +6,7 @@ import { BUILD3_TRUTH_CRON } from '../src/build-3-outcome-scheduler';
 test('Build 3 Truth has a dedicated post-close scheduler with a retry',()=>{
   assert.equal(BUILD3_TRUTH_CRON,'7,37 11 * * 1-5');
   const config=readFileSync(new URL('../wrangler.jsonc',import.meta.url),'utf8');
-  assert.match(config,/"7,37 11 \* \* \* 1-5"/);
+  assert.match(config,/"7,37 11 \* \* 1-5"/);
 });
 
 test('production entry routes the Truth cron before unrelated scheduled work',()=>{
