@@ -105,3 +105,41 @@ export async function materializePersistedStockBuild3Forecast(
   });
   return persistBuild3Forecast(env.DATABASE_URL,forecast);
 }
+
+
+export async function materializePendingBuild3StockForecasts(
+  env:Env,
+  limit=12,
+):Promise<Record<string,unknown>[]>{
+  if(!env.EDGE_DATABASE_URL?.trim()||!env.DATABASE_URL?.trim())return [];
+  const edge=neon(env.EDGE_DATABASE_URL);
+  const rows=await edge`
+    select lifecycle_id,ticker,recommendation_id,stage,updated_at
+      from edge_run_lifecycles
+     where stage in ('PERSISTED','PRESENTED')
+       and recommendation_id is not null
+     order by updated_at desc
+     limit ${Math.max(1,Math.min(50,limit))}
+  `;
+  const results:Record<string,unknown>[]=[];
+  for(const row of rows){
+    const lifecycleId=String(row.lifecycle_id);
+    try{
+      const forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
+      results.push({
+        lifecycle_id:lifecycleId,ticker:String(row.ticker).toUpperCase(),
+        recommendation_id:String(row.recommendation_id),status:'MATERIALIZED',
+        forecast_version:forecast.forecast_version,horizon_count:forecast.horizons.length
+      });
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      results.push({
+        lifecycle_id:lifecycleId,ticker:String(row.ticker).toUpperCase(),
+        recommendation_id:String(row.recommendation_id),
+        status:detail==='BUILD3_STOCK_RUN_REGISTRY_MISSING'?'LEGACY_NOT_APPLICABLE':'BLOCKED',
+        detail
+      });
+    }
+  }
+  return results;
+}
