@@ -626,6 +626,8 @@ export async function progressNormalStockLifecycle(
   market_snapshot_id?:string|null;
   research_bundle_id?:string|null;
   auction_snapshot_id?:string|null;
+  build3_forecast_version?:string;
+  build3_forecast_horizons?:number;
   detail?:string|null;
 }>{
   let lifecycle=await getStockLifecycle(env,lifecycleId);
