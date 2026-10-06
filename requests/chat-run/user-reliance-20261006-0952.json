@@ -1,0 +1,68 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "user-reliance-20261006-0952",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-06T04:22:44Z",
+    "research_fresh_at": "2026-10-06T04:22:44Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "ril-src-1",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/ambanis-jio-platforms-plans-launch-ipo-october-21-sources-say-2026-10-05/",
+        "title": "Jio Platforms plans October 21 IPO",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-05T00:00:00Z",
+        "event_date": "2026-10-05T00:00:00Z"
+      },
+      {
+        "source_id": "ril-src-2",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/business/energy/india-will-ask-private-fuel-retailers-end-sales-rationing-2026-10-01/",
+        "title": "India asks private fuel retailers to end sales rationing",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-01T00:00:00Z",
+        "event_date": "2026-10-01T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-claim-1",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "Jio Platforms is reported to plan an October 21 IPO of about $3.8 billion, creating a material near-term valuation and capital-structure catalyst for Reliance Industries.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "ril-src-1"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-claim-2",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "India's government said private fuel retailers including Reliance would be asked to end sales rationing while regulated retail prices remain under pressure from elevated fuel costs.",
+        "materiality": "MODERATE",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "ril-src-2"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The two verified catalysts point in opposite directions; EDGE market evidence and tradeability gates determine the final forecast and recommendation."
+    ]
+  }
+}
