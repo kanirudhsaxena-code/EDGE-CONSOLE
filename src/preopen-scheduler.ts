@@ -16,6 +16,7 @@ import {
 import { produceStockSystemResearch } from './stock-system-research';
 import { classifyGovernedNseSession } from './nse-trading-calendar';
 import { buildBuild3RunRegistryRecord, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
 
 type JsonRecord=Record<string,unknown>;
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -350,7 +351,29 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
         continue;
       }
 
-      if(['COMPUTE_DISPATCHED','COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+      if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+        try{
+          const forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
+          stocks.push({
+            ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
+            auction_snapshot_id:lifecycle.auction_snapshot_id,
+            recommendation_id:lifecycle.recommendation_id,
+            build3_forecast_version:forecast.forecast_version,
+            build3_forecast_horizons:forecast.horizons.length,
+            idempotent:true
+          });
+        }catch(error){
+          stocks.push({
+            ticker,lifecycle_id:lifecycleId,status:'BUILD3_FORECAST_BLOCKED',
+            lifecycle_stage:lifecycle.stage,
+            recommendation_id:lifecycle.recommendation_id,
+            blocker:error instanceof Error?error.message:String(error)
+          });
+        }
+        continue;
+      }
+
+      if(['COMPUTE_DISPATCHED','COMPUTE_PENDING'].includes(lifecycle.stage)){
         stocks.push({
           ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
           auction_snapshot_id:lifecycle.auction_snapshot_id,
