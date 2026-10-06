@@ -87,12 +87,12 @@ export function buildNiftyBuild3Forecast(input:{
   issued_at:string;
   result:Record<string,unknown>;
   target_sessions:Build3TargetSession[];
-  geometry:GeometryRow[];
+  geometry?:GeometryRow[];
   reference_price_p0:number;
   evidence_snapshot_id:string;
   evidence_hash:string;
 }):Build3Forecast{
-  if(input.target_sessions.length!==5||input.geometry.length!==5)throw new Error('BUILD3_NIFTY_REQUIRES_FIVE_HORIZONS');
+  if(input.target_sessions.length!==5||(input.geometry&&input.geometry.length!==5))throw new Error('BUILD3_NIFTY_REQUIRES_FIVE_HORIZONS');
   const slots=isObject(input.result.horizon_slots)?input.result.horizon_slots:{};
   const regime=String(input.result.regime??(isObject(input.result.engine_diagnostics)?input.result.engine_diagnostics.regime:''));
   if(!['TREND','RANGE','TRANSITION','EVENT_SHOCK'].includes(regime))throw new Error('BUILD3_NIFTY_REGIME_INVALID');
@@ -103,9 +103,28 @@ export function buildNiftyBuild3Forecast(input:{
     if(!slot)throw new Error(`BUILD3_NIFTY_LEGACY_SLOT_MISSING:${legacyKey}`);
     const probs=isObject(slot.probabilities)?slot.probabilities:{};
     const target=input.target_sessions[index];
-    const geometry=input.geometry[index];
-    if(target.horizon!==horizon||geometry.horizon!==horizon||geometry.target_session!==target.target_session){
-      throw new Error(`BUILD3_NIFTY_SESSION_IDENTITY_MISMATCH:${horizon}`);
+    const suppliedGeometry=input.geometry?.[index];
+    let expectedCentre:number;
+    let coreZone:Build3Zone;
+    let outerZone:Build3Zone;
+    let coreZoneKind:'CALIBRATED'|'CENTRE_ONLY';
+    if(suppliedGeometry){
+      if(target.horizon!==horizon||suppliedGeometry.horizon!==horizon||suppliedGeometry.target_session!==target.target_session){
+        throw new Error(`BUILD3_NIFTY_SESSION_IDENTITY_MISMATCH:${horizon}`);
+      }
+      expectedCentre=suppliedGeometry.expected_centre;
+      coreZone=suppliedGeometry.core_zone;
+      outerZone=suppliedGeometry.outer_zone;
+      coreZoneKind='CALIBRATED';
+    }else{
+      if(target.horizon!==horizon)throw new Error(`BUILD3_NIFTY_SESSION_IDENTITY_MISMATCH:${horizon}`);
+      const low=numberOrNull(slot.zone_low);
+      const high=numberOrNull(slot.zone_high);
+      if(low===null||high===null||low<=0||high<=low)throw new Error(`BUILD3_NIFTY_LEGACY_ZONE_INVALID:${legacyKey}`);
+      expectedCentre=(low+high)/2;
+      coreZone={low:expectedCentre,high:expectedCentre};
+      outerZone={low,high};
+      coreZoneKind='CENTRE_ONLY';
     }
     return {
       horizon,
@@ -114,10 +133,10 @@ export function buildNiftyBuild3Forecast(input:{
       probabilities:{BULL:Number(probs.BULL),RANGE:Number(probs.RANGE),BEAR:Number(probs.BEAR)},
       regime:regime as Build3Regime,
       reasoning:String(slot.basis??'').trim(),
-      expected_centre:geometry.expected_centre,
-      core_zone_kind:'CALIBRATED',
-      core_zone:geometry.core_zone,
-      outer_zone:geometry.outer_zone,
+      expected_centre:expectedCentre,
+      core_zone_kind:coreZoneKind,
+      core_zone:coreZone,
+      outer_zone:outerZone,
     };
   });
   return assertBuild3Forecast({
