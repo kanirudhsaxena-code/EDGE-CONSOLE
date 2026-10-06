@@ -10,6 +10,7 @@ import { assessAutomatedMarketEvidence } from './automated-market-evidence';
 import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -658,9 +659,25 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     return json({...normalizedBody,...executionPacket},packetResponse.status);
   }
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
-  const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
+  let evidenceSnapshot;
+  try{
+    evidenceSnapshot=await freezeBuild3EvidenceSnapshot(env.DATABASE_URL,{
+      engine:'5DR',
+      instrument:'NIFTY',
+      source_id:requestId,
+      evidence:{engine_input:executionPacket},
+    });
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const blocked={status:'BLOCKED',detail,blocked_at:new Date().toISOString()};
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:blocked,error:'Build 3.0 evidence freeze failed',next_step:'RETRY_EVIDENCE_FREEZE'},409);
+  }
+  const snapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
+  const governedExecutionPacket={...executionPacket,build3_evidence_snapshot:snapshotRef};
+  const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,governedExecutionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
-  const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
+  const nextMetadata={...metadata,build3_evidence_snapshot:snapshotRef,engine_dispatch:dispatchRecord};
   if(dispatch.ok){
     await sql`update analysis_requests set status='PROCESSING',metadata=${JSON.stringify(nextMetadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
     return json({...normalizedBody,engine_dispatch:dispatchRecord,status:'PROCESSING'});

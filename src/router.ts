@@ -18,6 +18,7 @@ import {
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -661,6 +662,24 @@ export async function progressNormalStockLifecycle(
     if(!lifecycle.market_snapshot_id||!lifecycle.research_bundle_id){
       return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'RESEARCH_READY lineage is incomplete'};
     }
+    let evidenceSnapshot;
+    try{
+      evidenceSnapshot=await freezeBuild3StockEvidence(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+      });
+    }catch(error){
+      return {
+        status:'BLOCKED',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        detail:`Build 3.0 evidence freeze failed: ${error instanceof Error?error.message:String(error)}`
+      };
+    }
     const dispatch=await dispatchEdgeWorkflow(
       env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
       undefined,undefined,lifecycleId,lifecycle.market_snapshot_id,undefined
@@ -967,6 +986,29 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         : dispatchedAt)
     : undefined;
 
+  let evidenceSnapshotRef:Record<string,string>|null=null;
+  if(lifecycleId&&marketSnapshotId&&researchBundleId){
+    try{
+      const evidenceSnapshot=await freezeBuild3StockEvidence(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:marketSnapshotId,
+        research_bundle_id:researchBundleId,
+        auction_snapshot_id:auctionSnapshotIdForDispatch??null,
+        canonical_requested_at:canonicalRequestedAt??null,
+        canonical_attempt_slot:canonicalAttemptSlot,
+      });
+      evidenceSnapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
+    }catch(error){
+      return json({
+        error:'Build 3.0 evidence freeze failed',
+        detail:error instanceof Error?error.message:String(error),
+        code:'BUILD3_EVIDENCE_SNAPSHOT_BLOCKED',
+        ticker,lifecycle_id:lifecycleId,trading_enabled:false
+      },409);
+    }
+  }
+
   const dispatch = await dispatchEdgeWorkflow(
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
     canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
@@ -999,6 +1041,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     lifecycle_id: lifecycleId,
     market_snapshot_id: marketSnapshotId,
     auction_snapshot_id: auctionSnapshotIdForDispatch??null,
+    build3_evidence_snapshot:evidenceSnapshotRef,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
