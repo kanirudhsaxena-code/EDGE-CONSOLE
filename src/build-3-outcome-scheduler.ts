@@ -1,6 +1,6 @@
 import { evaluateMaturedBuild3Outcomes, type Build3OutcomeEvaluatorEnv } from './build-3-outcome-evaluator';
 
-export const BUILD3_TRUTH_CRON='7,37 11 * * * 1-5' as const;
+export const BUILD3_TRUTH_CRON='7,37 11 * * 1-5' as const;
 export const BUILD3_TRUTH_SCHEDULER_VERSION='MDOS_BUILD_3_TRUTH_SCHEDULER_V1' as const;
 
 export async function runBuild3TruthScheduledTick(
