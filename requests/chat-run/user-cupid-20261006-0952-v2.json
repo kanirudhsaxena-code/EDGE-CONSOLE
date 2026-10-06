@@ -1,0 +1,115 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "require_g5_parity": true,
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "user-cupid-20261006-0952-v2",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-10-06T04:22:44Z",
+    "research_fresh_at": "2026-10-06T04:22:44Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "cupid-official",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited Shareholders Notice 2026-2027",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      },
+      {
+        "source_id": "cupid-guidance",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://m.economictimes.com/markets/stocks/news/cupid-shares-hit-fresh-52-week-high-as-firm-raises-fy27-revenue-profit-guidance-again-multibagger-stock-skyrockets-617-in-a-year/articleshow/134607835.cms",
+        "title": "Cupid raises FY27 revenue and profit guidance",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-10-01T00:00:00Z",
+        "event_date": "2026-10-01T00:00:00Z"
+      },
+      {
+        "source_id": "cupid-holding",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.valueresearchonline.com/stocks/41707/cupid-ltd/shareholding/",
+        "title": "Cupid shareholding and valuation",
+        "retrieved_at": "2026-10-06T04:22:44Z",
+        "publication_date": "2026-09-30T00:00:00Z",
+        "event_date": "2026-09-30T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "cupid-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Cupid raised FY27 guidance to about ₹800 crore revenue and ₹250 crore net profit, indicating materially stronger management expectations for the year.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-guidance"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-inst",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Jun-2026 ownership data show FII holding near 4.17% versus 1.01% in Mar-2026 and mutual-fund holding near 0.33% versus 0.15%, indicating rising institutional participation from a low base.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-holding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-news",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Cupid published a Q2 FY27 business-update press release on 30 September 2026.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "cupid-official"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Recent valuation data place Cupid around 281x trailing earnings and roughly 78x book value, implying a very demanding valuation backdrop.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "cupid-holding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "The repeated FY27 guidance upgrade is a high-materiality positive event, while the elevated valuation raises the risk of sharp repricing if momentum or execution disappoints.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "cupid-guidance",
+          "cupid-holding"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Guidance and valuation create opposing forces; live EDGE market evidence and tradeability gates determine the final recommendation."
+    ]
+  }
+}
