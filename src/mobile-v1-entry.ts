@@ -11,6 +11,7 @@ import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
+import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -674,10 +675,27 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:blocked,error:'Build 3.0 evidence freeze failed',next_step:'RETRY_EVIDENCE_FREEZE'},409);
   }
   const snapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
-  const governedExecutionPacket={...executionPacket,build3_evidence_snapshot:snapshotRef};
+  const build3Run=isObject(metadata.build3_run)?metadata.build3_run:{};
+  const marketPhase=String(build3Run.market_phase??'CLOSED_SESSION') as 'PRE_OPEN'|'OPEN'|'INTRADAY'|'POST_CLOSE'|'CLOSED_SESSION';
+  let dataQuality;
+  try{
+    dataQuality=assessBuild3FiveDrDataQuality(evidenceSnapshot,marketPhase);
+    dataQuality=await persistBuild3DataQuality(env.DATABASE_URL,dataQuality);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const blocked={status:'BLOCKED',detail,blocked_at:new Date().toISOString()};
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:snapshotRef,build3_data_quality:blocked,error:'Build 3.0 data-quality assessment failed',next_step:'RETRY_DATA_QUALITY_GATE'},409);
+  }
+  const qualityRef=build3DataQualityRef(dataQuality);
+  if(!dataQuality.valid_for_forecast){
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef,error:'Build 3.0 data-quality gate blocked forecast dispatch',next_step:'REFRESH_REQUIRED_EVIDENCE'},409);
+  }
+  const governedExecutionPacket={...executionPacket,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef};
   const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,governedExecutionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
-  const nextMetadata={...metadata,build3_evidence_snapshot:snapshotRef,engine_dispatch:dispatchRecord};
+  const nextMetadata={...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef,engine_dispatch:dispatchRecord};
   if(dispatch.ok){
     await sql`update analysis_requests set status='PROCESSING',metadata=${JSON.stringify(nextMetadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
     return json({...normalizedBody,engine_dispatch:dispatchRecord,status:'PROCESSING'});

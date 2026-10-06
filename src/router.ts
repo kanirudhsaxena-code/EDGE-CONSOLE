@@ -19,6 +19,7 @@ import {
 import { produceStockSystemResearch } from './stock-system-research';
 import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
 import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
+import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -680,6 +681,20 @@ export async function progressNormalStockLifecycle(
         detail:`Build 3.0 evidence freeze failed: ${error instanceof Error?error.message:String(error)}`
       };
     }
+    const dataQuality=await persistBuild3DataQuality(
+      env.DATABASE_URL,
+      assessBuild3StockDataQuality(evidenceSnapshot)
+    );
+    if(!dataQuality.valid_for_forecast){
+      return {
+        status:'BLOCKED',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        detail:`Build 3.0 data-quality gate blocked: ${dataQuality.blockers.join(', ')}`
+      };
+    }
     const dispatch=await dispatchEdgeWorkflow(
       env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
       undefined,undefined,lifecycleId,lifecycle.market_snapshot_id,undefined
@@ -999,6 +1014,20 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         canonical_attempt_slot:canonicalAttemptSlot,
       });
       evidenceSnapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
+      const dataQuality=await persistBuild3DataQuality(
+        env.DATABASE_URL,
+        assessBuild3StockDataQuality(evidenceSnapshot)
+      );
+      if(!dataQuality.valid_for_forecast){
+        return json({
+          error:'Build 3.0 data-quality gate blocked forecast dispatch',
+          code:'BUILD3_DATA_QUALITY_BLOCKED',
+          ticker,lifecycle_id:lifecycleId,
+          build3_evidence_snapshot:evidenceSnapshotRef,
+          build3_data_quality:build3DataQualityRef(dataQuality),
+          trading_enabled:false
+        },409);
+      }
     }catch(error){
       return json({
         error:'Build 3.0 evidence freeze failed',
