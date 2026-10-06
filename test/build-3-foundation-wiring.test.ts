@@ -12,7 +12,7 @@ test('Build 3.0 Foundation migrations define immutable registry, evidence, DQ an
   assert.match(registry,/create table if not exists build3_run_registry/i);
   assert.match(registry,/unique\s*\(engine,source_id\)/i);
   assert.match(evidence,/create table if not exists build3_evidence_snapshots/i);
-  assert.match(evidence,/prevent_build3_evidence_mutation/i);
+  assert.match(evidence,/prevent_build3_evidence_snapshot_mutation/i);
   assert.match(quality,/create table if not exists build3_data_quality_assessments/i);
   assert.match(quality,/valid_for_forecast boolean not null/i);
   assert.match(forecast,/create table if not exists build3_forecast_horizons/i);
