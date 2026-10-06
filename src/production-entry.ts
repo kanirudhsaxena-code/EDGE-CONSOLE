@@ -10,6 +10,8 @@ import { gateCanonicalHistoryResponse } from './canonical-history-release-gate';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 import { runPreopenScheduledTick } from './preopen-scheduler';
 import { progressPendingNormalStockLifecycles } from './router';
+import { materializePendingBuild3StockForecasts } from './build-3-stock-materializer';
+import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';
 
 /**
  * Production entrypoint shim.
@@ -95,8 +97,18 @@ export default {
     const cron=String((controller as any).cron??'');
     if(cron==='7,22,37,52 * * * 1-5'){
       ctx.waitUntil((async()=>{
-        const results=await progressPendingNormalStockLifecycles(env,12);
-        console.log(JSON.stringify({status:'EDGE_NORMAL_LIFECYCLE_GUARD',count:results.length,results,trading_enabled:false}));
+        const [normalResults,stockBuild3,niftyBuild3]=await Promise.all([
+          progressPendingNormalStockLifecycles(env,12),
+          materializePendingBuild3StockForecasts(env,12),
+          progressPendingBuild3NiftyRuns(env,12),
+        ]);
+        console.log(JSON.stringify({
+          status:'BUILD3_COMPLETION_GUARD',
+          normal_lifecycles:{count:normalResults.length,results:normalResults},
+          stock_forecasts:{count:stockBuild3.length,results:stockBuild3},
+          nifty_forecasts:{count:niftyBuild3.length,results:niftyBuild3},
+          trading_enabled:false
+        }));
       })());
       return;
     }
