@@ -206,6 +206,25 @@ export function assessBuild3StockDataQuality(
   return finalAssessment(snapshot,requiredInputs,optionalInputs);
 }
 
+export async function readBuild3DataQuality(
+  databaseUrl:string|undefined,
+  engine:Build3Engine,
+  sourceId:string,
+):Promise<Build3DataQualityAssessment|null>{
+  if(!databaseUrl?.trim())throw new Error('BUILD3_DATA_QUALITY_DATABASE_NOT_CONFIGURED');
+  if(!sourceId.trim())throw new Error('BUILD3_DATA_QUALITY_SOURCE_ID_REQUIRED');
+  const sql=neon(databaseUrl);
+  const rows=await sql`
+    select payload from build3_data_quality_assessments
+     where engine=${engine} and source_id=${sourceId}
+     limit 1
+  `;
+  if(!rows.length||!isObject(rows[0].payload))return null;
+  const stored=rows[0].payload as Build3DataQualityAssessment;
+  if(stored.engine!==engine||stored.source_id!==sourceId)throw new Error('BUILD3_DATA_QUALITY_READBACK_IDENTITY_MISMATCH');
+  return stored;
+}
+
 export async function persistBuild3DataQuality(
   databaseUrl:string|undefined,
   assessment:Build3DataQualityAssessment,
