@@ -69,6 +69,9 @@ test('NIFTY actionable recommendation remains distinct from the horizon forecast
   assert.equal(decision.decision_state,'ACTIONABLE');
   assert.equal(decision.recommendation,'BUY_CE');
   assert.equal(decision.counterfactual.applicable,false);
+  assert.equal(decision.execution_snapshot.applicable,true);
+  assert.equal(decision.execution_snapshot.availability,'NOT_AVAILABLE');
+  assert.equal(decision.execution_snapshot.exact_contract_verified,false);
 });
 
 test('stock NO_TRADE/HOLD path preserves only actually persisted rejected setup fields',()=>{
@@ -101,4 +104,24 @@ test('stock actionable BUY remains ACTIONABLE without being confused with foreca
   assert.equal(decision.decision_state,'ACTIONABLE');
   assert.equal(decision.recommendation,'BUY');
   assert.equal(decision.counterfactual.applicable,false);
+});
+
+
+test('stock actionable execution levels are frozen as a complete decision snapshot',()=>{
+  const decision=buildStockBuild3Decision(forecast('EDGE_STOCKS'),{
+    definitive_forecast:'BULLISH',definitive_recommendation:'BUY',
+    des:65,market_trust_score:82,bot_grade:'A+',decision_ladder:'FULL',
+    evidence_gate_status:'PASS',event_shock_level:'LOW',active_override:null,rationale:'Qualified.',
+    execution_plan:{
+      instrument:'EQUITY',entry_low:101,entry_high:101,stop_price:96,target1:111,target2:118,
+      rr_t1:2,execution_quality_score:90,time_exit:'Frozen forecast horizon',
+    },
+  });
+  assert.equal(decision.execution_snapshot.applicable,true);
+  assert.equal(decision.execution_snapshot.availability,'COMPLETE');
+  assert.equal(decision.execution_snapshot.action,'LONG_ENTRY');
+  assert.equal(decision.execution_snapshot.entry_low,101);
+  assert.equal(decision.execution_snapshot.stop,96);
+  assert.equal(decision.execution_snapshot.target1,111);
+  assert.equal(decision.execution_snapshot.exact_contract_verified,true);
 });

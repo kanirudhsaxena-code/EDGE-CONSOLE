@@ -26,6 +26,21 @@ export type Build3NoTradeCounterfactual={
   rejecting_gates:string[];
 };
 
+export type Build3ExecutionSnapshot={
+  applicable:boolean;
+  availability:'COMPLETE'|'PARTIAL'|'NOT_AVAILABLE';
+  action:'LONG_ENTRY'|'LONG_EXIT'|'OPTION_CALL'|'OPTION_PUT'|'OPTION_CONVEXITY'|'NONE'|'UNKNOWN';
+  instrument_expression:string|null;
+  entry_low:number|null;
+  entry_high:number|null;
+  stop:number|null;
+  target1:number|null;
+  target2:number|null;
+  time_exit:string|null;
+  exact_contract_verified:boolean;
+  reason:string|null;
+};
+
 export type Build3DecisionRecord={
   decision_version:typeof BUILD3_DECISION_VERSION;
   engine:'5DR'|'EDGE_STOCKS';
@@ -41,6 +56,7 @@ export type Build3DecisionRecord={
   gate_results:Build3GateResult[];
   rejecting_gates:string[];
   counterfactual:Build3NoTradeCounterfactual;
+  execution_snapshot:Build3ExecutionSnapshot;
 };
 
 const isObject=(value:unknown):value is Record<string,unknown>=>!!value&&typeof value==='object'&&!Array.isArray(value);
@@ -69,6 +85,72 @@ function emptyCounterfactual():Build3NoTradeCounterfactual{
     applicable:false,diagnostic_only:true,issued_trade:false,availability:'NOT_AVAILABLE',
     direction_candidate:null,instrument_expression:null,entry_logic:null,invalidation:null,
     expected_rr:null,target1:null,target2:null,rejecting_gates:[],
+  };
+}
+
+function emptyExecution(reason:string):Build3ExecutionSnapshot{
+  return {
+    applicable:false,availability:'NOT_AVAILABLE',action:'NONE',instrument_expression:null,
+    entry_low:null,entry_high:null,stop:null,target1:null,target2:null,time_exit:null,
+    exact_contract_verified:false,reason,
+  };
+}
+
+function executionAvailability(values:Array<unknown>):'COMPLETE'|'PARTIAL'|'NOT_AVAILABLE'{
+  const present=values.filter(value=>value!==null&&value!==undefined&&value!=='').length;
+  if(present===0)return 'NOT_AVAILABLE';
+  if(present===values.length)return 'COMPLETE';
+  return 'PARTIAL';
+}
+
+function niftyExecutionSnapshot(
+  recommendation:string,
+  result:Record<string,unknown>,
+):Build3ExecutionSnapshot{
+  if(recommendation==='NO_TRADE')return emptyExecution('NO_ISSUED_TRADE');
+  const supplied=isObject(result.execution_snapshot)
+    ?result.execution_snapshot
+    :isObject(result.execution_plan)?result.execution_plan:{};
+  const instrument=textOrNull(supplied.contract_symbol??supplied.instrument_expression??supplied.instrument);
+  const entryLow=num(supplied.entry_low??supplied.entry??supplied.observed_premium);
+  const entryHigh=num(supplied.entry_high??supplied.entry??supplied.observed_premium);
+  const stop=num(supplied.stop??supplied.stop_price??supplied.stop_premium);
+  const target1=num(supplied.target1??supplied.target1_premium);
+  const target2=num(supplied.target2??supplied.target2_premium);
+  const timeExit=textOrNull(supplied.time_exit??supplied.expiry);
+  const action=recommendation==='BUY_CE'?'OPTION_CALL'
+    :recommendation==='BUY_PE'?'OPTION_PUT'
+    :recommendation==='BUY_CONVEXITY'?'OPTION_CONVEXITY'
+    :'UNKNOWN';
+  const availability=executionAvailability([instrument,entryLow,entryHigh,stop,target1]);
+  return {
+    applicable:true,availability,action,instrument_expression:instrument,
+    entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
+    exact_contract_verified:availability==='COMPLETE'&&!!instrument,
+    reason:availability==='COMPLETE'?null:'EXACT_ISSUED_EXECUTION_PACKET_NOT_BOUND',
+  };
+}
+
+function stockExecutionSnapshot(
+  recommendation:string,
+  execution:Record<string,unknown>,
+):Build3ExecutionSnapshot{
+  const actionable=new Set(['STRONG BUY','BUY','ACCUMULATE','SELL','REDUCE']);
+  if(!actionable.has(recommendation))return emptyExecution('NO_ISSUED_TRADE');
+  const instrument=textOrNull(execution.instrument);
+  const entryLow=num(execution.entry_low);
+  const entryHigh=num(execution.entry_high);
+  const stop=num(execution.stop_price);
+  const target1=num(execution.target1);
+  const target2=num(execution.target2);
+  const timeExit=textOrNull(execution.time_exit);
+  const availability=executionAvailability([instrument,entryLow,entryHigh,stop,target1]);
+  const action=['STRONG BUY','BUY','ACCUMULATE'].includes(recommendation)?'LONG_ENTRY':'LONG_EXIT';
+  return {
+    applicable:true,availability,action,instrument_expression:instrument,
+    entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
+    exact_contract_verified:availability==='COMPLETE'&&['EQUITY','EQUITY_EXIT'].includes(String(instrument??'').toUpperCase()),
+    reason:availability==='COMPLETE'?null:'ISSUED_EXECUTION_LEVELS_INCOMPLETE',
   };
 }
 
@@ -146,6 +228,7 @@ export function buildNiftyBuild3Decision(
     gate_results:gates,
     rejecting_gates:rejecting,
     counterfactual,
+    execution_snapshot:niftyExecutionSnapshot(recommendation,result),
   };
 }
 
@@ -236,6 +319,7 @@ export function buildStockBuild3Decision(
     gate_results:gates,
     rejecting_gates:rejecting,
     counterfactual,
+    execution_snapshot:stockExecutionSnapshot(recommendation,execution),
   };
 }
 
@@ -249,14 +333,14 @@ export async function persistBuild3Decision(
     insert into build3_decisions(
       decision_version,engine,instrument,source_id,issued_at,forecast_direction,
       decision_state,recommendation,tradeable,evidence_snapshot_id,evidence_hash,
-      gate_results,rejecting_gates,counterfactual,payload
+      gate_results,rejecting_gates,counterfactual,execution_snapshot,payload
     ) values(
       ${decision.decision_version},${decision.engine},${decision.instrument},${decision.source_id},
       ${decision.issued_at},${decision.forecast_direction},${decision.decision_state},
       ${decision.recommendation},${decision.tradeable},${decision.evidence_snapshot_id},
       ${decision.evidence_hash},${JSON.stringify(decision.gate_results)}::jsonb,
       ${JSON.stringify(decision.rejecting_gates)}::jsonb,${JSON.stringify(decision.counterfactual)}::jsonb,
-      ${JSON.stringify(decision)}::jsonb
+      ${JSON.stringify(decision.execution_snapshot)}::jsonb,${JSON.stringify(decision)}::jsonb
     )
     on conflict (engine,source_id) do nothing
   `;
