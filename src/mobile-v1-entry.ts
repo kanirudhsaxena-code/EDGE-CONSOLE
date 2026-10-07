@@ -282,7 +282,16 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
-  if(build3Run)await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+  if(build3Run){
+    try{
+      await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      const blocked={...metadata,build3_registry:{status:'BLOCKED',detail,blocked_at:new Date().toISOString()},adapter_stage:'BUILD3_RUN_REGISTRY_BLOCKED'};
+      await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify(blocked)}::jsonb,error=${JSON.stringify({stage:'BUILD3_RUN_REGISTRY',detail})}::jsonb,updated_at=now() where request_id=${requestId}`;
+      return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'BUILD3_RUN_REGISTRY_BLOCKED',error:'Build 3.0 run registry persistence failed',detail,next_step:'RETRY_BUILD3_RUN_REGISTRY'},503);
+    }
+  }
   const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
