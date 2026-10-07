@@ -283,3 +283,25 @@ test('deterministic fallback accepts surviving content-qualified catalyst source
   assert.ok(event?.source_ids.includes('CUPID_SCREENER')||event?.source_ids.includes('CUPID_OFFICIAL_FINANCIALS'));
   assert.ok(result.bundle.limitations.some(x=>x.includes('CUPID_OFFICIAL_NOTICES unavailable')));
 });
+
+test('deterministic research rejects navigation boilerplate as RELIANCE catalyst evidence',async()=>{
+  const env:any={AI:{run:async()=>{throw new Error('4006: daily free allocation exhausted')}}};
+  const fetcher:any=async(url:string)=>{
+    if(url.includes('ril.com/news-media'))return html('Home About Us Businesses Investors Media Press Releases Careers Contact Us Quick Links');
+    if(url.includes('ril.com/investors'))return html('FY26 financial reporting: revenue 100 crore and profit 10 crore.');
+    if(url.includes('screener.in'))return html('Market Cap ₹100 Cr. Stock P/E 20. Promoter holding 50%.');
+    if(url.includes('nseindia.com'))return html('NSE issuer shareholding page.');
+    if(url.includes('news.google.com'))return new Response('',{status:503});
+    return new Response('',{status:404});
+  };
+  await assert.rejects(
+    produceStockSystemResearch(env,{
+      ticker:'RELIANCE',
+      lifecycle_id:'EDGE-LC-2026-10-07-RELIANCE-BOILERPLATE',
+      market_snapshot_id:'EDGE-MKT-RELIANCE-20261007-boilerplate',
+      data_captured_at:'2026-10-07T04:30:00.000Z',
+      market_payload:{market:{observations:[],payloads:{}},provider_research:{observations:[],payloads:{}}}
+    },fetcher),
+    /STOCK_RESEARCH_DETERMINISTIC_COVERAGE_INSUFFICIENT:.*NEWS_EVENTS_CATALYSTS.*EVENT_SHOCK/
+  );
+});

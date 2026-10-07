@@ -132,6 +132,29 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
     if (!isObject(d.risk_override)) errors.push('current_stock_outcome.risk_override is mandatory');
     if (!isObject(d.expected_price_zone)) errors.push('current_stock_outcome.expected_price_zone is mandatory');
     if (!isObject(d.execution)) errors.push('current_stock_outcome.execution is mandatory');
+    else {
+      const execution=d.execution as JsonRecord;
+      const instrument=String(execution.instrument ?? 'NONE').toUpperCase();
+      if (instrument==='NONE') {
+        if (!isNonEmptyString(execution.dominant_rejection_reason)) {
+          errors.push('current_stock_outcome.execution.dominant_rejection_reason is mandatory for non-executable decisions');
+        }
+        if (!Array.isArray(execution.gate_results) || execution.gate_results.length===0) {
+          errors.push('current_stock_outcome.execution.gate_results must explain non-executable decisions');
+        } else {
+          execution.gate_results.forEach((gate,index)=>{
+            if(!isObject(gate)){
+              errors.push(`current_stock_outcome.execution.gate_results[${index}] must be an object`);
+              return;
+            }
+            if(!isNonEmptyString(gate.gate))errors.push(`current_stock_outcome.execution.gate_results[${index}].gate is mandatory`);
+            if(!['PASS','FAIL','N/A'].includes(String(gate.status)))errors.push(`current_stock_outcome.execution.gate_results[${index}].status is invalid`);
+            if(!isNonEmptyString(gate.threshold))errors.push(`current_stock_outcome.execution.gate_results[${index}].threshold is mandatory`);
+            if(String(gate.status)==='FAIL'&&!isNonEmptyString(gate.reason))errors.push(`current_stock_outcome.execution.gate_results[${index}].reason is mandatory for failed gates`);
+          });
+        }
+      }
+    }
     if (!isObject(d.probabilities)) errors.push('current_stock_outcome.probabilities is mandatory');
     else {
       const p = d.probabilities as JsonRecord;
@@ -159,8 +182,14 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
       }
       if (typeof row.conflict_flag !== 'boolean') errors.push(`drilldown[${index}].conflict_flag is mandatory`);
       if (row.evidence_quality == null) errors.push(`drilldown[${index}].evidence_quality is mandatory`);
-      if (!['VERIFIED','NOT_VERIFIED','NOT_AVAILABLE','NOT_SCORABLE','N/A'].includes(String(row.verification_status))) {
+      if (!['VERIFIED','CONFLICTED','NOT_VERIFIED','NOT_AVAILABLE','NOT_SCORABLE','N/A'].includes(String(row.verification_status))) {
         errors.push(`drilldown[${index}].verification_status is invalid`);
+      }
+      if (!['INCLUDED','EXCLUDED'].includes(String(row.score_eligibility))) {
+        errors.push(`drilldown[${index}].score_eligibility must be INCLUDED or EXCLUDED`);
+      }
+      if (String(row.score_eligibility)==='EXCLUDED' && !isNonEmptyString(row.score_exclusion_reason)) {
+        errors.push(`drilldown[${index}].score_exclusion_reason is mandatory when score is excluded`);
       }
       if (String(row.verification_status) === 'VERIFIED') {
         const interpretation = String(row.interpretation ?? '').trim();
@@ -173,9 +202,11 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
   return errors;
 }
 
-export function componentVerificationStatus(availability: unknown, quality: unknown): 'VERIFIED'|'NOT_VERIFIED'|'NOT_AVAILABLE'|'N/A' {
+export function componentVerificationStatus(availability: unknown, quality: unknown): 'VERIFIED'|'CONFLICTED'|'NOT_VERIFIED'|'NOT_AVAILABLE'|'N/A' {
+  const q=String(quality ?? '').toUpperCase();
+  if (q==='CONFLICTED') return 'CONFLICTED';
+  if (q && q!=='NOT_VERIFIED' && q!=='NOT_AVAILABLE' && q!=='N/A') return 'VERIFIED';
   if (availability === 'NOT_AVAILABLE') return 'NOT_AVAILABLE';
   if (availability === 'N/A') return 'N/A';
-  if (availability !== 'AVAILABLE' || quality === 'NOT_VERIFIED' || quality == null) return 'NOT_VERIFIED';
-  return 'VERIFIED';
+  return 'NOT_VERIFIED';
 }

@@ -245,11 +245,27 @@ const sentenceFragments=(text:string):string[]=>text
 
 const containsAny=(text:string,patterns:RegExp[])=>patterns.some(pattern=>pattern.test(text));
 
+const isLikelyBoilerplate=(text:string):boolean=>{
+  const normalized=text.replace(/\s+/g,' ').trim();
+  if(!normalized)return true;
+  if(/\b(skip to (?:main )?content|cookie preferences?|privacy policy|terms (?:of use|and conditions)|site ?map|sign in|log in|subscribe)\b/i.test(normalized))return true;
+  const navPatterns=[
+    /\bhome\b/i,/\babout us\b/i,/\bbusiness(?:es)?\b/i,/\binvestors?\b/i,
+    /\bmedia\b/i,/\bcareers?\b/i,/\bcontact us\b/i,/\bquick links\b/i,
+  ];
+  const navHits=navPatterns.filter(pattern=>pattern.test(normalized)).length;
+  const factualMarker=/\b(?:20\d{2}|FY\d{2}|Q[1-4]|quarter|crore|million|billion|revenue|profit|EBITDA|order value|stake|holding|approved|acquired|resigned|penalty|investigation)\b|%|₹/i.test(normalized);
+  return navHits>=4&&!factualMarker;
+};
+
+const hasQualifiedResearchSentence=(text:string,patterns:RegExp[]):boolean=>
+  sentenceFragments(text).some(sentence=>!isLikelyBoilerplate(sentence)&&containsAny(sentence,patterns));
+
 function relevantExcerpt(sources:RetrievedResearchSource[],patterns:RegExp[],max=3):string[]{
   const out:string[]=[];
   for(const source of sources){
     for(const sentence of sentenceFragments(source.excerpt)){
-      if(!containsAny(sentence,patterns))continue;
+      if(isLikelyBoilerplate(sentence)||!containsAny(sentence,patterns))continue;
       const clipped=sentence.replace(/\s+/g,' ').trim().slice(0,360);
       if(clipped&&!out.includes(clipped))out.push(clipped);
       if(out.length>=max)return out;
@@ -284,14 +300,22 @@ function deterministicSourceGroundedClaims(
 ):{claims:EdgeResearchClaim[];limitations:string[]}{
   const fundamentalsSources=pickSources(sources,[/OFFICIAL_(INVESTORS|FINANCIALS)/,/SCREENER$/]);
   const institutionalSources=pickSources(sources,[/SCREENER$/,/NSE_QUOTE$/]);
-  const directNewsSources=pickSources(sources,[/OFFICIAL_(NEWSROOM|PRESS|NOTICES)/,/NEWS_RSS$/]);
+  const directNewsSources=pickSources(sources,[/OFFICIAL_(NEWSROOM|PRESS|NOTICES)/,/NEWS_RSS$/])
+    .filter(source=>!isLikelyBoilerplate(source.excerpt));
   // Some issuer/news endpoints can be unavailable from the Worker runtime even when
   // another independently retrieved page contains fresh announcements. Do not
   // infer coverage from a source ID alone: promote a surviving source to
   // NEWS/EVENT evidence only when its retrieved text contains explicit
   // announcement/catalyst/event language.
+  const catalystSourcePatterns=[
+    /\bannouncement\b/i,/\bpress release\b/i,/\bresults?\b/i,/\bboard meeting\b/i,
+    /\bbusiness update\b/i,/\border\b/i,/\bcontract\b/i,/\bacquisition\b/i,
+    /\bmerger\b/i,/\bexpansion\b/i,/\bcapacity\b/i,/\bapproval\b/i,
+    /\bnotice\b/i,/\bresignation\b/i,/\binvestigation\b/i,/\bpenalt(?:y|ies)\b/i,
+    /\bcourt order\b/i,/\bshow cause\b/i,/\bwarning\b/i,
+  ];
   const contentQualifiedNewsSources=sources.filter(source=>
-    /\b(announcement|press release|results?|board meeting|business update|order|contract|acquisition|merger|expansion|capacity|approval|notice|resignation|investigation|penalt(?:y|ies)|court order|show cause|warning)\b/i.test(source.excerpt)
+    hasQualifiedResearchSentence(source.excerpt,catalystSourcePatterns)
   );
   const newsSources=[...new Map(
     [...directNewsSources,...contentQualifiedNewsSources].map(source=>[source.source_id,source] as const)
