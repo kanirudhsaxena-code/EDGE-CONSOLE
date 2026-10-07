@@ -8,6 +8,9 @@ export type EngineDispatchEnv={
   FIVEDR_ASSESSMENT_REPOSITORY?:string;
   FIVEDR_WORKFLOW_REF?:string;
   FIVEDR_CALLBACK_URL?:string;
+  BUILD3_TRUTH_REPOSITORY?:string;
+  BUILD3_TRUTH_WORKFLOW?:string;
+  BUILD3_TRUTH_REF?:string;
 };
 
 export type EngineDispatchResult={
@@ -23,6 +26,7 @@ const DEFAULT_WORKFLOW='console-execute.yml';
 const DEFAULT_ACQUIRE_WORKFLOW='console-acquire.yml';
 const DEFAULT_PREOPEN_ACQUIRE_WORKFLOW='console-preopen-acquire.yml';
 const DEFAULT_ASSESSMENT_WORKFLOW='assessment-refresh.yml';
+const DEFAULT_BUILD3_TRUTH_WORKFLOW='build3-recommendation-intraday-truth.yml';
 const DEFAULT_REF='main';
 
 export type EngineDispatchHealth={
@@ -84,10 +88,11 @@ async function dispatchWorkflow(
   workflow:string,
   inputs:Record<string,string>,
   fetcher:typeof fetch,
-  repositoryOverride?:string
+  repositoryOverride?:string,
+  refOverride?:string
 ):Promise<EngineDispatchResult>{
   const repository=repositoryOverride?.trim()||env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
-  const ref=env.FIVEDR_WORKFLOW_REF?.trim()||DEFAULT_REF;
+  const ref=refOverride?.trim()||env.FIVEDR_WORKFLOW_REF?.trim()||DEFAULT_REF;
   const token=env.GITHUB_ACTIONS_TOKEN?.trim();
   if(!token)return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'GitHub workflow dispatch secret is not configured'};
   try{
@@ -176,4 +181,40 @@ export async function dispatch5drEngine(
     console_url:origin,
     execution_packet:executionPacket===undefined?'':JSON.stringify(executionPacket)
   },fetcher);
+}
+
+
+export type Build3RecommendationTruthDispatchInput={
+  engine:'5DR'|'EDGE_STOCKS';
+  source_id:string;
+  provider_instrument_key:string;
+  session_date:string;
+};
+
+export async function dispatchBuild3RecommendationIntradayTruth(
+  env:EngineDispatchEnv,
+  input:Build3RecommendationTruthDispatchInput,
+  consoleUrl:string,
+  fetcher:typeof fetch=fetch,
+):Promise<EngineDispatchResult>{
+  const workflow=env.BUILD3_TRUTH_WORKFLOW?.trim()||DEFAULT_BUILD3_TRUTH_WORKFLOW;
+  const repository=env.BUILD3_TRUTH_REPOSITORY?.trim()||env.FIVEDR_REPOSITORY?.trim()||DEFAULT_REPOSITORY;
+  const ref=env.BUILD3_TRUTH_REF?.trim()||env.FIVEDR_WORKFLOW_REF?.trim()||DEFAULT_REF;
+  const origin=callbackOrigin(env,consoleUrl);
+  if(
+    !origin||
+    !input.source_id.trim()||
+    !input.provider_instrument_key.trim()||
+    !/^\d{4}-\d{2}-\d{2}$/.test(input.session_date)||
+    !['5DR','EDGE_STOCKS'].includes(input.engine)
+  ){
+    return {ok:false,status:'CONFIGURATION_BLOCKED',repository,workflow,detail:'Build 3 intraday truth dispatch identity is invalid'};
+  }
+  return dispatchWorkflow(env,workflow,{
+    engine:input.engine,
+    source_id:input.source_id.trim(),
+    instrument_key:input.provider_instrument_key.trim(),
+    session_date:input.session_date,
+    console_url:origin,
+  },fetcher,repository,ref);
 }
