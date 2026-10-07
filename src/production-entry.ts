@@ -13,6 +13,7 @@ import { progressPendingNormalStockLifecycles } from './router';
 import { materializePendingBuild3StockForecasts } from './build-3-stock-materializer';
 import { progressPendingBuild3NiftyRuns } from './mobile-v1-entry';
 import { BUILD3_TRUTH_CRON, runBuild3TruthScheduledTick } from './build-3-outcome-scheduler';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
 
 /**
  * Production entrypoint shim.
@@ -97,6 +98,10 @@ export default {
   async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
     const cron=String((controller as any).cron??'');
     if(cron===BUILD3_TRUTH_CRON){
+      if(!isBuild3RuntimeEnabled(env)){
+        console.log(JSON.stringify({status:'BUILD3_DISABLED',cron,trading_enabled:false}));
+        return;
+      }
       ctx.waitUntil((async()=>{
         const result=await runBuild3TruthScheduledTick(env,controller.scheduledTime);
         console.log(JSON.stringify(result));
@@ -104,6 +109,10 @@ export default {
       return;
     }
     if(cron==='7,22,37,52 * * * 1-5'){
+      if(!isBuild3RuntimeEnabled(env)){
+        console.log(JSON.stringify({status:'BUILD3_DISABLED',cron,trading_enabled:false}));
+        return;
+      }
       ctx.waitUntil((async()=>{
         const [normalResults,stockBuild3,niftyBuild3]=await Promise.all([
           progressPendingNormalStockLifecycles(env,12),
