@@ -73,3 +73,12 @@ test('semantic JSON equality ignores object key ordering from jsonb persistence'
   const b={component_scores:{MACRO_CATALYSTS:0,PARTICIPATION:0,PVPO:12.5,PRICE_STRUCTURE:20}};
   assert.equal(jsonEquivalent(a,b),true);
 });
+
+
+test('rejects zero expected R:R with a non-zero R:R quality subscore',()=>{
+  const bad=structuredClone(fullNormalized) as any;
+  bad.expected_rr=0;
+  bad.execution_inputs.rr_score=60;
+  const errors=validateNormalizedEvidence({evidence:[item(bad)]});
+  assert.ok(errors.some(error=>error.includes('rr_score must be 0 when expected_rr is 0')));
+});

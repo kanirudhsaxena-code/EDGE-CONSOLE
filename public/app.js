@@ -57,11 +57,15 @@ function niftyMetricBreakdown(result,normalized){
 
   const execution=data.execution_inputs||d.execution_inputs||{};
   const execWeights={rr_score:30,premium_iv_theta_score:25,strike_expiry_fit_score:15,liquidity_spread_score:15,entry_invalidation_score:15};
-  const execLabels={rr_score:'Expected R:R',premium_iv_theta_score:'Premium / IV / theta',strike_expiry_fit_score:'Strike / expiry fit',liquidity_spread_score:'Liquidity / spread',entry_invalidation_score:'Entry / invalidation'};
+  const execLabels={rr_score:'R:R quality subscore',premium_iv_theta_score:'Premium / IV / theta',strike_expiry_fit_score:'Strike / expiry fit',liquidity_spread_score:'Liquidity / spread',entry_invalidation_score:'Entry / invalidation'};
+  const actualExpectedRr=Number(data.expected_rr??result?.expected_rr);
   const execCards=Object.keys(execLabels).map(key=>{
     const value=Number(execution[key]),weight=execWeights[key];
     const contribution=Number.isFinite(value)?value*weight/100:null;
-    return '<div class="breakdown-card"><span>'+escapeHtml(execLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · edge contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+'</small></div>'
+    const rrDetail=key==='rr_score'&&Number.isFinite(actualExpectedRr)
+      ?' · actual expected R:R '+actualExpectedRr.toFixed(2)+' · hard gate '+(actualExpectedRr>=2?'PASS':'FAIL')
+      :'';
+    return '<div class="breakdown-card"><span>'+escapeHtml(execLabels[key])+'</span><strong>'+(Number.isFinite(value)?escapeHtml(value.toFixed(0))+'/100':'Not verified')+'</strong><small>Weight '+weight+'% · edge contribution '+(contribution==null?'—':escapeHtml(contribution.toFixed(2)))+rrDetail+'</small></div>'
   }).join('');
 
   return '<details class="metric-breakdown-details" open><summary>Metric breakdown & legends</summary>'+
@@ -253,15 +257,28 @@ function governedWhy(meta,normalized,result){
       if(rel||next)fed={action:null,range:null,statementRelease:rel?rel[1]:null,nextMeeting:next?next[1]:null};
     }
   }
-  const priceFacts=['NIFTY around '+(spot?spot.toLocaleString('en-IN',{maximumFractionDigits:2}):'—'),trend.detail];
+  const normalizedComponents=(normalized&&typeof normalized==='object'&&normalized.component_scores&&typeof normalized.component_scores==='object')?normalized.component_scores:(result?.engine_diagnostics?.component_scores||{});
+  const priceScore=Number(normalizedComponents.PRICE_STRUCTURE),pvpoScore=Number(normalizedComponents.PVPO);
+  const firstPathSlot=result&&result.horizon_slots&&typeof result.horizon_slots==='object'?result.horizon_slots['D+1']:null;
+  const governedPathBasis=firstPathSlot&&typeof firstPathSlot==='object'&&typeof firstPathSlot.basis==='string'?firstPathSlot.basis.trim():'';
+  const priceFacts=[];
+  if(spot)priceFacts.push('NIFTY around '+spot.toLocaleString('en-IN',{maximumFractionDigits:2}));
+  if(trend.label!=='Not verified')priceFacts.push(trend.detail);
+  else if(governedPathBasis)priceFacts.push('Governed structured basis: '+governedPathBasis);
+  else if(Number.isFinite(priceScore))priceFacts.push('Governed PRICE_STRUCTURE component '+priceScore.toFixed(1)+'; detailed chart observation is not preserved in this presentation record');
+  else priceFacts.push(trend.detail);
   if(emaVals.some(v=>/above/i.test(v)))priceFacts.push('price is above the visible EMA');
   if(vwapVals.some(v=>/above/i.test(v)))priceFacts.push('price is above VWAP on at least one intraday view');
   if(support)priceFacts.push('support near '+support);if(resistance)priceFacts.push('resistance near '+resistance);
   const priceMeaning=result.directional_label==='RANGE'
-    ? 'That is constructive underneath, but not a clean breakout: price structure is firmer than the headline range call, so the range view is being driven by missing confirmation from positioning, participation and execution rather than by outright bearish price action.'
-    : 'The price structure supports the published direction only if derivatives, participation and macro risk confirm it; otherwise the system deliberately reduces conviction.';
-  const optionsObserved=strikeText?('Near-ATM strikes show '+strikeText+'.'):'The stored derivatives extraction does not contain enough strike-level premium/OI/volume fields for a reliable directional read.';
-  const optionsMeaning=rows.length?(mixedBias?'The strike surface is internally conflicted, so options are not confirming the constructive chart structure. That conflict is a direct reason the 5-day probability stays closer to range than to a directional breakout.':'Nearby strikes are broadly aligned, so options are reinforcing rather than contradicting the chart structure.'):'Without reliable strike-level alignment, aggregate OI is not allowed to create a directional call.';
+    ? 'The governed price/structure input is one part of the frozen directional model; the published range call also depends on derivatives, participation and macro confirmation.'
+    : 'The governed price/structure input supports the published direction only if derivatives, participation and macro risk confirm it; otherwise the system deliberately reduces conviction.';
+  const optionsObserved=strikeText
+    ?('Near-ATM strikes show '+strikeText+'.')
+    :(Number.isFinite(pvpoScore)?('Governed PVPO component '+pvpoScore.toFixed(1)+' was frozen into the engine input; strike-level drill-down was not preserved in this presentation record.'):'The derivatives evidence is not sufficient to expose a strike-level directional drill-down.');
+  const optionsMeaning=rows.length
+    ?(mixedBias?'The strike surface is internally conflicted, so options are not confirming the chart structure.':'Nearby strikes are broadly aligned, so options are reinforcing rather than contradicting the chart structure.')
+    :(Number.isFinite(pvpoScore)?'PVPO may contribute to DES5 from the governed normalized evidence even when the presentation record lacks strike-level detail; the UI must not describe that scored evidence as absent.':'Without reliable strike-level alignment, aggregate OI is not allowed to create a directional call.');
   const sectorText=sectorMoves.length?sectorMoves.map(x=>x.name+' '+(x.change>=0?'+':'')+x.change.toFixed(2)+'%').join(', '):'sector participation unavailable';
   const vixText=vix&&Number.isFinite(vix.change)?('India VIX '+(vix.change>=0?'+':'')+vix.change.toFixed(2)+'%'):'India VIX unavailable';
   const marketObserved=breadth?('Official NSE breadth is '+breadth.advances+' advances vs '+breadth.declines+' declines with NIFTY '+(breadth.change>=0?'+':'')+breadth.change.toFixed(2)+'%. '+vixText+'. Sector tape: '+sectorText+'.'):'A structured NSE breadth reading was not available.';
@@ -312,8 +329,8 @@ function governedWhy(meta,normalized,result){
   const tradeObserved='Market Trust '+(Number.isFinite(trust)?trust.toFixed(1):'—')+'/100; execution edge '+(Number.isFinite(edge)?edge.toFixed(0):'—')+'/100; expected reward/risk '+(Number.isFinite(rr)?rr.toFixed(1):'—')+'.';
   const tradeMeaning=result.tradeable===true?'The directional view and execution gates both passed, so the setup is actionable.':'The forecast can still be valid while the trade is rejected. Here the evidence quality, execution setup and reward/risk are not strong enough to justify a position.';
   return {
-    price:{observed:priceFacts.join(' · ')+'.',meaning:priceMeaning,impact:'Price structure is constructive, but not decisive on its own.'},
-    options:{observed:optionsObserved,meaning:optionsMeaning,impact:mixedBias?'Options are a major source of directional conflict.':'Options provide some directional confirmation.'},
+    price:{observed:priceFacts.join(' · ')+'.',meaning:priceMeaning,impact:Number.isFinite(priceScore)?'Price/structure is a governed DES5 input; its effect is shown in the metric breakdown.':'Price structure is not independently verified in this presentation record.'},
+    options:{observed:optionsObserved,meaning:optionsMeaning,impact:rows.length?(mixedBias?'Options are a major source of directional conflict.':'Options provide some directional confirmation.'):(Number.isFinite(pvpoScore)?'PVPO contributes to DES5; detailed strike evidence is unavailable in this view.':'Options confirmation is not verified.')},
     market:{observed:marketObserved,meaning:marketMeaning,impact:'Participation is confirmation evidence, not a substitute for price.'},
     macro:{observed:macroObserved,meaning:macroMeaning,impact:'Macro is treated as confirmation/risk context.'},
     trade:{observed:tradeObserved,meaning:tradeMeaning,impact:result.tradeable===true?'Execution gates passed.':'Execution gates did not pass.'},
@@ -460,13 +477,17 @@ function renderAssessment(container,payload){
   const eligible=Number(summary.matured_eligible_checkpoints??f.eligible_total??summary.matured_runs??0),scorable=Number(summary.scorable_checkpoints??f.total??0),missing=Number(summary.missing_unscorable_checkpoints??f.missing_unscorable??Math.max(eligible-scorable,0)),coverage=summary.scorable_coverage_pct??f.coverage_pct,pendingCount=Number(summary.pending_forecasts??pending.length??0);
   const latest=details.slice().sort((a,b)=>Date.parse(b.assessed_at||0)-Date.parse(a.assessed_at||0))[0]||{},m=latest.metrics||{},mr=m.recommendation_metrics||{},mret=m.return_metrics||{},mo=m.overall_forecast_metrics||{};
   const averageR=mr.average_resolved_r??r.average_r??null,openMtm=mr.open_standardized_mtm_pct??null,brier=mo.avg_brier_score??mo.brier_score??null,drawdown=mret.maximum_drawdown_pct??null,noTrade=m.no_trade_metrics?.effectiveness_pct??null,regime=m.regime_metrics??null;
+  const dayForOverall=m.day_metrics||m.day_wise||m.daywise||{};
+  const overallZoneHits=mo.zone_hits??Object.values(dayForOverall).reduce((sum,row)=>sum+(row&&typeof row==='object'?Number(row.zone_hits??0):0),0);
+  const overallZoneScorable=mo.zone_scorable??Object.values(dayForOverall).reduce((sum,row)=>sum+(row&&typeof row==='object'?Number(row.zone_scorable??row.scorable??0):0),0);
+  const overallZoneRate=mo.zone_hit_rate_pct??(overallZoneScorable?overallZoneHits/overallZoneScorable*100:null);
   const brierDetail=brier==null?'Not scorable yet — legacy daily records do not contain complete three-scenario probability vectors.':'Lower is better; 0 means perfect three-scenario calibration.';
   container.innerHTML=[
     '<div class="assessment-header"><div><div class="eyebrow">TABLE 1 · 5DR ASSESSMENT & EFFICACY</div><h3>Performance assessment</h3></div><small>'+eligible+' matured eligible · '+scorable+' scorable · '+pendingCount+' pending legacy canonical'+(pendingCount===1?'':'s')+'</small></div>',
     canonicalAssessmentContext(canonical),
     '<div class="assessment-grid">',
       '<div class="assessment-metric"><span>Forecast accuracy</span><strong>'+pct(f.accuracy_pct??mo.directional_accuracy_pct)+'</strong><small>'+escapeHtml(f.hits??mo.directional_hits??0)+' hits / '+escapeHtml(f.total??mo.canonical_scorable_checkpoints??0)+' scorable · '+escapeHtml(scorable)+'/'+escapeHtml(eligible)+' matured eligible scorable ('+pct(coverage)+')</small></div>',
-      '<div class="assessment-metric"><span>Zone hit rate</span><strong>'+pct(mo.zone_hit_rate_pct)+'</strong><small>'+escapeHtml(mo.zone_hits??0)+' zone hits across the selected canonical population.</small></div>',
+      '<div class="assessment-metric"><span>Zone hit rate</span><strong>'+pct(overallZoneRate)+'</strong><small>'+escapeHtml(overallZoneHits)+'/'+escapeHtml(overallZoneScorable)+' zone hits across the selected canonical population.</small></div>',
       '<div class="assessment-metric"><span>Recommendation hit rate</span><strong>'+pct(r.accuracy_pct??mr.hit_rate_pct)+'</strong><small>'+escapeHtml(r.hits??mr.wins??0)+' wins / '+escapeHtml(r.total??mr.resolved??0)+' resolved canonical recommendations</small></div>',
       '<div class="assessment-metric"><span>Average R</span><strong>'+(averageR==null?'Not scorable':escapeHtml(Number(averageR).toFixed(2))+'R')+'</strong><small>Average standardized reward/risk on resolved canonical actionable recommendations.</small></div>',
       '<div class="assessment-metric"><span>Realized model P/L</span><strong>'+pct(ret.absolute_return_pct??mret.cumulative_resolved_pnl_pct)+'</strong><small>Equal-notional standardized model result; never inferred as user profit.</small></div>',
@@ -636,7 +657,7 @@ function render5dr(run,request,outcomeAssessment){
       '<div class="decision-grid">',
         '<div class="decision-card"><span>Can I trade this?</span><strong>'+(tradeable?'Yes':'No trade')+'</strong><small>'+(tradeable?'All six frozen tradeability gates passed.':'One or more frozen tradeability gates failed; see checklist below.')+'</small></div>',
         '<div class="decision-card"><span>5-day market view</span><strong>'+escapeHtml(direction)+'</strong><small>Published five-day direction after all evidence checks.</small></div>',
-        '<div class="decision-card"><span>Expected NIFTY zone · D+5</span><strong>'+(result.expected_nifty_zone?escapeHtml(result.expected_nifty_zone.low)+' – '+escapeHtml(result.expected_nifty_zone.high):'Legacy incomplete')+'</strong><small>Final-session expected range; not a guaranteed target.</small></div>',
+        '<div class="decision-card"><span>Expected NIFTY zone · D+4</span><strong>'+(result.expected_nifty_zone?escapeHtml(result.expected_nifty_zone.low)+' – '+escapeHtml(result.expected_nifty_zone.high):'Legacy incomplete')+'</strong><small>Final governed-session expected range; not a guaranteed target.</small></div>',
         '<div class="decision-card"><span>Event Shock</span><strong>'+(result.event_shock?escapeHtml(humanText(result.event_shock.level)):'Legacy incomplete')+'</strong><small>'+(result.event_shock?('Transmission '+escapeHtml(humanText(result.event_shock.transmission))+' · Convexity '+(result.event_shock.convexity_warranted?'YES':'NO')+' · Kill switch '+(result.event_shock.kill_switch?'ACTIVE':'inactive')):'Event transmission/convexity were not persisted in this legacy run.')+'</small></div>',
       '</div>',
       '<div class="action-box"><span>Definitive recommendation</span><strong>'+escapeHtml(action)+'</strong></div>',
@@ -660,7 +681,7 @@ function render5dr(run,request,outcomeAssessment){
         (blockersPlain.length?'<div class="plain-blockers"><strong>Main reasons for no trade</strong><ul>'+blockersPlain.slice(0,5).map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></div>':''),
       '</details>',
       '<details class="change-details"><summary>What could change the view?</summary><p class="change-intro">These are the market developments that would actually make the current assessment stronger, weaker or tradeable:</p><ul>'+changes.map(x=>'<li>'+escapeHtml(x)+'</li>').join('')+'</ul></details>',
-      '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. This forecast will be scored after its D+1 to D+5 outcomes are available. That scorecard measures forecast/recommendation performance; it is separate from the run assessment above.')+'</p></details>',
+      '<details class="assessment-future"><summary>Future performance scorecard</summary><p>'+(outcomeAssessment?('Outcome: '+escapeHtml(outcomeAssessment.outcome||'Assessed')+' · Horizon '+escapeHtml(outcomeAssessment.assessment_horizon||'—')+(outcomeAssessment.score!=null?' · Score '+escapeHtml(outcomeAssessment.score):'')):'Not due yet. This forecast will be scored after its D through D+4 outcomes are available. That scorecard measures forecast/recommendation performance; it is separate from the run assessment above.')+'</p></details>',
       '<details class="tech-details"><summary>Advanced details</summary><div class="tech-body">',
         '<div><span>Framework</span><strong>'+escapeHtml(run.framework_version)+'</strong></div>',
         '<div><span>Run ID</span><strong>'+escapeHtml(run.run_id)+'</strong></div>',

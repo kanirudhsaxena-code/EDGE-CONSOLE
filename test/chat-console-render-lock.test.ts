@@ -83,3 +83,33 @@ test('stock Chat parity compares regime evidence and verification fields to gove
   assert.match(workflow,/r\.get\('evidence_basis'\)==str\(s\.get\('evidence_basis'\) or ''\)/);
   assert.match(workflow,/r\.get\('verification_state'\)==str\(s\.get\('verification_state'\) or ''\)/);
 });
+
+
+test('Build 2.75 locks NIFTY D:D+4 labels and semantic execution wording',()=>{
+  assert.match(app,/Expected NIFTY zone · D\+4/);
+  assert.doesNotMatch(app,/Expected NIFTY zone · D\+5/);
+  assert.match(app,/D through D\+4 outcomes are available/);
+  assert.doesNotMatch(app,/D\+1 to D\+5 outcomes are available/);
+  assert.match(app,/R:R quality subscore/);
+  assert.match(app,/actual expected R:R/);
+});
+
+test('Build 2.75 derives headline zone efficacy from the governed cumulative assessment when needed',()=>{
+  assert.match(app,/overallZoneHits/);
+  assert.match(app,/overallZoneScorable/);
+  assert.match(app,/overallZoneRate/);
+  assert.match(app,/zone hits across the selected canonical population/);
+});
+
+test('Build 2.75 explanation cards do not call scored structured evidence absent merely because screenshot drilldown is missing',()=>{
+  assert.match(app,/Governed structured basis:/);
+  assert.match(app,/Governed PVPO component/);
+  assert.match(app,/PVPO may contribute to DES5 from the governed normalized evidence/);
+});
+
+
+test('Build 2.75 live Chat workflow fails on NIFTY semantic contradictions',()=>{
+  assert.match(workflow,/forbidden_nifty_presentation/);
+  assert.match(workflow,/contradictory_zone_efficacy_pairs/);
+  assert.match(workflow,/actual expected R:R 0\.00 · hard gate FAIL/);
+});
