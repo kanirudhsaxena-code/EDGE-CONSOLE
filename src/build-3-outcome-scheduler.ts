@@ -1,17 +1,20 @@
 import { evaluateMaturedBuild3Outcomes, type Build3OutcomeEvaluatorEnv } from './build-3-outcome-evaluator';
 import { readBuild3TruthMetrics } from './build-3-truth-metrics';
 import { evaluateMaturedBuild3Recommendations } from './build-3-recommendation-efficacy';
+import { dispatchDueBuild3RecommendationIntradayTruth } from './build-3-recommendation-intraday-dispatch';
+import type { EngineDispatchEnv } from './engine-dispatch';
 
 export const BUILD3_TRUTH_CRON='7,37 11 * * 1-5' as const;
 export const BUILD3_TRUTH_SCHEDULER_VERSION='MDOS_BUILD_3_TRUTH_SCHEDULER_V1' as const;
 
 export async function runBuild3TruthScheduledTick(
-  env:Build3OutcomeEvaluatorEnv,
+  env:Build3OutcomeEvaluatorEnv&EngineDispatchEnv,
   scheduledTime:number|Date,
 ):Promise<Record<string,unknown>>{
   const now=scheduledTime instanceof Date?scheduledTime:new Date(scheduledTime);
   if(Number.isNaN(now.getTime()))throw new Error('BUILD3_TRUTH_SCHEDULED_TIME_INVALID');
   const results=await evaluateMaturedBuild3Outcomes(env,{now,limit:100});
+  const intradayDispatchResults=await dispatchDueBuild3RecommendationIntradayTruth(env,{now,limit:100});
   const recommendationResults=await evaluateMaturedBuild3Recommendations(env.DATABASE_URL,{now,limit:100});
   const truthMetrics=await readBuild3TruthMetrics(env.DATABASE_URL);
   const counts=results.reduce<Record<string,number>>((acc,row)=>{
@@ -25,6 +28,8 @@ export async function runBuild3TruthScheduledTick(
     evaluated:results.length,
     counts,
     results,
+    intraday_truth_dispatched:intradayDispatchResults.length,
+    intraday_dispatch_results:intradayDispatchResults,
     recommendation_evaluated:recommendationResults.length,
     recommendation_results:recommendationResults,
     truth_metrics:truthMetrics,
