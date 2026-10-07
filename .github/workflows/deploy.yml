@@ -72,6 +72,40 @@ jobs:
           if(!JSON.stringify(deployments).includes(versionId))throw new Error(`Version ${versionId} is not present in current deployment history`);
           console.log(`verified_active_version=${versionId} tag=${tag}`);
           NODE
+      - name: Reconcile additive Build 3 production schema
+        run: |
+          set -euo pipefail
+          test -n "$CF_ACCESS_CLIENT_ID"
+          test -n "$CF_ACCESS_CLIENT_SECRET"
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-before.json -w '%{http_code}')"
+          echo "build3_schema_status_http=$code"
+          test "$code" = "200"
+          if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/build3-schema-before.json'))
+          raise SystemExit(0 if d.get('ready') is True else 1)
+          PY
+          then
+            cp /tmp/build3-schema-before.json /tmp/build3-schema-after.json
+          else
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' -H 'X-Build3-Schema-Action: APPLY_ADDITIVE_BUILD3_V1' -X POST "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-apply.json -w '%{http_code}')"
+            echo "build3_schema_apply_http=$code"
+            cat /tmp/build3-schema-apply.json
+            echo
+            test "$code" = "200"
+            curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-after.json
+          fi
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/build3-schema-after.json'))
+          assert d.get('version')=='MDOS_BUILD_3_SCHEMA_V1', d
+          assert d.get('ready') is True, d
+          assert not d.get('missing_tables'), d
+          assert not d.get('missing_columns'), d
+          print('BUILD3_PRODUCTION_SCHEMA_READY=PASS')
+          PY
       - name: Verify production health after tagged deploy
         run: |
           set -euo pipefail
