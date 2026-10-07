@@ -42,7 +42,7 @@ export const SYSTEM_RESEARCH_SOURCES:readonly ResearchSource[]=[
   {id:'FED_MONETARY_POLICY',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.federalreserve.gov/monetarypolicy.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'FED_FOMC_CALENDAR',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'RBI_HOME',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://www.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
-  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://m.rbi.org.in/Scripts/NotificationUser.aspx?Id=10001&Mode=0',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
+  {id:'RBI_CURRENT_RATES',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:'https://m.rbi.org.in/',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
   {id:'EIA_CRUDE_SPOT',category:'EVENT_SHOCK',dimensions:['COMMODITIES_CROSS_ASSET','EVENT_SHOCK'],url:'https://www.eia.gov/dnav/pet/PET_PRI_SPT_S1_D.htm',authority:'PRIMARY',accept:'text/html,*/*;q=0.5'},
 
   {id:'NSE_NIFTY_OPTION_CHAIN',category:'EXECUTION_RISK',dimensions:['DERIVATIVES_VOLATILITY'],url:'https://www.nseindia.com/api/option-chain-indices?symbol=NIFTY',authority:'OFFICIAL_MARKET',accept:'application/json,text/plain;q=0.8,*/*;q=0.5'},
@@ -60,6 +60,22 @@ const digest=async(text:string)=>hex(await crypto.subtle.digest('SHA-256',new Te
 const cleanExcerpt=(text:string)=>text.replace(/<script\b[^>]*>[\s\S]*?<\/script>/gi,' ').replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi,' ').replace(/<[^>]+>/g,' ').replace(/&nbsp;/gi,' ').replace(/&amp;/gi,'&').replace(/\s+/g,' ').trim().slice(0,MAX_EXCERPT_CHARS);
 
 const nums=(value:string)=>[...value.matchAll(/-?\d+(?:\.\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite);
+
+function rbiPolicyDocumentLinks(body:string):Array<{url:string;label:string;priority:number}>{
+  const out:Array<{url:string;label:string;priority:number}>=[];
+  for(const match of body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)){
+    const href=String(match[1]||'').trim();
+    const label=cleanExcerpt(String(match[2]||''));
+    if(!href||!label)continue;
+    if(!/(Resolution of the Monetary Policy Committee|Monetary Policy Statement|Governor.?s Statement)/i.test(label))continue;
+    let url:string;
+    try{url=new URL(href,'https://www.rbi.org.in/').toString()}catch{continue}
+    const priority=/Resolution of the Monetary Policy Committee/i.test(label)?0:/Monetary Policy Statement/i.test(label)?1:2;
+    out.push({url,label,priority});
+  }
+  const seen=new Set<string>();
+  return out.sort((a,b)=>a.priority-b.priority).filter(item=>seen.has(item.url)?false:(seen.add(item.url),true)).slice(0,5);
+}
 function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<string,unknown>|undefined{
   try{
     if(source.id==='NSE_ALL_INDICES'){
@@ -150,18 +166,43 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
       if(meetings.length)facts.meeting_dates_2026=meetings;
       return Object.keys(facts).length?facts:undefined;
     }
-    if(source.id==='RBI_CURRENT_RATES'){
-      const repo=excerpt.match(/Policy\s*Repo Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
-      const sdf=excerpt.match(/Standing Deposit Facility Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
-      const msf=excerpt.match(/Marginal Standing Facility Rate\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
-      const usdinr=excerpt.match(/INR\s*\/\s*1 USD\s*:?\s*(\d+(?:\.\d+)?)/i);
-      const dated=excerpt.match(/As at\s+[^A-Za-z0-9]*([A-Za-z]+\s+\d{1,2},\s*20\d{2})/i);
+    if(source.id==='RBI_HOME'||source.id==='RBI_CURRENT_RATES'){
+      const repo=excerpt.match(/Policy\s*Repo Rate\s*\|?\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const sdf=excerpt.match(/Standing Deposit Facility Rate\s*\|?\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const msf=excerpt.match(/Marginal Standing Facility Rate\s*\|?\s*:?\s*(\d+(?:\.\d+)?)\s*%/i);
+      const usdinr=excerpt.match(/INR\s*\/\s*1 USD\s*\|?\s*:?\s*(\d+(?:\.\d+)?)/i);
+      const dated=excerpt.match(/As at\s+(?:\d{1,2}(?:\.\d+)?\s*(?:am|pm)\s+of\s+)?([A-Za-z]+\s+\d{1,2},\s*20\d{2})/i);
       const facts:Record<string,unknown>={};
       if(repo)facts.policy_repo_rate_pct=Number(repo[1]);
       if(sdf)facts.standing_deposit_facility_pct=Number(sdf[1]);
       if(msf)facts.marginal_standing_facility_pct=Number(msf[1]);
       if(usdinr)facts.usdinr_reference=Number(usdinr[1]);
       if(dated)facts.rates_as_of=dated[1];
+      if(source.id==='RBI_HOME'){
+        const links=rbiPolicyDocumentLinks(body);
+        if(links.length){
+          facts.policy_document_links=links;
+          facts.latest_policy_document_url=links[0].url;
+          facts.latest_policy_document_label=links[0].label;
+        }
+      }
+      return Object.keys(facts).length?facts:undefined;
+    }
+    if(source.id==='RBI_LATEST_POLICY_DECISION'){
+      const facts:Record<string,unknown>={};
+      const action=excerpt.match(/(?:MPC|Committee)[\s\S]{0,500}?decided to\s+(increase|raise|reduce|lower|keep|maintain)[\s\S]{0,260}?policy repo rate[\s\S]{0,180}?(?:by\s+(\d+(?:\.\d+)?)\s+basis points?\s+)?(?:to|at|unchanged at)\s+(\d+(?:\.\d+)?)\s*(?:per cent|%)/i);
+      const directRate=excerpt.match(/policy repo rate[\s\S]{0,120}?(?:to|at|unchanged at)\s+(\d+(?:\.\d+)?)\s*(?:per cent|%)/i);
+      const stance=excerpt.match(/(?:stance|remain|shift(?:ed)?\s+to)[\s\S]{0,120}?(calibrated tightening|neutral|withdrawal of accommodation|accommodative)/i);
+      const date=excerpt.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2}/i);
+      if(action){
+        facts.policy_action=String(action[1]).toLowerCase();
+        if(action[2])facts.policy_change_bps=Number(action[2]);
+        facts.policy_repo_rate_pct=Number(action[3]);
+      }else if(directRate){
+        facts.policy_repo_rate_pct=Number(directRate[1]);
+      }
+      if(stance)facts.policy_stance=String(stance[1]);
+      if(date)facts.policy_decision_date=date[0];
       return Object.keys(facts).length?facts:undefined;
     }
     if(source.id==='FED_LATEST_FOMC_STATEMENT'){
@@ -235,6 +276,7 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
   by_dimension:Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
   research_manifest_complete:boolean;
   missing_dimensions:NiftyResearchDimension[];
+  fact_blockers:string[];
 }>{
   const snapshots=await Promise.all(SYSTEM_RESEARCH_SOURCES.map(source=>acquireResearchSource(source,fetcher)));
   const fedLanding=snapshots.find(s=>s.source_id==='FED_MONETARY_POLICY'&&s.status==='RETRIEVED');
@@ -247,6 +289,12 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
       snapshots.push(await acquireResearchSource(latest,fetcher));
     }
   }
+  const rbiHome=snapshots.find(s=>s.source_id==='RBI_HOME'&&s.status==='RETRIEVED');
+  const rbiPolicyUrl=typeof rbiHome?.facts?.latest_policy_document_url==='string'?rbiHome.facts.latest_policy_document_url:'';
+  if(rbiPolicyUrl){
+    const latestRbi:ResearchSource={id:'RBI_LATEST_POLICY_DECISION',category:'EVENT_SHOCK',dimensions:['MACRO_RATES_FX','NEWS_CATALYSTS','EVENT_SHOCK'],url:rbiPolicyUrl,authority:'PRIMARY',accept:'text/html,*/*;q=0.5'};
+    snapshots.push(await acquireResearchSource(latestRbi,fetcher));
+  }
   const categories:SystemResearchCategory[]=['MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'];
   const by_category={} as Record<SystemResearchCategory,{retrieved:number;unavailable:number;ready_for_interpretation:boolean}>;
   for(const category of categories){
@@ -254,26 +302,43 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
     by_category[category]={retrieved,unavailable:group.length-retrieved,ready_for_interpretation:retrieved>0};
   }
   const by_dimension={} as Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
+  const rbiRateRows=snapshots.filter(item=>item.status==='RETRIEVED'&&['RBI_HOME','RBI_CURRENT_RATES'].includes(item.source_id)&&typeof item.facts?.policy_repo_rate_pct==='number');
+  const rbiLatestLink=typeof rbiHome?.facts?.latest_policy_document_url==='string'&&!!rbiHome.facts.latest_policy_document_url;
+  const rbiDecisionRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.source_id==='RBI_LATEST_POLICY_DECISION'&&typeof item.facts?.policy_repo_rate_pct==='number'&&typeof item.facts?.policy_action==='string');
+  const fedDecisionRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.source_id==='FED_LATEST_FOMC_STATEMENT'&&!!item.facts&&(typeof item.facts.policy_action==='string'||typeof item.facts.target_range_text==='string'));
   for(const dimension of REQUIRED_NIFTY_RESEARCH_DIMENSIONS){
     const retrievedRows=snapshots.filter(item=>{
       if(item.status!=='RETRIEVED'||!item.dimensions.includes(dimension))return false;
       if(dimension==='INSTITUTIONAL_FLOWS'){
         return item.authority==='OFFICIAL_MARKET'&&item.source_id.startsWith('NSE_FII_DII_')&&!!item.facts&&!!item.facts.dii&&!!item.facts.fii_fpi;
       }
+      if(dimension==='MACRO_RATES_FX'){
+        const rbiReady=rbiRateRows.length>0&&(!rbiLatestLink||rbiDecisionRows.length>0);
+        const fedReady=fedDecisionRows.length>0;
+        return rbiReady&&fedReady&&(['RBI_HOME','RBI_CURRENT_RATES','RBI_LATEST_POLICY_DECISION','FED_LATEST_FOMC_STATEMENT'].includes(item.source_id));
+      }
       return true;
     });
+    const macroReady=dimension==='MACRO_RATES_FX'
+      ?rbiRateRows.length>0&&(!rbiLatestLink||rbiDecisionRows.length>0)&&fedDecisionRows.length>0
+      :retrievedRows.length>0;
     by_dimension[dimension]={
       retrieved:retrievedRows.length,
-      ready_for_interpretation:retrievedRows.length>0,
+      ready_for_interpretation:macroReady,
       source_ids:retrievedRows.map(item=>item.source_id)
     };
   }
   const missing_dimensions=REQUIRED_NIFTY_RESEARCH_DIMENSIONS.filter(d=>!by_dimension[d].ready_for_interpretation);
+  const fact_blockers:string[]=[];
+  if(!rbiRateRows.length)fact_blockers.push('RBI_CURRENT_POLICY_RATE_FACT_MISSING');
+  if(rbiLatestLink&&!rbiDecisionRows.length)fact_blockers.push('RBI_LATEST_POLICY_DECISION_UNRESOLVED');
+  if(!fedDecisionRows.length)fact_blockers.push('FED_LATEST_POLICY_DECISION_UNRESOLVED');
   return {
     snapshots,
     by_category,
     by_dimension,
     research_manifest_complete:missing_dimensions.length===0,
-    missing_dimensions
+    missing_dimensions,
+    fact_blockers
   };
 }
