@@ -124,4 +124,7 @@ test('stock actionable execution levels are frozen as a complete decision snapsh
   assert.equal(decision.execution_snapshot.stop,96);
   assert.equal(decision.execution_snapshot.target1,111);
   assert.equal(decision.execution_snapshot.exact_contract_verified,true);
+  assert.equal(decision.execution_snapshot.efficacy_target,111);
+  assert.equal(decision.execution_snapshot.efficacy_target_label,'T1');
+  assert.equal(decision.execution_snapshot.entry_activation_rule,'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE');
 });
