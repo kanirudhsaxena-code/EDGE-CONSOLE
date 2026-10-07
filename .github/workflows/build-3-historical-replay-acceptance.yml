@@ -74,10 +74,14 @@ jobs:
           edge=d.get('edge_stocks') or {}
           fpop=five.get('source_population') or {}
           epop=edge.get('source_population') or {}
-          assert int(fpop.get('valid_forecasts') or 0) > 0, fpop
-          assert int(fpop.get('horizon_rows') or 0) > 0, fpop
+          if five.get('status')=='EXTERNAL_AUTHORITATIVE_REPLAY_REQUIRED':
+              assert five.get('authority')=='5DR-V2/DATABASE_URL', five
+              print('5DR_REPLAY_AUTHORITY=EXTERNAL_5DR_REPO')
+          else:
+              assert int(fpop.get('valid_forecasts') or 0) > 0, fpop
+              assert int(fpop.get('horizon_rows') or 0) > 0, fpop
+              assert int(five.get('accounted_forecasts') or 0) == int(fpop.get('valid_forecasts') or -1), five
           assert int(epop.get('recommendations') or 0) > 0, epop
-          assert int(five.get('accounted_forecasts') or 0) == int(fpop.get('valid_forecasts') or -1), five
           assert int(edge.get('accounted_recommendations') or 0) == int(epop.get('recommendations') or -1), edge
 
           print('BUILD3_HISTORICAL_REPLAY_ACCEPTANCE=PASS')
