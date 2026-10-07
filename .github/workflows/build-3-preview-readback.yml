@@ -1,0 +1,181 @@
+name: Build 3.0 Preview Readback
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/build-3-**'
+      - 'src/router.ts'
+      - 'src/mobile-v1-entry.ts'
+      - 'src/edge-stocks.ts'
+      - 'public/app.js'
+      - 'public/build3-core-zone.js'
+      - 'public/edge-stocks-five-session.js'
+      - 'public/index.html'
+      - 'test/build-3-**'
+      - '.github/workflows/build-3-preview-readback.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-3-preview-readback-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  readback:
+    if: github.head_ref == 'build-3.0-accuracy-loop-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      BASE: https://build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+
+    steps:
+      - name: Wait for current preview deployment
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          for attempt in $(seq 1 24); do
+            if curl --location --silent --show-error --fail "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/?build3=${{ github.sha }}" -o /tmp/index.html               && grep -q 'app.js?v=build3-core-zone-20261007' /tmp/index.html               && grep -q 'edge-stocks-five-session.js?v=build3-core-zone-20261007' /tmp/index.html; then
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Build 3.0 preview did not converge to current branch assets"
+          exit 1
+
+      - name: Verify visible Core Zone assets
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/build3-core-zone.js?v=${{ github.sha }}" -o /tmp/build3-core-zone.js
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/app.js?v=${{ github.sha }}" -o /tmp/app.js
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/edge-stocks-five-session.js?v=${{ github.sha }}" -o /tmp/stock-path.js
+          grep -q 'BUILD 3.0 PRECISION' /tmp/build3-core-zone.js
+          grep -q 'does not alter the production recommendation' /tmp/build3-core-zone.js
+          grep -q 'renderBuild3CoreZones(run.build3_precision' /tmp/app.js
+          grep -q 'Core Zone ' /tmp/stock-path.js
+          grep -q 'core_zone_calibration' /tmp/stock-path.js
+
+      - name: Reconcile additive Build 3.0 preview schema
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="000"
+          for attempt in $(seq 1 24); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-before.json -w '%{http_code}')"
+            echo "schema_status_http=$code attempt=$attempt"
+            if [ "$code" = "200" ]; then break; fi
+            sleep 10
+          done
+          test "$code" = "200"
+          if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/build3-schema-before.json'))
+          raise SystemExit(0 if d.get('ready') is True else 1)
+          PY
+          then
+            cp /tmp/build3-schema-before.json /tmp/build3-schema-after.json
+            echo "Build 3.0 schema already ready"
+          else
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' -H 'X-Build3-Schema-Action: APPLY_ADDITIVE_BUILD3_V1' -X POST "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-apply.json -w '%{http_code}')"
+            echo "schema_apply_http=$code"
+            cat /tmp/build3-schema-apply.json
+            echo
+            test "$code" = "200"
+            curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/preview-schema" -o /tmp/build3-schema-after.json
+          fi
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/build3-schema-after.json'))
+          assert d.get('version')=='MDOS_BUILD_3_SCHEMA_V1', d
+          assert d.get('ready') is True, d
+          assert not d.get('missing_tables'), d
+          assert not d.get('missing_columns'), d
+          print('BUILD3_SCHEMA_READY=PASS')
+          PY
+
+      - name: Read current NIFTY Build 3.0 state
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/5dr/latest" -o /tmp/nifty.json -w '%{http_code}')"
+          echo "nifty_http=$code"
+          cat /tmp/nifty.json
+          echo
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/nifty.json'))
+          run=d.get('run') or {}
+          assert run.get('run_id'), d
+          precision=run.get('build3_precision')
+          state='MATERIALIZED' if precision else 'LEGACY_OR_NOT_MATERIALIZED'
+          if precision:
+              assert precision.get('version')=='MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1', precision
+              assert precision.get('engine')=='5DR', precision
+              assert precision.get('shadow_only') is True, precision
+              assert precision.get('production_methodology_changed') is False, precision
+              rows=precision.get('rows') or []
+              assert [r.get('horizon') for r in rows]==['D','D+1','D+2','D+3','D+4'], rows
+          print('NIFTY_BUILD3_PRECISION_STATE='+state)
+          PY
+
+      - name: Read current LTF Build 3.0 state
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="000"
+          for attempt in $(seq 1 24); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/edge-stocks/report?ticker=LTF" -o /tmp/ltf.json -w '%{http_code}')"
+            echo "ltf_http=$code attempt=$attempt"
+            if [ "$code" != "500" ]; then break; fi
+            sleep 10
+          done
+          cat /tmp/ltf.json
+          echo
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/ltf.json'))
+          r=d.get('report') or {}
+          assert r.get('ticker')=='LTF', r
+          sessions=(r.get('current_stock_outcome') or {}).get('forecast_sessions') or []
+          assert [x.get('session_label') for x in sessions]==['D','D+1','D+2','D+3','D+4'], sessions
+          precision=r.get('build3_precision')
+          state='MATERIALIZED' if precision else 'LEGACY_OR_NOT_MATERIALIZED'
+          if precision:
+              assert precision.get('version')=='MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1', precision
+              assert precision.get('engine')=='EDGE_STOCKS', precision
+              assert precision.get('shadow_only') is True, precision
+              assert precision.get('production_methodology_changed') is False, precision
+              rows=precision.get('rows') or []
+              assert len(rows)==5, rows
+              for idx,row in enumerate(rows):
+                  core=row.get('core_zone') or {}
+                  outer=row.get('outer_zone') or {}
+                  assert float(outer['low']) <= float(core['low']) <= float(core['high']) <= float(outer['high']), row
+                  visible=sessions[idx].get('core_zone') or {}
+                  assert visible==core, (visible,core)
+          print('LTF_BUILD3_PRECISION_STATE='+state)
+          PY
+
+      - name: Publish bounded preview evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-3-preview-readback
+          path: |
+            /tmp/index.html
+            /tmp/build3-core-zone.js
+            /tmp/app.js
+            /tmp/stock-path.js
+            /tmp/build3-schema-before.json
+            /tmp/build3-schema-apply.json
+            /tmp/build3-schema-after.json
+            /tmp/nifty.json
+            /tmp/ltf.json
+          retention-days: 14
+          if-no-files-found: warn

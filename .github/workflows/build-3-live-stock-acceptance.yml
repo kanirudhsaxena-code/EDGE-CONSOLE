@@ -1,0 +1,186 @@
+name: Build 3.0 Live Stock Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-3-live-stock-acceptance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-3-live-stock-acceptance-${{ github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  live-ltf:
+    if: github.head_ref == 'build-3.0-accuracy-loop-20261006' && vars.MDOS_BUILD3_PREVIEW_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE: https://build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+
+    steps:
+      - name: Prove Build 3.0 schema is ready
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/preview-schema" -o /tmp/schema.json
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/schema.json'))
+          assert d.get('ready') is True, d
+          assert not d.get('missing_tables'), d
+          assert not d.get('missing_columns'), d
+          print('BUILD3_SCHEMA_READY=PASS')
+          PY
+
+      - name: Start fresh non-canonical LTF lifecycle
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Content-Type: application/json' -H 'Cache-Control: no-cache' -X POST --data '{"command":"EDGE LTF","force_new":true}' "$BASE/api/edge-stocks/invoke" -o /tmp/start.json -w '%{http_code}')"
+          echo "start_http=$code"
+          cat /tmp/start.json
+          echo
+          test "$code" = "202"
+          python - <<'PY'
+          import json,os
+          d=json.load(open('/tmp/start.json'))
+          assert d.get('ok') is True, d
+          assert d.get('status')=='DATA_DISPATCHED', d
+          assert d.get('data_first') is True, d
+          assert d.get('research_executed_this_run') is False, d
+          assert d.get('trading_enabled') is False, d
+          lifecycle=str(d.get('lifecycle_id') or '')
+          next_path=str(d.get('next') or '')
+          assert lifecycle and next_path, d
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('LIFECYCLE_ID='+lifecycle+'\n')
+              f.write('STATUS_PATH='+next_path+'\n')
+          print('lifecycle_id='+lifecycle)
+          PY
+
+      - name: Follow DATA research compute persistence to completion
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          : > /tmp/final.json
+          for attempt in $(seq 1 100); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE$STATUS_PATH" -o /tmp/status.json -w '%{http_code}')"
+            cp /tmp/status.json /tmp/final.json
+            python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          print('status='+str(d.get('status'))+' stage='+str(d.get('lifecycle_stage'))+' detail='+str(d.get('detail')))
+          PY
+            if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          raise SystemExit(0 if d.get('status')=='COMPLETE' else 1)
+          PY
+            then
+              test "$code" = "200"
+              break
+            fi
+            if python - <<'PY'
+          import json
+          d=json.load(open('/tmp/status.json'))
+          raise SystemExit(0 if d.get('status')=='BLOCKED' else 1)
+          PY
+            then
+              echo "Build 3.0 LTF lifecycle blocked"
+              cat /tmp/status.json
+              exit 1
+            fi
+            test "$code" = "200"
+            sleep 4
+          done
+          python - <<'PY'
+          import json,os
+          d=json.load(open('/tmp/final.json'))
+          assert d.get('status')=='COMPLETE', d
+          assert str(d.get('lifecycle_id'))==os.environ['LIFECYCLE_ID'], d
+          run_id=str(d.get('run_id') or '')
+          assert run_id, d
+          with open(os.environ['GITHUB_ENV'],'a') as f:
+              f.write('RUN_ID='+run_id+'\n')
+          print('run_id='+run_id)
+          print('build3_forecast='+str(d.get('build3_forecast')))
+          PY
+
+      - name: Verify fresh LTF Core Zones in final report
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          : > /tmp/report.json
+          for attempt in $(seq 1 15); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/edge-stocks/report?ticker=LTF" -o /tmp/report-envelope.json -w '%{http_code}')"
+            if [ "$code" = "200" ] && python - <<'PY'
+          import json,os
+          d=json.load(open('/tmp/report-envelope.json'))
+          r=d.get('report') or {}
+          raise SystemExit(0 if str(r.get('run_id') or '')==os.environ['RUN_ID'] else 1)
+          PY
+            then
+              cp /tmp/report-envelope.json /tmp/report.json
+              break
+            fi
+            sleep 2
+          done
+          python - <<'PY'
+          import json,os,math
+          d=json.load(open('/tmp/report.json'))
+          r=d.get('report') or {}
+          assert str(r.get('run_id') or '')==os.environ['RUN_ID'], r
+          precision=r.get('build3_precision')
+          assert isinstance(precision,dict), r
+          assert precision.get('version')=='MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1', precision
+          assert precision.get('engine')=='EDGE_STOCKS', precision
+          assert precision.get('instrument')=='LTF', precision
+          assert str(precision.get('source_id'))==os.environ['LIFECYCLE_ID'], precision
+          assert precision.get('shadow_only') is True, precision
+          assert precision.get('production_methodology_changed') is False, precision
+          rows=precision.get('rows') or []
+          expected=['D','D+1','D+2','D+3','D+4']
+          assert len(rows)==5 and [x.get('horizon') for x in rows]==expected, rows
+          states=[str(x.get('calibration_state')) for x in rows]
+          assert all(state!='CALIBRATION_PENDING' for state in states), states
+          sessions=(r.get('current_stock_outcome') or {}).get('forecast_sessions') or []
+          assert len(sessions)==5 and [x.get('session_label') for x in sessions]==expected, sessions
+          for idx,(row,visible) in enumerate(zip(rows,sessions)):
+              core=row.get('core_zone') or {}
+              outer=row.get('outer_zone') or {}
+              assert float(outer['low']) <= float(core['low']) <= float(core['high']) <= float(outer['high']), row
+              assert visible.get('core_zone')==core, (idx,visible,core)
+              cal=visible.get('core_zone_calibration') or {}
+              assert cal.get('version')==row.get('calibration_version'), (idx,cal,row)
+              assert cal.get('state')==row.get('calibration_state'), (idx,cal,row)
+              assert cal.get('shadow_only') is True, cal
+              probs=visible.get('probabilities') or {}
+              assert math.isclose(sum(float(probs[k]) for k in ('bull','base','bear')),100.0,abs_tol=0.01), visible
+          prov=r.get('run_provenance') or {}
+          assert prov.get('trigger_type')=='USER', prov
+          assert prov.get('benchmark_role')=='NONE', prov
+          assert prov.get('candidate_type')=='USER_CANONICAL_SNAPSHOT', prov
+          print('BUILD3_LTF_LIVE_END_TO_END=PASS')
+          print('calibration_states='+','.join(states))
+          print('run_id='+os.environ['RUN_ID'])
+          print('lifecycle_id='+os.environ['LIFECYCLE_ID'])
+          PY
+
+      - name: Preserve live acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-3-live-ltf-acceptance
+          path: |
+            /tmp/schema.json
+            /tmp/start.json
+            /tmp/final.json
+            /tmp/report.json
+          retention-days: 30
+          if-no-files-found: warn

@@ -15,6 +15,9 @@ import {
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
 import { classifyGovernedNseSession } from './nse-trading-calendar';
+import { buildBuild3RunRegistryRecord, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
 
 type JsonRecord=Record<string,unknown>;
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -22,6 +25,7 @@ type PreopenEnv=EngineDispatchEnv&{
   DATABASE_URL?:string;
   EDGE_DATABASE_URL?:string;
   EDGE_GITHUB_TOKEN?:string;
+  MDOS_BUILD3_ENABLED?:string;
   APP_ENV?:string;
   OUTPUT_CONTRACT_VERSION?:string;
   AI:AiBinding;
@@ -100,6 +104,13 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
         trigger_type:'SCHEDULED',
         target_session:clock.date,
       });
+      if(isBuild3RuntimeEnabled(env)){
+        const build3Run=buildBuild3RunRegistryRecord({
+          engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
+          run_timestamp:now,trigger_type:'AUTOMATIC',market_phase:'PRE_OPEN'
+        });
+        await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+      }
       let dispatch:JsonRecord|null=null;
       if(['RUN_CREATED','DATA_BLOCKED'].includes(lifecycle.stage)){
         const started=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
@@ -122,11 +133,13 @@ async function prep(env:PreopenEnv,now:Date):Promise<void>{
         data_dispatch:dispatch,
       });
     }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      try{await markStockDataBlocked(env,lifecycleId,detail)}catch{}
       stocks.push({
         ticker,
         lifecycle_id:lifecycleId,
         lifecycle_stage:'DATA_BLOCKED',
-        error:error instanceof Error?error.message:String(error),
+        error:detail,
       });
     }
   }
@@ -342,7 +355,38 @@ async function auction(env:PreopenEnv,now:Date):Promise<void>{
         continue;
       }
 
-      if(['COMPUTE_DISPATCHED','COMPUTE_PENDING','PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+      if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+        if(!isBuild3RuntimeEnabled(env)){
+          stocks.push({
+            ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
+            auction_snapshot_id:lifecycle.auction_snapshot_id,
+            recommendation_id:lifecycle.recommendation_id,
+            idempotent:true
+          });
+          continue;
+        }
+        try{
+          const forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
+          stocks.push({
+            ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
+            auction_snapshot_id:lifecycle.auction_snapshot_id,
+            recommendation_id:lifecycle.recommendation_id,
+            build3_forecast_version:forecast.forecast_version,
+            build3_forecast_horizons:forecast.horizons.length,
+            idempotent:true
+          });
+        }catch(error){
+          stocks.push({
+            ticker,lifecycle_id:lifecycleId,status:'BUILD3_FORECAST_BLOCKED',
+            lifecycle_stage:lifecycle.stage,
+            recommendation_id:lifecycle.recommendation_id,
+            blocker:error instanceof Error?error.message:String(error)
+          });
+        }
+        continue;
+      }
+
+      if(['COMPUTE_DISPATCHED','COMPUTE_PENDING'].includes(lifecycle.stage)){
         stocks.push({
           ticker,lifecycle_id:lifecycleId,status:lifecycle.stage,
           auction_snapshot_id:lifecycle.auction_snapshot_id,

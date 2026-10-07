@@ -17,6 +17,12 @@ import {
   readMarketSnapshotPayload,
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
+import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord, readBuild3RunRegistryRecord } from './build-3-run-registry';
+import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
+import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
+import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
+import { build3PrecisionOutput, readBuild3NiftyPrecisionByRunId, readBuild3OutputPrecision } from './build-3-output-read';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -26,6 +32,7 @@ type Env = AccessIdentityEnv & {
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
   EDGE_GITHUB_TOKEN?: string;
+  MDOS_BUILD3_ENABLED?: string;
   APP_ENV: string;
   OUTPUT_CONTRACT_VERSION: string;
 };
@@ -588,6 +595,19 @@ async function beginNormalStockLifecycle(env:Env,ticker:string):Promise<{
     trigger_type:'USER',
     target_session:currentIstDate(),
   });
+  if(isBuild3RuntimeEnabled(env)){
+    const build3RunTimestamp=new Date();
+    const build3Run=buildBuild3RunRegistryRecord({
+      engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
+      run_timestamp:build3RunTimestamp,trigger_type:'MANUAL',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
+    });
+    try{
+      await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',error:`Build 3.0 isolated sidecar blocked: ${detail}`};
+    }
+  }
   const dispatched=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
     ticker,lifecycle_id:lifecycleId,trigger_type:'USER',target_session:currentIstDate()
   });
@@ -610,6 +630,8 @@ export async function progressNormalStockLifecycle(
   market_snapshot_id?:string|null;
   research_bundle_id?:string|null;
   auction_snapshot_id?:string|null;
+  build3_forecast_version?:string;
+  build3_forecast_horizons?:number;
   detail?:string|null;
 }>{
   let lifecycle=await getStockLifecycle(env,lifecycleId);
@@ -648,6 +670,40 @@ export async function progressNormalStockLifecycle(
     if(!lifecycle.market_snapshot_id||!lifecycle.research_bundle_id){
       return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'RESEARCH_READY lineage is incomplete'};
     }
+    if(isBuild3RuntimeEnabled(env)){
+      let evidenceSnapshot;
+      try{
+        evidenceSnapshot=await freezeBuild3StockEvidence(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+      });
+    }catch(error){
+      return {
+        status:'BLOCKED',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        detail:`Build 3.0 evidence freeze failed: ${error instanceof Error?error.message:String(error)}`
+      };
+    }
+    const dataQuality=await persistBuild3DataQuality(
+      env.DATABASE_URL,
+      assessBuild3StockDataQuality(evidenceSnapshot)
+    );
+      if(!dataQuality.valid_for_forecast){
+        return {
+          status:'BLOCKED',
+          lifecycle_stage:lifecycle.stage,
+          lifecycle_id:lifecycleId,
+          market_snapshot_id:lifecycle.market_snapshot_id,
+          research_bundle_id:lifecycle.research_bundle_id,
+          detail:`Build 3.0 data-quality gate blocked: ${dataQuality.blockers.join(', ')}`
+        };
+      }
+    }
     const dispatch=await dispatchEdgeWorkflow(
       env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
       undefined,undefined,lifecycleId,lifecycle.market_snapshot_id,undefined
@@ -659,6 +715,32 @@ export async function progressNormalStockLifecycle(
   }
 
   if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+    if(!isBuild3RuntimeEnabled(env)){
+      return {
+        status:'COMPLETE',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        run_id:lifecycle.recommendation_id??null,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        auction_snapshot_id:lifecycle.auction_snapshot_id,
+      };
+    }
+    let build3Forecast;
+    try{
+      build3Forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
+    }catch(error){
+      return {
+        status:'BLOCKED',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        run_id:lifecycle.recommendation_id??null,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        auction_snapshot_id:lifecycle.auction_snapshot_id,
+        detail:`Build 3.0 stock forecast materialization failed: ${error instanceof Error?error.message:String(error)}`
+      };
+    }
     return {
       status:'COMPLETE',
       lifecycle_stage:lifecycle.stage,
@@ -666,7 +748,9 @@ export async function progressNormalStockLifecycle(
       run_id:lifecycle.recommendation_id??null,
       market_snapshot_id:lifecycle.market_snapshot_id,
       research_bundle_id:lifecycle.research_bundle_id,
-      auction_snapshot_id:lifecycle.auction_snapshot_id
+      auction_snapshot_id:lifecycle.auction_snapshot_id,
+      build3_forecast_version:build3Forecast.forecast_version,
+      build3_forecast_horizons:build3Forecast.horizons.length
     };
   }
   if(['DATA_BLOCKED','RESEARCH_BLOCKED','COMPUTE_BLOCKED','AUCTION_BLOCKED'].includes(lifecycle.stage)){
@@ -954,6 +1038,43 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
         : dispatchedAt)
     : undefined;
 
+  let evidenceSnapshotRef:Record<string,string>|null=null;
+  if(isBuild3RuntimeEnabled(env)&&lifecycleId&&marketSnapshotId&&researchBundleId){
+    try{
+      const evidenceSnapshot=await freezeBuild3StockEvidence(env,{
+        ticker,
+        lifecycle_id:lifecycleId,
+        market_snapshot_id:marketSnapshotId,
+        research_bundle_id:researchBundleId,
+        auction_snapshot_id:auctionSnapshotIdForDispatch??null,
+        canonical_requested_at:canonicalRequestedAt??null,
+        canonical_attempt_slot:canonicalAttemptSlot,
+      });
+      evidenceSnapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
+      const dataQuality=await persistBuild3DataQuality(
+        env.DATABASE_URL,
+        assessBuild3StockDataQuality(evidenceSnapshot)
+      );
+      if(!dataQuality.valid_for_forecast){
+        return json({
+          error:'Build 3.0 data-quality gate blocked forecast dispatch',
+          code:'BUILD3_DATA_QUALITY_BLOCKED',
+          ticker,lifecycle_id:lifecycleId,
+          build3_evidence_snapshot:evidenceSnapshotRef,
+          build3_data_quality:build3DataQualityRef(dataQuality),
+          trading_enabled:false
+        },409);
+      }
+    }catch(error){
+      return json({
+        error:'Build 3.0 evidence freeze failed',
+        detail:error instanceof Error?error.message:String(error),
+        code:'BUILD3_EVIDENCE_SNAPSHOT_BLOCKED',
+        ticker,lifecycle_id:lifecycleId,trading_enabled:false
+      },409);
+    }
+  }
+
   const dispatch = await dispatchEdgeWorkflow(
     env.EDGE_GITHUB_TOKEN ?? '', ticker, 'UNKNOWN', researchBundleId,
     canonicalRequestedAt, canonicalAttemptSlot ?? undefined,
@@ -986,6 +1107,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     lifecycle_id: lifecycleId,
     market_snapshot_id: marketSnapshotId,
     auction_snapshot_id: auctionSnapshotIdForDispatch??null,
+    build3_evidence_snapshot:evidenceSnapshotRef,
     baseline_run_id: baselineRunId,
     dispatched_at: dispatchedAt,
     fresh_run: true,
@@ -1518,6 +1640,66 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     };
   }
 
+  let build3Precision: ReturnType<typeof build3PrecisionOutput> = null;
+  if (isBuild3RuntimeEnabled(env) && env.DATABASE_URL && forecastSessions) {
+    try {
+      const lifecycleRows = await sql`
+        select lifecycle_id
+          from edge_run_lifecycles
+         where recommendation_id=${String(active.recommendation_id)}
+         order by updated_at desc
+         limit 1
+      `;
+      if (lifecycleRows.length) {
+        const lifecycleId=String(lifecycleRows[0].lifecycle_id);
+        const registry=await readBuild3RunRegistryRecord(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
+        if(registry){
+          const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
+          if(!precisionRows.length)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_MISSING');
+          const byHorizon=new Map(precisionRows.map(row=>[row.horizon,row]));
+          forecastSessions=forecastSessions.map((session:Record<string,unknown>)=>{
+            const label=String(session.session_label);
+            const precision=byHorizon.get(label as 'D'|'D+1'|'D+2'|'D+3'|'D+4');
+            if(!precision)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_HORIZON_MISSING:'+label);
+            const expectedZone=isObject(session.expected_zone)?session.expected_zone as JsonRecord:{};
+            const same=(a:unknown,b:number)=>{
+              const n=Number(a);
+              return Number.isFinite(n)&&Math.abs(n-b)<=Math.max(1e-6,Math.abs(b)*1e-9);
+            };
+            if(String(session.trading_date)!==precision.target_session){
+              throw new Error('BUILD3_OUTPUT_STOCK_SESSION_PARITY_MISMATCH:'+label);
+            }
+            if(!same(expectedZone.low,precision.outer_low)||!same(expectedZone.high,precision.outer_high)){
+              throw new Error('BUILD3_OUTPUT_STOCK_OUTER_ZONE_PARITY_MISMATCH:'+label);
+            }
+            return {
+              ...session,
+              core_zone:{low:precision.core_low,high:precision.core_high},
+              core_zone_width_points:precision.core_width_points,
+              core_zone_width_percent:precision.core_width_percent,
+              core_zone_calibration:{
+                version:precision.calibration_version,
+                state:precision.calibration_state,
+                normalization_basis:precision.normalization_basis,
+                shadow_only:true,
+                production_methodology_changed:false,
+              },
+            };
+          });
+          build3Precision=build3PrecisionOutput(precisionRows);
+        }
+      }
+    } catch(error) {
+      return json({
+        error:'Build 3.0 stock precision readback blocked',
+        code:'BUILD3_OUTPUT_STOCK_PRECISION_BLOCKED',
+        detail:error instanceof Error?error.message:String(error),
+        ticker:symbol,
+        recommendation_id:String(active.recommendation_id),
+      },409);
+    }
+  }
+
   const canonicalRows = await sql`
     select canonical_key,target_trading_date,forecast_horizon,selection_status,canonical_type,
            selected_recommendation_id,selected_at,selection_reason
@@ -1566,6 +1748,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    build3_precision: build3Precision,
     run_provenance: currentGovernance ? {
       trigger_type: currentGovernance.trigger_type ?? null,
       evidence_mode: currentGovernance.evidence_mode ?? null,
@@ -1882,6 +2065,26 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/5dr/latest' && request.method === 'GET') {
+    if(!env.DATABASE_URL)return json({run:null,note:'DATABASE_URL not configured yet'},503);
+    const sql=neon(env.DATABASE_URL);
+    const rows=await sql`
+      select run_id,contract_version,framework_version,status,provenance_mode,sources,
+             freshness_at,generated_at,result,warnings,published
+        from analysis_runs
+       where engine='5DR' and published=true
+       order by generated_at desc
+       limit 1
+    `;
+    if(!rows.length)return json({run:null,note:'No published 5DR run yet'});
+    const run=rows[0] as Record<string,unknown>;
+    if(!isBuild3RuntimeEnabled(env))return json({run,note:undefined});
+    const precision=await readBuild3NiftyPrecisionByRunId(env.DATABASE_URL,String(run.run_id));
+    return json({
+      run:{...run,build3_precision:precision?build3PrecisionOutput(precision.rows):null},
+      note:undefined
+    });
+  }
   if (url.pathname === '/api/5dr/canonical-handoff' && request.method === 'GET') return fiveDrCanonicalHandoff(env);
   if (url.pathname === '/api/5dr/assessment-import' && request.method === 'POST') return fiveDrAssessmentImport(request, env);
   if (url.pathname.startsWith('/api/edge-stocks/') && isAccessIdentityEnforced(env)) {

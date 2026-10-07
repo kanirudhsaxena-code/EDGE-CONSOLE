@@ -22,7 +22,8 @@
       "20 3 * * 1-5",
       "35-39 3 * * 1-5",
       "40-44 3 * * 1-5",
-      "7,22,37,52 * * * 1-5"
+      "7,22,37,52 * * * 1-5",
+      "7,37 11 * * 1-5"
     ]
   },
   "vars": {
@@ -35,6 +36,9 @@
     "FIVEDR_ASSESSMENT_REPOSITORY": "kanirudhsaxena-code/5DR-V2",
     "FIVEDR_ASSESSMENT_WORKFLOW": "assessment-refresh.yml",
     "FIVEDR_WORKFLOW": "5dr-console-execute-proxy.yml",
-    "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev"
+    "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev",
+    "BUILD3_TRUTH_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
+    "BUILD3_TRUTH_WORKFLOW": "build3-recommendation-intraday-truth.yml",
+    "BUILD3_TRUTH_REF": "main"
   }
 }

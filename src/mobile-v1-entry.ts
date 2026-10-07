@@ -9,9 +9,22 @@ import { produceIntelligence } from './intelligence-producer';
 import { assessAutomatedMarketEvidence } from './automated-market-evidence';
 import { canAdvanceIntelligenceHandoff } from './intelligence-contract';
 import { actorCanAccessStored, actorMetadata, isAccessIdentityEnforced, resolveAccessActor, type AccessIdentityEnv } from './access-identity';
+import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
+import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
+import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materializer';
+import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-output-read';
+import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
+import { readBuild3Scorecard } from './build-3-scorecard';
+import { readBuild3LearningLab } from './build-3-learning-lab';
+import { prepareBuild3ChallengerEvent, persistBuild3ChallengerEvent } from './build-3-challenger-governance';
+import { persistBuild3RecommendationIntradaySource, prepareBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
+import { readBuild3HistoricalReplay } from './build-3-historical-replay';
+import { validateBuild3TruthHandoffWithoutPersist } from './build-3-truth-handoff';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
-type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
+type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;FIVEDR_DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const allowed=new Set<ScreenshotCategory>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const REQUIRED_FAMILIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
@@ -92,7 +105,12 @@ async function exact5drRequest(request:Request,env:Env,requestId:string):Promise
   if(isAccessIdentityEnforced(env)&&actor.role!=='OWNER'&&!actorCanAccessStored(actor,metadata.actor,env))return json({error:'This run belongs to a different Console user'},403);
   const runId=rows[0].run_id?String(rows[0].run_id):null;
   const runRows=runId?await sql`select run_id,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,published,learning_eligible from analysis_runs where engine='5DR' and run_id=${runId} limit 1`:[];
-  return json({request:rows[0],run:runRows[0]??null});
+  let run:Record<string,unknown>|null=runRows.length?runRows[0] as Record<string,unknown>:null;
+  if(run&&isBuild3RuntimeEnabled(env)){
+    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',requestId);
+    run={...run,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
+  }
+  return json({request:rows[0],run});
 }
 
 async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
@@ -121,8 +139,15 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
   }
 
   if(url.pathname==='/api/5dr/latest'&&request.method==='GET'){
-    const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
-    return json({run:rows[0]??null,sandbox:true,note:rows.length?undefined:'No sandbox 5DR run yet'});
+    const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published,req.request_id as build3_source_id from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
+    if(!rows.length)return json({run:null,sandbox:true,note:'No sandbox 5DR run yet'});
+    const raw=rows[0] as Record<string,unknown>;
+    const sourceId=String(raw.build3_source_id);
+    const {build3_source_id:_build3SourceId,...visible}=raw;
+    if(!isBuild3RuntimeEnabled(env))return json({run:visible,sandbox:true});
+    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',sourceId);
+    const run={...visible,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
+    return json({run,sandbox:true});
   }
 
   if(url.pathname==='/api/5dr/outcome-assessment'&&request.method==='GET'){
@@ -227,6 +252,12 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   }
   const requestId=`5drreq_${crypto.randomUUID()}`;
   const batchId=`auto_${crypto.randomUUID()}`;
+  const build3Enabled=isBuild3RuntimeEnabled(env);
+  const build3RunTimestamp=new Date();
+  const build3Run=build3Enabled?buildBuild3RunRegistryRecord({
+    engine:'5DR',instrument:'NIFTY',source_id:requestId,model_version:'5DR_V2_1',
+    run_timestamp:build3RunTimestamp,trigger_type:'AUTOMATIC',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
+  }):null;
   let metadata:Record<string,unknown>={
     actor:actorMetadata(runActor),
     identity_enforced:isAccessIdentityEnforced(env),
@@ -237,6 +268,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot,prep_only:prepOnly},
     preopen_prep_only:prepOnly,
+    ...(build3Run?{build3_run:build3Run}:{}),
     run_provenance:{
       trigger_type:prepOnly?'SCHEDULED_PREP':canonicalAttempt?'SCHEDULED':'USER',
       evidence_mode:prepOnly?'PREOPEN_PREP':canonicalAttempt?'PREOPEN':null,
@@ -250,6 +282,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
+  if(build3Run)await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
   const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
@@ -650,9 +683,73 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     return json({...normalizedBody,...executionPacket},packetResponse.status);
   }
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
-  const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
+  if(!isBuild3RuntimeEnabled(env)){
+    const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
+    const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
+    const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
+    if(dispatch.ok){
+      await sql`update analysis_requests set status='PROCESSING',metadata=${JSON.stringify(nextMetadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({...normalizedBody,engine_dispatch:dispatchRecord,status:'PROCESSING'});
+    }
+    await sql`update analysis_requests set metadata=${JSON.stringify(nextMetadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,engine_dispatch:dispatchRecord,next_step:'RETRY_ENGINE_DISPATCH'},503);
+  }
+  let evidenceSnapshot;
+  try{
+    const issuanceContext={
+      build3_run:isObject(metadata.build3_run)?metadata.build3_run:null,
+      run_provenance:isObject(metadata.run_provenance)?metadata.run_provenance:null,
+      invocation:isObject(metadata.invocation)?metadata.invocation:null,
+      automated_market_evidence:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence:null,
+      screenshot_intelligence:isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:null,
+      system_research_acquisition:isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:null,
+      intelligence_handoff:isObject(metadata.intelligence_handoff)?metadata.intelligence_handoff:null,
+      normalization_assessment:isObject(metadata.normalization_assessment)?metadata.normalization_assessment:null,
+      decision_setup:isObject(metadata.decision_setup)?metadata.decision_setup:null,
+      evidence_readiness:isObject(metadata.evidence_readiness)?metadata.evidence_readiness:null,
+      canonical_attempt:isObject(metadata.canonical_attempt)?metadata.canonical_attempt:null,
+      freshness_at:metadata.freshness_at??null,
+      evidence_file_count:metadata.evidence_file_count??null,
+      evidence_mime_types:Array.isArray(metadata.evidence_mime_types)?metadata.evidence_mime_types:null,
+      preopen_prep_only:metadata.preopen_prep_only===true,
+    };
+    evidenceSnapshot=await freezeBuild3EvidenceSnapshot(env.DATABASE_URL,{
+      engine:'5DR',
+      instrument:'NIFTY',
+      source_id:requestId,
+      evidence:{
+        engine_input:executionPacket,
+        issuance_context:issuanceContext,
+      },
+    });
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const blocked={status:'BLOCKED',detail,blocked_at:new Date().toISOString()};
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:blocked,error:'Build 3.0 evidence freeze failed',next_step:'RETRY_EVIDENCE_FREEZE'},409);
+  }
+  const snapshotRef=build3EvidenceSnapshotRef(evidenceSnapshot);
+  const build3Run=isObject(metadata.build3_run)?metadata.build3_run:{};
+  const marketPhase=String(build3Run.market_phase??'CLOSED_SESSION') as 'PRE_OPEN'|'OPEN'|'INTRADAY'|'POST_CLOSE'|'CLOSED_SESSION';
+  let dataQuality;
+  try{
+    dataQuality=assessBuild3FiveDrDataQuality(evidenceSnapshot,marketPhase);
+    dataQuality=await persistBuild3DataQuality(env.DATABASE_URL,dataQuality);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const blocked={status:'BLOCKED',detail,blocked_at:new Date().toISOString()};
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:snapshotRef,build3_data_quality:blocked,error:'Build 3.0 data-quality assessment failed',next_step:'RETRY_DATA_QUALITY_GATE'},409);
+  }
+  const qualityRef=build3DataQualityRef(dataQuality);
+  if(!dataQuality.valid_for_forecast){
+    await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'NORMALIZED_READY',build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef,error:'Build 3.0 data-quality gate blocked forecast dispatch',next_step:'REFRESH_REQUIRED_EVIDENCE'},409);
+  }
+  const governedExecutionPacket={...executionPacket,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef};
+  const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,governedExecutionPacket);
   const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
-  const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
+  const nextMetadata={...metadata,build3_evidence_snapshot:snapshotRef,build3_data_quality:qualityRef,engine_dispatch:dispatchRecord};
   if(dispatch.ok){
     await sql`update analysis_requests set status='PROCESSING',metadata=${JSON.stringify(nextMetadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
     return json({...normalizedBody,engine_dispatch:dispatchRecord,status:'PROCESSING'});
@@ -684,6 +781,27 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
     const runRows=runId?await sql`select published,learning_eligible from analysis_runs where run_id=${runId} and engine='5DR' limit 1`:[];
     const completion=isObject(metadata.completion)?metadata.completion:{};
     const sandbox=completion.sandbox===true;
+    let build3Forecast:Record<string,unknown>|null=null;
+    if(isBuild3RuntimeEnabled(env)&&isObject(metadata.build3_run)){
+      try{
+        const forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+        build3Forecast={
+          forecast_version:forecast.forecast_version,
+          engine:forecast.engine,
+          source_id:forecast.source_id,
+          issued_at:forecast.issued_at,
+          evidence_snapshot_id:forecast.evidence_snapshot_id,
+          horizon_count:forecast.horizons.length
+        };
+      }catch(error){
+        return json({
+          ok:false,request_id:requestId,status:'COMPLETED',adapter_stage:stage||'COMPLETED',
+          run_id:runId,error:'Build 3.0 NIFTY forecast materialization failed',
+          detail:error instanceof Error?error.message:String(error),
+          next_step:'RETRY_BUILD3_FORECAST_MATERIALIZATION'
+        },409);
+      }
+    }
     return json({
       ok:true,
       request_id:requestId,
@@ -693,6 +811,7 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
       published:runRows.length?runRows[0].published===true:false,
       learning_eligible:runRows.length?runRows[0].learning_eligible===true:false,
       sandbox,
+      build3_forecast:build3Forecast,
       idempotent:true
     });
   }
@@ -719,10 +838,24 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
       const body=await responseJson(published);
       if(!published.ok)return json({ok:false,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_sync:sync,error:'validated engine result could not be persisted',publish_gate:body},409);
       const completedDispatch={...dispatch,ok:true,status:'RESULT_SYNCED',workflow_run_id:sync.workflow_run_id,result_synced_at:new Date().toISOString()};
+      let build3Forecast;
+      try{
+        build3Forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+      }catch(error){
+        const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
+        const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
+        const build3Blocked={status:'BLOCKED',detail:error instanceof Error?error.message:String(error),blocked_at:new Date().toISOString()};
+        await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch,build3_forecast:build3Blocked})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+        return json({...body,ok:false,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch,build3_forecast:build3Blocked,error:'Build 3.0 NIFTY forecast materialization failed',next_step:'RETRY_BUILD3_FORECAST_MATERIALIZATION'},409);
+      }
+      const build3Ref={
+        forecast_version:build3Forecast.forecast_version,engine:build3Forecast.engine,source_id:build3Forecast.source_id,
+        issued_at:build3Forecast.issued_at,evidence_snapshot_id:build3Forecast.evidence_snapshot_id,horizon_count:build3Forecast.horizons.length
+      };
       const latest=await sql`select metadata from analysis_requests where request_id=${requestId} limit 1`;
       const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:{};
-      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-      return json({...body,ok:true,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch});
+      await sql`update analysis_requests set metadata=${JSON.stringify({...latestMetadata,engine_dispatch:completedDispatch,build3_forecast:build3Ref})}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({...body,ok:true,request_id:requestId,status:'COMPLETED',adapter_stage:stage,engine_dispatch:completedDispatch,build3_forecast:build3Ref});
     }
     return json({ok:true,request_id:requestId,status:'PROCESSING',adapter_stage:stage,engine_dispatch:dispatch,engine_sync:sync,idempotent:true});
   }
@@ -796,6 +929,65 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
   return json({error:'request cannot be resumed from its current stage',adapter_stage:stage,status},409);
 }
 
+
+export async function progressPendingBuild3NiftyRuns(
+  env:Env,
+  limit=12
+):Promise<Record<string,unknown>[]>{
+  if(!isBuild3RuntimeEnabled(env))return [];
+  if(!env.DATABASE_URL?.trim())return [];
+  const sql=neon(env.DATABASE_URL);
+  const rows=await sql`
+    select req.request_id,req.status,req.updated_at
+      from analysis_requests req
+     where req.engine='5DR'
+       and req.metadata ? 'build3_run'
+       and (
+         req.status='PROCESSING'
+         or (
+           req.status='COMPLETED'
+           and not exists (
+             select 1 from build3_forecast_horizons f
+              where f.engine='5DR' and f.source_id=req.request_id
+           )
+         )
+       )
+     order by req.updated_at asc
+     limit ${Math.max(1,Math.min(50,limit))}
+  `;
+  const results:Record<string,unknown>[]=[];
+  for(const row of rows){
+    const requestId=String(row.request_id);
+    try{
+      if(String(row.status)==='COMPLETED'){
+        const forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
+        results.push({
+          request_id:requestId,status:'MATERIALIZED',
+          forecast_version:forecast.forecast_version,horizon_count:forecast.horizons.length
+        });
+        continue;
+      }
+      const retry=new Request(
+        `https://edge-console.internal/api/5dr/run-requests/${encodeURIComponent(requestId)}/resume-processing`,
+        {method:'POST',headers:{'content-type':'application/json'},body:'{}'}
+      );
+      const response=await resumeProcessing(retry,env,requestId);
+      const body=await responseJson(response);
+      results.push({
+        request_id:requestId,status:String(body.status??'UNKNOWN'),
+        adapter_stage:body.adapter_stage??null,http_status:response.status,
+        build3_forecast:body.build3_forecast??null,next_step:body.next_step??null
+      });
+    }catch(error){
+      results.push({
+        request_id:requestId,status:'BLOCKED',
+        detail:error instanceof Error?error.message:String(error)
+      });
+    }
+  }
+  return results;
+}
+
 async function preopenStatus(request:Request,env:Env):Promise<Response>{
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
   const url=new URL(request.url);
@@ -866,8 +1058,269 @@ async function preopenStatus(request:Request,env:Env):Promise<Response>{
 }
 
 
+async function build3RecommendationIntradaySourceApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  let body:unknown;
+  try{body=await request.json()}catch{return json({error:'Valid JSON body is required'},422);}
+  if(!isObject(body))return json({error:'Object payload is required'},422);
+  try{
+    const stored=await persistBuild3RecommendationIntradaySource(
+      env.DATABASE_URL,
+      body as unknown as Build3RecommendationIntradaySourceInput,
+    );
+    return json({
+      ok:true,
+      source_version:stored.source_version,
+      engine:stored.engine,
+      instrument:stored.instrument,
+      source_id:stored.source_id,
+      provider_instrument_key:stored.provider_instrument_key,
+      session_date:stored.session_date,
+      provider_hash:stored.provider_hash,
+      candle_count:stored.candles.length,
+      trading_enabled:false,
+    },201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/DATABASE_NOT_CONFIGURED/.test(detail)?503:
+      /DECISION_NOT_FOUND|PROVIDER_KEY_MISMATCH|IMMUTABLE_CONFLICT|FROZEN_PROVIDER_KEY_MISSING/.test(detail)?409:422;
+    return json({error:'Build 3 intraday source rejected',detail},status);
+  }
+}
+
+async function build3ScorecardApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 scorecard'},403);
+  }
+  const url=new URL(request.url);
+  const scope=String(url.searchParams.get('engine')??'ALL').toUpperCase();
+  if(!['ALL','5DR','EDGE_STOCKS'].includes(scope)){
+    return json({error:'engine must be ALL, 5DR or EDGE_STOCKS'},422);
+  }
+  try{
+    const scorecard=await readBuild3Scorecard(
+      env.DATABASE_URL,
+      scope==='ALL'?undefined:scope as '5DR'|'EDGE_STOCKS',
+    );
+    return json({scorecard,trading_enabled:false,build3_runtime:true});
+  }catch(error){
+    return json({
+      error:'Build 3 scorecard unavailable',
+      detail:error instanceof Error?error.message:String(error),
+    },503);
+  }
+}
+
+async function build3LearningLabApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 Learning Lab'},403);
+  }
+  let body:Record<string,unknown>={};
+  try{
+    const raw=await request.json();
+    if(!isObject(raw))return json({error:'Learning Lab scope body must be an object'},422);
+    body=raw;
+  }catch{
+    return json({error:'Learning Lab scope JSON body is required'},422);
+  }
+  try{
+    const result=await readBuild3LearningLab(env.DATABASE_URL,{
+      engine:String(body.engine??'ALL').toUpperCase() as 'ALL'|'5DR'|'EDGE_STOCKS',
+      instrument:body.instrument===null||body.instrument===undefined?null:String(body.instrument),
+      from_date:body.from_date===null||body.from_date===undefined?null:String(body.from_date),
+      to_date:body.to_date===null||body.to_date===undefined?null:String(body.to_date),
+    },true);
+    return json({...result,trading_enabled:false,production_mutation_allowed:false,build3_runtime:true},201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/SCOPE_/.test(detail)?422:/DATABASE_NOT_CONFIGURED/.test(detail)?503:500;
+    return json({error:'Build 3 Learning Lab unavailable',detail},status);
+  }
+}
+
+async function build3ChallengerEventApi(request:Request,env:Env,challengerId:string):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 challenger governance'},403);
+  }
+  let body:Record<string,unknown>={};
+  try{
+    const raw=await request.json();
+    if(!isObject(raw))return json({error:'Challenger event body must be an object'},422);
+    body=raw;
+  }catch{
+    return json({error:'Challenger event JSON body is required'},422);
+  }
+  const eventType=String(body.event_type??'').toUpperCase();
+  if(!['APPROVED','REJECTED','PROMOTED','WITHDRAWN'].includes(eventType)){
+    return json({error:'event_type must be APPROVED, REJECTED, PROMOTED or WITHDRAWN'},422);
+  }
+  try{
+    const event=prepareBuild3ChallengerEvent({
+      challenger_id:challengerId,
+      event_type:eventType as 'APPROVED'|'REJECTED'|'PROMOTED'|'WITHDRAWN',
+      explicit_user_approval:body.explicit_user_approval===true,
+      actor:actor.id,
+      details:isObject(body.details)?body.details:{},
+    });
+    const stored=await persistBuild3ChallengerEvent(env.DATABASE_URL,event);
+    return json({
+      event:stored,production_mutation_applied:false,
+      explicit_user_approval_recorded:stored.explicit_user_approval,
+      trading_enabled:false,build3_runtime:true,
+    },201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/EXPLICIT_USER_APPROVAL_REQUIRED/.test(detail)?403:/NOT_FOUND/.test(detail)?404:422;
+    return json({error:'Build 3 challenger event rejected',detail},status);
+  }
+}
+
+async function build3TruthHandoffSmokeApi(request:Request,env:Env):Promise<Response>{
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  const url=new URL(request.url);
+  const engine=url.searchParams.get('engine');
+  const sourceId=url.searchParams.get('source_id')??'';
+  const providerKey=url.searchParams.get('provider_instrument_key')??'';
+  const sessionDate=url.searchParams.get('session_date')??'';
+  const instrument=url.searchParams.get('instrument')??'';
+  if(engine!=='5DR'&&engine!=='EDGE_STOCKS')return json({error:'engine must be 5DR or EDGE_STOCKS'},422);
+  try{
+    const prepared=await validateBuild3TruthHandoffWithoutPersist(env,{
+      engine,source_id:sourceId,provider_instrument_key:providerKey,session_date:sessionDate,instrument,
+    });
+    if(!prepared)return json({version:'MDOS_BUILD_3_TRUTH_HANDOFF_SMOKE_V1',status:'PENDING',writes_performed:0},404);
+    return json({
+      version:'MDOS_BUILD_3_TRUTH_HANDOFF_SMOKE_V1',
+      status:'PASS',
+      handoff_transport_valid:true,
+      live_provider_payload_valid:true,
+      persistence_applied:false,
+      writes_performed:0,
+      engine:prepared.engine,
+      instrument:prepared.instrument,
+      source_id:prepared.source_id,
+      provider_instrument_key:prepared.provider_instrument_key,
+      session_date:prepared.session_date,
+      source_ref:prepared.source_ref,
+      provider_hash:prepared.provider_hash,
+      candle_count:prepared.candles.length,
+      first_candle_at:prepared.candles[0]?.timestamp??null,
+      last_candle_at:prepared.candles.at(-1)?.timestamp??null,
+      trading_enabled:false,
+    });
+  }catch(error){
+    return json({error:'Build 3 truth handoff smoke failed',detail:error instanceof Error?error.message:String(error)},500);
+  }
+}
+
+async function build3TruthSmokeApi(request:Request,env:Env):Promise<Response>{
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  let raw:unknown;
+  try{raw=await request.json();}catch{return json({error:'Build 3 truth smoke JSON body is required'},422);}
+  if(!isObject(raw))return json({error:'Build 3 truth smoke body must be an object'},422);
+  const engine=String(raw.engine??'');
+  if(engine!=='5DR'&&engine!=='EDGE_STOCKS')return json({error:'engine must be 5DR or EDGE_STOCKS'},422);
+  const input:Build3RecommendationIntradaySourceInput={
+    engine,
+    source_id:String(raw.source_id??''),
+    provider_instrument_key:String(raw.provider_instrument_key??''),
+    session_date:String(raw.session_date??''),
+    captured_at:String(raw.captured_at??''),
+    source_ref:String(raw.source_ref??''),
+    candles:Array.isArray(raw.candles)?raw.candles:[],
+  };
+  const instrument=String(raw.instrument??(engine==='5DR'?'NIFTY':'')).trim();
+  if(!instrument)return json({error:'instrument is required'},422);
+  try{
+    const prepared=await prepareBuild3RecommendationIntradaySource(input,instrument);
+    return json({
+      version:'MDOS_BUILD_3_TRUTH_SMOKE_V1',
+      status:'PASS',
+      live_provider_payload_valid:true,
+      callback_authenticated:true,
+      persistence_applied:false,
+      writes_performed:0,
+      engine:prepared.engine,
+      instrument:prepared.instrument,
+      source_id:prepared.source_id,
+      provider_instrument_key:prepared.provider_instrument_key,
+      session_date:prepared.session_date,
+      source_ref:prepared.source_ref,
+      provider_hash:prepared.provider_hash,
+      candle_count:prepared.candles.length,
+      first_candle_at:prepared.candles[0]?.timestamp??null,
+      last_candle_at:prepared.candles.at(-1)?.timestamp??null,
+      trading_enabled:false,
+    });
+  }catch(error){
+    return json({error:'Build 3 truth smoke validation failed',detail:error instanceof Error?error.message:String(error)},422);
+  }
+}
+
+async function build3HistoricalReplayApi(request:Request,env:Env):Promise<Response>{
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  const url=new URL(request.url);
+  const asOf=url.searchParams.get('as_of')??undefined;
+  try{
+    const replay=await readBuild3HistoricalReplay(env,{as_of:asOf});
+    return json(replay);
+  }catch(error){
+    return json({error:'Build 3 historical replay failed',detail:error instanceof Error?error.message:String(error)},500);
+  }
+}
+
+async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
+  const url=new URL(request.url);
+  if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
+    return json({error:'Not found'},404);
+  }
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  if(request.method==='GET'){
+    try{return json(await readBuild3SchemaStatus(env.DATABASE_URL));}
+    catch(error){return json({error:error instanceof Error?error.message:String(error)},503);}
+  }
+  if(request.method==='POST'){
+    if(request.headers.get('X-Build3-Schema-Action')!=='APPLY_ADDITIVE_BUILD3_V1'){
+      return json({error:'Explicit additive Build 3.0 schema action header is required'},403);
+    }
+    try{return json(await applyBuild3Schema(env.DATABASE_URL));}
+    catch(error){return json({error:'Build 3.0 schema migration failed',detail:error instanceof Error?error.message:String(error)},500);}
+  }
+  return json({error:'Method not allowed'},405);
+}
+
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
+  if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
+  if(url.pathname==='/api/build3/historical-replay'&&request.method==='GET')return build3HistoricalReplayApi(request,env);
+  if(url.pathname==='/api/build3/truth-smoke'&&request.method==='POST')return build3TruthSmokeApi(request,env);
+  if(url.pathname==='/api/build3/truth-handoff-smoke'&&request.method==='GET')return build3TruthHandoffSmokeApi(request,env);
+  if(url.pathname==='/api/build3/recommendation-intraday-source'&&request.method==='POST')return build3RecommendationIntradaySourceApi(request,env);
+  if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
+  if(url.pathname==='/api/build3/learning-lab'&&request.method==='POST')return build3LearningLabApi(request,env);
+  const challengerEvent=url.pathname.match(/^\/api\/build3\/challengers\/([^/]+)\/events$/);
+  if(challengerEvent&&request.method==='POST')return build3ChallengerEventApi(request,env,decodeURIComponent(challengerEvent[1]));
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
   const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
