@@ -28,3 +28,57 @@ test('G5 rejects missing regime/evidence semantics',()=>{
   delete bad.current_stock_outcome.forecast_sessions[0].regime_context;
   assert.throws(()=>validateSessions(bad),/regime context missing/);
 });
+
+
+test('Build 3.0 stock path renders persisted Core Zone and calibration state on every horizon',()=>{
+  const current=structuredClone(report);
+  current.build3_precision={
+    version:'MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1',
+    engine:'EDGE_STOCKS',
+    instrument:'LTF',
+    source_id:'life-1',
+    horizon_count:5,
+    shadow_only:true,
+    production_methodology_changed:false,
+    rows:EXPECTED.map((horizon,i)=>({
+      horizon,target_session:sessions[i].trading_date,expected_centre:272+i,
+      core_zone:{low:271+i,high:273+i},outer_zone:{...sessions[i].expected_zone},
+      core_width_points:2,core_width_percent:0.7,outer_width_points:5,outer_width_percent:1.8,
+      calibration_version:'STOCK_CORE_ZONE_CHALLENGER_V0_1',
+      calibration_state:'UNVALIDATED_SHADOW',normalization_basis:'STOCK_ATR_POINTS'
+    }))
+  };
+  current.current_stock_outcome.forecast_sessions=current.current_stock_outcome.forecast_sessions.map((row,i)=>({
+    ...row,
+    core_zone:{low:271+i,high:273+i},
+    core_zone_width_points:2,
+    core_zone_width_percent:0.7,
+    core_zone_calibration:{
+      version:'STOCK_CORE_ZONE_CHALLENGER_V0_1',
+      state:'UNVALIDATED_SHADOW',
+      normalization_basis:'STOCK_ATR_POINTS',
+      shadow_only:true,
+      production_methodology_changed:false
+    }
+  }));
+  const rows=validateSessions(current);
+  const html=renderRows(rows);
+  assert.equal((html.match(/Core Zone ₹/g)||[]).length,5);
+  assert.ok(html.includes('UNVALIDATED SHADOW'));
+  assert.ok(html.includes('STOCK_CORE_ZONE_CHALLENGER_V0_1'));
+});
+
+test('Build 3.0 stock path fails closed when a visible Core Zone escapes the outer zone',()=>{
+  const current=structuredClone(report);
+  current.build3_precision={
+    version:'MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1',engine:'EDGE_STOCKS',instrument:'LTF',source_id:'life-1',
+    horizon_count:5,shadow_only:true,production_methodology_changed:false,
+    rows:EXPECTED.map((horizon,i)=>({horizon,target_session:sessions[i].trading_date}))
+  };
+  current.current_stock_outcome.forecast_sessions=current.current_stock_outcome.forecast_sessions.map((row,i)=>({
+    ...row,
+    core_zone:{low:i===0?250:271+i,high:273+i},
+    core_zone_calibration:{version:'STOCK_CORE_ZONE_CHALLENGER_V0_1',state:'UNVALIDATED_SHADOW'}
+  }));
+  assert.throws(()=>validateSessions(current),/Core Zone must remain inside outer zone/);
+});
