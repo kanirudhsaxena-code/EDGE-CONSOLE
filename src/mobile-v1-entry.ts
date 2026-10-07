@@ -100,7 +100,7 @@ async function exact5drRequest(request:Request,env:Env,requestId:string):Promise
   const runId=rows[0].run_id?String(rows[0].run_id):null;
   const runRows=runId?await sql`select run_id,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,published,learning_eligible from analysis_runs where engine='5DR' and run_id=${runId} limit 1`:[];
   let run:Record<string,unknown>|null=runRows.length?runRows[0] as Record<string,unknown>:null;
-  if(run){
+  if(run&&isBuild3RuntimeEnabled(env)){
     const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',requestId);
     run={...run,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
   }
@@ -137,8 +137,9 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
     if(!rows.length)return json({run:null,sandbox:true,note:'No sandbox 5DR run yet'});
     const raw=rows[0] as Record<string,unknown>;
     const sourceId=String(raw.build3_source_id);
-    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',sourceId);
     const {build3_source_id:_build3SourceId,...visible}=raw;
+    if(!isBuild3RuntimeEnabled(env))return json({run:visible,sandbox:true});
+    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',sourceId);
     const run={...visible,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
     return json({run,sandbox:true});
   }
@@ -927,6 +928,7 @@ export async function progressPendingBuild3NiftyRuns(
   env:Env,
   limit=12
 ):Promise<Record<string,unknown>[]>{
+  if(!isBuild3RuntimeEnabled(env))return [];
   if(!env.DATABASE_URL?.trim())return [];
   const sql=neon(env.DATABASE_URL);
   const rows=await sql`
