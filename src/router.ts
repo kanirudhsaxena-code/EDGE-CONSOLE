@@ -1529,6 +1529,34 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   const canonical = canonicalRows.length ? canonicalRows[0] as Record<string, unknown> : null;
 
   const executionDiagnostics=parseExecutionNotes(active.execution_notes);
+  const persistedInstrument=String(active.instrument ?? 'NONE').toUpperCase();
+  const persistedForecast=String(active.definitive_forecast ?? '').toUpperCase();
+  const legacyNonExecutable=persistedInstrument==='NONE' && executionDiagnostics.gate_results.length===0;
+  const derivedDominantReason=executionDiagnostics.dominant_rejection_reason ?? (
+    persistedForecast.includes('BASE') || persistedForecast.includes('RANGE')
+      ? 'base/range has no directional edge'
+      : 'Persisted legacy run did not contain a complete executable candidate.'
+  );
+  const derivedGateResults=executionDiagnostics.gate_results.length
+    ? executionDiagnostics.gate_results
+    : (persistedInstrument==='NONE' ? [
+        {
+          gate:'DIRECTIONAL_EDGE',
+          status:(persistedForecast==='BULLISH'||persistedForecast==='BEARISH')?'PASS':'FAIL',
+          observed:persistedForecast || 'UNKNOWN',
+          threshold:'BULLISH or BEARISH',
+          reason:(persistedForecast==='BULLISH'||persistedForecast==='BEARISH')
+            ? null
+            : 'base/range has no directional edge',
+        },
+        {
+          gate:'STRUCTURE',
+          status:'FAIL',
+          observed:'LEGACY_NOT_PERSISTED',
+          threshold:'verified candidate entry/invalidation/target structure',
+          reason:'Legacy run did not persist a complete candidate execution structure; Build 2.5 does not reconstruct missing levels.',
+        },
+      ] : []);
 
   const payload = {
     contract_version: 'EDGE_STOCKS_V1_3',
@@ -1712,13 +1740,13 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         option_expiry: active.option_expiry ?? null,
         observed_premium: numberOrNull(active.observed_premium),
         option_suitability_status: active.option_suitability_status ?? null,
-        execution_quality_score: numberOrNull(active.execution_quality_score),
-        execution_quality_level: active.execution_quality_level ?? null,
+        execution_quality_score: legacyNonExecutable ? 0 : numberOrNull(active.execution_quality_score),
+        execution_quality_level: legacyNonExecutable ? 'NOT_EXECUTABLE' : (active.execution_quality_level ?? null),
         candidate_instrument: executionDiagnostics.candidate_instrument ?? (
-          String(active.instrument ?? 'NONE') === 'NONE' ? null : String(active.instrument)
+          persistedInstrument === 'NONE' ? null : String(active.instrument)
         ),
-        dominant_rejection_reason: executionDiagnostics.dominant_rejection_reason ?? null,
-        gate_results: executionDiagnostics.gate_results
+        dominant_rejection_reason: persistedInstrument==='NONE' ? derivedDominantReason : (executionDiagnostics.dominant_rejection_reason ?? null),
+        gate_results: derivedGateResults
       },
       current_price: numberOrNull(active.current_price),
       current_return_pct: numberOrNull(active.current_return_pct),
