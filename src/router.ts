@@ -17,7 +17,7 @@ import {
   readMarketSnapshotPayload,
 } from './stock-lifecycle';
 import { produceStockSystemResearch } from './stock-system-research';
-import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord } from './build-3-run-registry';
+import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3RunRegistryRecord, readBuild3RunRegistryRecord } from './build-3-run-registry';
 import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
 import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
@@ -1591,45 +1591,61 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
 
   let build3Precision: ReturnType<typeof build3PrecisionOutput> = null;
   if (env.DATABASE_URL && forecastSessions) {
-    const lifecycleRows = await sql`
-      select lifecycle_id
-        from edge_run_lifecycles
-       where recommendation_id=${String(active.recommendation_id)}
-       order by updated_at desc
-       limit 1
-    `;
-    if (lifecycleRows.length) {
-      const lifecycleId=String(lifecycleRows[0].lifecycle_id);
-      const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
-      if (precisionRows.length) {
-        const byHorizon=new Map(precisionRows.map(row=>[row.horizon,row]));
-        forecastSessions=forecastSessions.map((session:Record<string,unknown>)=>{
-          const label=String(session.session_label);
-          const precision=byHorizon.get(label as 'D'|'D+1'|'D+2'|'D+3'|'D+4');
-          if(!precision)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_HORIZON_MISSING:'+label);
-          const expectedZone=isObject(session.expected_zone)?session.expected_zone as JsonRecord:{};
-          const same=(a:unknown,b:number)=>typeof a==='number'&&Math.abs(a-b)<1e-8;
-          if(
-            String(session.trading_date)!==precision.target_session||
-            !same(expectedZone.low,precision.outer_low)||
-            !same(expectedZone.high,precision.outer_high)
-          )throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_PARITY_MISMATCH:'+label);
-          return {
-            ...session,
-            core_zone:{low:precision.core_low,high:precision.core_high},
-            core_zone_width_points:precision.core_width_points,
-            core_zone_width_percent:precision.core_width_percent,
-            core_zone_calibration:{
-              version:precision.calibration_version,
-              state:precision.calibration_state,
-              normalization_basis:precision.normalization_basis,
-              shadow_only:true,
-              production_methodology_changed:false,
-            },
-          };
-        });
-        build3Precision=build3PrecisionOutput(precisionRows);
+    try {
+      const lifecycleRows = await sql`
+        select lifecycle_id
+          from edge_run_lifecycles
+         where recommendation_id=${String(active.recommendation_id)}
+         order by updated_at desc
+         limit 1
+      `;
+      if (lifecycleRows.length) {
+        const lifecycleId=String(lifecycleRows[0].lifecycle_id);
+        const registry=await readBuild3RunRegistryRecord(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
+        if(registry){
+          const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
+          if(!precisionRows.length)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_MISSING');
+          const byHorizon=new Map(precisionRows.map(row=>[row.horizon,row]));
+          forecastSessions=forecastSessions.map((session:Record<string,unknown>)=>{
+            const label=String(session.session_label);
+            const precision=byHorizon.get(label as 'D'|'D+1'|'D+2'|'D+3'|'D+4');
+            if(!precision)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_HORIZON_MISSING:'+label);
+            const expectedZone=isObject(session.expected_zone)?session.expected_zone as JsonRecord:{};
+            const same=(a:unknown,b:number)=>{
+              const n=Number(a);
+              return Number.isFinite(n)&&Math.abs(n-b)<=Math.max(1e-6,Math.abs(b)*1e-9);
+            };
+            if(String(session.trading_date)!==precision.target_session){
+              throw new Error('BUILD3_OUTPUT_STOCK_SESSION_PARITY_MISMATCH:'+label);
+            }
+            if(!same(expectedZone.low,precision.outer_low)||!same(expectedZone.high,precision.outer_high)){
+              throw new Error('BUILD3_OUTPUT_STOCK_OUTER_ZONE_PARITY_MISMATCH:'+label);
+            }
+            return {
+              ...session,
+              core_zone:{low:precision.core_low,high:precision.core_high},
+              core_zone_width_points:precision.core_width_points,
+              core_zone_width_percent:precision.core_width_percent,
+              core_zone_calibration:{
+                version:precision.calibration_version,
+                state:precision.calibration_state,
+                normalization_basis:precision.normalization_basis,
+                shadow_only:true,
+                production_methodology_changed:false,
+              },
+            };
+          });
+          build3Precision=build3PrecisionOutput(precisionRows);
+        }
       }
+    } catch(error) {
+      return json({
+        error:'Build 3.0 stock precision readback blocked',
+        code:'BUILD3_OUTPUT_STOCK_PRECISION_BLOCKED',
+        detail:error instanceof Error?error.message:String(error),
+        ticker:symbol,
+        recommendation_id:String(active.recommendation_id),
+      },409);
     }
   }
 
