@@ -1,6 +1,6 @@
 import { neon } from '@neondatabase/serverless';
 
-export const BUILD3_TRUTH_METRICS_VERSION='MDOS_BUILD_3_TRUTH_METRICS_V1' as const;
+export const BUILD3_TRUTH_METRICS_VERSION='MDOS_BUILD_3_TRUTH_METRICS_V2' as const;
 
 export type Build3TruthMetricRow={
   engine:'5DR'|'EDGE_STOCKS';
@@ -14,6 +14,16 @@ export type Build3TruthMetricRow={
   outer_close_hit:boolean;
   core_touch:boolean;
   core_close_hit:boolean;
+  outer_efficacy_state:'SCORABLE'|'NOT_SCORABLE';
+  core_efficacy_state:'SCORABLE'|'NOT_SCORABLE';
+  outer_deviation_hit:boolean|null;
+  core_deviation_hit:boolean|null;
+  outer_challenger_3pct_hit:boolean|null;
+  core_challenger_3pct_hit:boolean|null;
+  outer_quality_status:'GREEN'|'AMBER'|'RED'|'NOT_SCORABLE';
+  core_quality_status:'GREEN'|'AMBER'|'RED'|'NOT_SCORABLE';
+  outer_range_deviation_pct:number|null;
+  core_range_deviation_pct:number|null;
   normalized_centre_error:number;
   brier_score:number|null;
   probability_state:'SCORABLE'|'NOT_SCORABLE';
@@ -25,10 +35,24 @@ export type Build3TruthMetricRow={
 type MetricSet={
   samples:number;
   direction_accuracy_pct:number|null;
-  core_touch_rate_pct:number|null;
-  core_close_hit_rate_pct:number|null;
-  outer_touch_rate_pct:number|null;
+  outer_zone_samples:number;
   outer_close_hit_rate_pct:number|null;
+  outer_deviation_hit_rate_pct:number|null;
+  outer_green_pct:number|null;
+  outer_amber_pct:number|null;
+  outer_red_pct:number|null;
+  outer_challenger_3pct_hit_rate_pct:number|null;
+  mean_outer_range_deviation_pct:number|null;
+  core_zone_samples:number;
+  core_close_hit_rate_pct:number|null;
+  core_deviation_hit_rate_pct:number|null;
+  core_green_pct:number|null;
+  core_amber_pct:number|null;
+  core_red_pct:number|null;
+  core_challenger_3pct_hit_rate_pct:number|null;
+  mean_core_range_deviation_pct:number|null;
+  diagnostic_outer_touch_rate_pct:number|null;
+  diagnostic_core_touch_rate_pct:number|null;
   mean_normalized_centre_error_pct:number|null;
   mean_brier_score:number|null;
   mean_core_width_pct:number|null;
@@ -69,6 +93,29 @@ function validateRow(row:Build3TruthMetricRow):void{
   if(!finite(row.normalized_centre_error)||row.normalized_centre_error<0)throw new Error('BUILD3_TRUTH_METRICS_CENTRE_ERROR_INVALID');
   if(!finite(row.core_width_percent)||row.core_width_percent<0)throw new Error('BUILD3_TRUTH_METRICS_CORE_WIDTH_INVALID');
   if(!finite(row.outer_width_percent)||row.outer_width_percent<=0)throw new Error('BUILD3_TRUTH_METRICS_OUTER_WIDTH_INVALID');
+  if(row.outer_efficacy_state==='SCORABLE'&&!finite(row.outer_range_deviation_pct))throw new Error('BUILD3_TRUTH_METRICS_OUTER_DEVIATION_MISSING');
+  if(row.core_efficacy_state==='SCORABLE'&&!finite(row.core_range_deviation_pct))throw new Error('BUILD3_TRUTH_METRICS_CORE_DEVIATION_MISSING');
+}
+
+function zoneMetrics(rows:Build3TruthMetricRow[],zone:'outer'|'core'){
+  const stateKey=zone==='outer'?'outer_efficacy_state':'core_efficacy_state';
+  const closeKey=zone==='outer'?'outer_close_hit':'core_close_hit';
+  const deviationKey=zone==='outer'?'outer_deviation_hit':'core_deviation_hit';
+  const challengerKey=zone==='outer'?'outer_challenger_3pct_hit':'core_challenger_3pct_hit';
+  const qualityKey=zone==='outer'?'outer_quality_status':'core_quality_status';
+  const rangeKey=zone==='outer'?'outer_range_deviation_pct':'core_range_deviation_pct';
+  const eligible=rows.filter(row=>row[stateKey]==='SCORABLE');
+  const deviations=eligible.map(row=>row[rangeKey]).filter(finite);
+  return {
+    samples:eligible.length,
+    close:pct(eligible.filter(row=>row[closeKey]===true).length,eligible.length),
+    deviation:pct(eligible.filter(row=>row[deviationKey]===true).length,eligible.length),
+    green:pct(eligible.filter(row=>row[qualityKey]==='GREEN').length,eligible.length),
+    amber:pct(eligible.filter(row=>row[qualityKey]==='AMBER').length,eligible.length),
+    red:pct(eligible.filter(row=>row[qualityKey]==='RED').length,eligible.length),
+    challenger:pct(eligible.filter(row=>row[challengerKey]===true).length,eligible.length),
+    meanDeviation:mean(deviations),
+  };
 }
 
 function metricSet(rows:Build3TruthMetricRow[]):MetricSet{
@@ -76,13 +123,29 @@ function metricSet(rows:Build3TruthMetricRow[]):MetricSet{
   const brier=rows
     .filter(row=>row.probability_state==='SCORABLE'&&finite(row.brier_score))
     .map(row=>Number(row.brier_score));
+  const outer=zoneMetrics(rows,'outer');
+  const core=zoneMetrics(rows,'core');
   return {
     samples:rows.length,
     direction_accuracy_pct:pct(directionRows.filter(row=>row.direction_result==='HIT').length,directionRows.length),
-    core_touch_rate_pct:pct(rows.filter(row=>row.core_touch).length,rows.length),
-    core_close_hit_rate_pct:pct(rows.filter(row=>row.core_close_hit).length,rows.length),
-    outer_touch_rate_pct:pct(rows.filter(row=>row.outer_touch).length,rows.length),
-    outer_close_hit_rate_pct:pct(rows.filter(row=>row.outer_close_hit).length,rows.length),
+    outer_zone_samples:outer.samples,
+    outer_close_hit_rate_pct:outer.close,
+    outer_deviation_hit_rate_pct:outer.deviation,
+    outer_green_pct:outer.green,
+    outer_amber_pct:outer.amber,
+    outer_red_pct:outer.red,
+    outer_challenger_3pct_hit_rate_pct:outer.challenger,
+    mean_outer_range_deviation_pct:outer.meanDeviation,
+    core_zone_samples:core.samples,
+    core_close_hit_rate_pct:core.close,
+    core_deviation_hit_rate_pct:core.deviation,
+    core_green_pct:core.green,
+    core_amber_pct:core.amber,
+    core_red_pct:core.red,
+    core_challenger_3pct_hit_rate_pct:core.challenger,
+    mean_core_range_deviation_pct:core.meanDeviation,
+    diagnostic_outer_touch_rate_pct:pct(rows.filter(row=>row.outer_touch).length,rows.length),
+    diagnostic_core_touch_rate_pct:pct(rows.filter(row=>row.core_touch).length,rows.length),
     mean_normalized_centre_error_pct:mean(rows.map(row=>row.normalized_centre_error)),
     mean_brier_score:mean(brier),
     mean_core_width_pct:mean(rows.map(row=>row.core_width_percent)),
@@ -151,8 +214,14 @@ export async function readBuild3TruthMetrics(
     ?await sql`
       select o.engine,o.instrument,o.source_id,o.horizon,o.target_session,
              f.issued_at,o.direction_result,o.outer_touch,o.outer_close_hit,
-             o.core_touch,o.core_close_hit,o.normalized_centre_error,o.brier_score,
-             o.probability_state,o.core_width_percent,o.outer_width_percent,o.scorability_state
+             o.core_touch,o.core_close_hit,
+             o.outer_efficacy_state,o.core_efficacy_state,
+             o.outer_deviation_hit,o.core_deviation_hit,
+             o.outer_challenger_3pct_hit,o.core_challenger_3pct_hit,
+             o.outer_quality_status,o.core_quality_status,
+             o.outer_range_deviation_pct,o.core_range_deviation_pct,
+             o.normalized_centre_error,o.brier_score,o.probability_state,
+             o.core_width_percent,o.outer_width_percent,o.scorability_state
         from build3_precision_outcomes o
         join build3_forecast_horizons f
           on f.engine=o.engine and f.source_id=o.source_id and f.horizon=o.horizon
@@ -162,8 +231,14 @@ export async function readBuild3TruthMetrics(
     :await sql`
       select o.engine,o.instrument,o.source_id,o.horizon,o.target_session,
              f.issued_at,o.direction_result,o.outer_touch,o.outer_close_hit,
-             o.core_touch,o.core_close_hit,o.normalized_centre_error,o.brier_score,
-             o.probability_state,o.core_width_percent,o.outer_width_percent,o.scorability_state
+             o.core_touch,o.core_close_hit,
+             o.outer_efficacy_state,o.core_efficacy_state,
+             o.outer_deviation_hit,o.core_deviation_hit,
+             o.outer_challenger_3pct_hit,o.core_challenger_3pct_hit,
+             o.outer_quality_status,o.core_quality_status,
+             o.outer_range_deviation_pct,o.core_range_deviation_pct,
+             o.normalized_centre_error,o.brier_score,o.probability_state,
+             o.core_width_percent,o.outer_width_percent,o.scorability_state
         from build3_precision_outcomes o
         join build3_forecast_horizons f
           on f.engine=o.engine and f.source_id=o.source_id and f.horizon=o.horizon
@@ -181,6 +256,16 @@ export async function readBuild3TruthMetrics(
     outer_close_hit:Boolean(row.outer_close_hit),
     core_touch:Boolean(row.core_touch),
     core_close_hit:Boolean(row.core_close_hit),
+    outer_efficacy_state:String(row.outer_efficacy_state) as Build3TruthMetricRow['outer_efficacy_state'],
+    core_efficacy_state:String(row.core_efficacy_state) as Build3TruthMetricRow['core_efficacy_state'],
+    outer_deviation_hit:row.outer_deviation_hit===null?null:Boolean(row.outer_deviation_hit),
+    core_deviation_hit:row.core_deviation_hit===null?null:Boolean(row.core_deviation_hit),
+    outer_challenger_3pct_hit:row.outer_challenger_3pct_hit===null?null:Boolean(row.outer_challenger_3pct_hit),
+    core_challenger_3pct_hit:row.core_challenger_3pct_hit===null?null:Boolean(row.core_challenger_3pct_hit),
+    outer_quality_status:String(row.outer_quality_status) as Build3TruthMetricRow['outer_quality_status'],
+    core_quality_status:String(row.core_quality_status) as Build3TruthMetricRow['core_quality_status'],
+    outer_range_deviation_pct:row.outer_range_deviation_pct===null?null:Number(row.outer_range_deviation_pct),
+    core_range_deviation_pct:row.core_range_deviation_pct===null?null:Number(row.core_range_deviation_pct),
     normalized_centre_error:Number(row.normalized_centre_error),
     brier_score:row.brier_score===null?null:Number(row.brier_score),
     probability_state:String(row.probability_state) as Build3TruthMetricRow['probability_state'],
