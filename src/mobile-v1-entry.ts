@@ -264,7 +264,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     sandbox_requested:sandboxRequested,
     decision_setup:setup.value,
     evidence_file_count:0,
-    evidence_readiness:{status:'AUTOMATED_ACQUISITION_PENDING',basis:prepOnly?'UPSTOX_PREOPEN_PREP':canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()},
+    evidence_readiness:{status:'SYSTEM_RESEARCH_PENDING',basis:'RESEARCH_FIRST_THEN_MARKET_ACQUISITION',assessed_at:new Date().toISOString()},
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot,prep_only:prepOnly},
     preopen_prep_only:prepOnly,
@@ -278,7 +278,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
       benchmark_role:canonicalAttempt?'SESSION_PREOPEN':'NONE'
     },
     canonical_attempt:canonicalAttempt?{type:'PREOPEN_CANONICAL_ATTEMPT',key:canonicalAttemptKey,slot:canonicalAttemptSlot,requested_at:new Date().toISOString()}:null,
-    adapter_stage:'AUTOMATED_MARKET_DATA_PENDING'
+    adapter_stage:'SYSTEM_RESEARCH_PENDING'
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
@@ -292,18 +292,37 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
       return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'BUILD3_RUN_REGISTRY_BLOCKED',error:'Build 3.0 run registry persistence failed',detail,next_step:'RETRY_BUILD3_RUN_REGISTRY'},503);
     }
   }
+  const researchFirstResponse=await systemResearch(env,requestId);
+  const researchFirstBody=await responseJson(researchFirstResponse);
+  if(!researchFirstResponse.ok){
+    const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+    const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:metadata;
+    return json({
+      ok:false,
+      fresh_run:true,
+      request_id:requestId,
+      status:'READY_FOR_ENGINE',
+      adapter_stage:latestMetadata.adapter_stage??'SYSTEM_RESEARCH_BLOCKED',
+      research:researchFirstBody,
+      next_step:'RETRY_SYSTEM_RESEARCH'
+    },409);
+  }
+  {
+    const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
+    metadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:metadata;
+  }
   const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
   const acquisitionDispatch={...dispatch,attempted_at:new Date().toISOString()};
-  metadata={...metadata,acquisition_dispatch:acquisitionDispatch};
+  metadata={...metadata,acquisition_dispatch:acquisitionDispatch,adapter_stage:dispatch.ok?'AUTOMATED_MARKET_DATA_PENDING':'AUTOMATED_MARKET_DATA_BLOCKED',evidence_readiness:{status:dispatch.ok?'AUTOMATED_ACQUISITION_PENDING':'AUTOMATED_ACQUISITION_BLOCKED',basis:prepOnly?'UPSTOX_PREOPEN_PREP':canonicalAttempt?'UPSTOX_PREOPEN_PRIMARY':'UPSTOX_PRIMARY',assessed_at:new Date().toISOString()}};
   if(!dispatch.ok){
     const blocked={...metadata,adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED'};
     await sql`update analysis_requests set status='FAILED',metadata=${JSON.stringify(blocked)}::jsonb,error=${JSON.stringify({stage:'AUTOMATED_ACQUISITION_DISPATCH',detail:dispatch.detail??dispatch.status})}::jsonb,updated_at=now() where request_id=${requestId}`;
     return json({ok:false,request_id:requestId,status:'FAILED',adapter_stage:'AUTOMATED_MARKET_DATA_BLOCKED',acquisition_dispatch:acquisitionDispatch,next_step:'USE_SCREENSHOT_BACKUP'},503);
   }
   await sql`update analysis_requests set metadata=${JSON.stringify(metadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  return json({ok:true,fresh_run:true,reused_output:false,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',canonical_attempt_key:canonicalAttemptKey,prep_only:prepOnly,next_step:prepOnly?'PREOPEN_PREP_MARKET_ACQUISITION':canonicalAttempt?'PREOPEN_MARKET_ACQUISITION':'AUTOMATED_MARKET_ACQUISITION'},201);
+  return json({ok:true,fresh_run:true,reused_output:false,deep_research_executed_this_run:'PASS',research_first:true,request:{request_id:requestId,engine:'5DR',batch_id:batchId,provenance_mode:'AUTOMATED',framework_version:'5DR_V2_1',output_contract_version:'5DR_V2_1_2',status:'READY_FOR_ENGINE',metadata},sandbox:sandboxRequested||runActor.role==='TESTER',canonical_attempt_key:canonicalAttemptKey,prep_only:prepOnly,next_step:prepOnly?'PREOPEN_PREP_MARKET_ACQUISITION':canonicalAttempt?'PREOPEN_MARKET_ACQUISITION':'AUTOMATED_MARKET_ACQUISITION'},201);
 }
 
 async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:string):Promise<Response>{
@@ -331,9 +350,12 @@ async function receiveAutomatedMarketEvidence(request:Request,env:Env,requestId:
     adapter_stage:'AUTOMATED_MARKET_DATA_READY'
   };
   await sql`update analysis_requests set status='READY_FOR_ENGINE',metadata=${JSON.stringify(next)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
-  const research=await systemResearch(env,requestId);
-  const researchBody=await responseJson(research);
-  if(!research.ok)return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_READY',research:researchBody,next_step:'RETRY_SYSTEM_RESEARCH'});
+  const storedResearch=isObject(metadata.system_research_acquisition)?metadata.system_research_acquisition:{};
+  if(storedResearch.status!=='RESEARCH_RETRIEVED'){
+    const research=await systemResearch(env,requestId);
+    const researchBody=await responseJson(research);
+    if(!research.ok)return json({ok:false,callback_accepted:true,request_id:requestId,status:'READY_FOR_ENGINE',adapter_stage:'AUTOMATED_MARKET_DATA_READY',research:researchBody,next_step:'RETRY_SYSTEM_RESEARCH'});
+  }
   if(metadata.preopen_prep_only===true){
     const latest=await sql`select metadata from analysis_requests where request_id=${requestId} and engine='5DR' limit 1`;
     const latestMetadata=latest.length&&isObject(latest[0].metadata)?latest[0].metadata:next;
@@ -513,19 +535,20 @@ async function systemResearch(env:Env,requestId:string):Promise<Response>{
   const automated=automatedMarketObservations(metadata);
   const screenshotIntelligence=isObject(metadata.screenshot_intelligence)?metadata.screenshot_intelligence:{};
   const screenshotReady=screenshotIntelligence.status==='VISION_READY';
-  if(!automated.length&&!screenshotReady)return json({error:'system research requires ready automated market evidence or screenshot fallback evidence',automated_status:isObject(metadata.automated_market_evidence)?metadata.automated_market_evidence.status??null:null,vision_status:screenshotIntelligence.status??null},409);
   const acquisition=await acquireSystemResearch();
   const categoryReady=Object.values(acquisition.by_category).every(item=>item.ready_for_interpretation);
   const allReady=categoryReady&&acquisition.research_manifest_complete;
+  const retrievedAt=new Date().toISOString();
   const record={
     status:allReady?'RESEARCH_RETRIEVED':'RESEARCH_BLOCKED',
-    retrieved_at:new Date().toISOString(),
-    market_evidence_mode:automated.length?'AUTOMATED':'SCREENSHOT_FALLBACK',
-    research_manifest:'NIFTY_G5_1_V1',
+    retrieved_at:retrievedAt,
+    market_evidence_mode:automated.length?'AUTOMATED':screenshotReady?'SCREENSHOT_FALLBACK':'PENDING',
+    research_manifest:'NIFTY_G5_1_V2_FACT_COMPLETE',
     ...acquisition
   };
-  const nextStage=allReady?'RESEARCH_RETRIEVED':String(metadata.adapter_stage??'');
-  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record,adapter_stage:nextStage})}::jsonb,updated_at=now() where request_id=${requestId}`;
+  const nextStage=allReady?'RESEARCH_RETRIEVED':'SYSTEM_RESEARCH_BLOCKED';
+  const provenance=isObject(metadata.run_provenance)?metadata.run_provenance:{};
+  await sql`update analysis_requests set metadata=${JSON.stringify({...metadata,system_research_acquisition:record,run_provenance:{...provenance,research_as_of:allReady?retrievedAt:provenance.research_as_of??null},adapter_stage:nextStage})}::jsonb,updated_at=now() where request_id=${requestId}`;
   return json({ok:allReady,request_id:requestId,adapter_stage:nextStage,system_research:record,next_step:allReady?'RECONCILE_INTELLIGENCE':'RETRY_SYSTEM_RESEARCH'},allReady?200:409);
 }
 

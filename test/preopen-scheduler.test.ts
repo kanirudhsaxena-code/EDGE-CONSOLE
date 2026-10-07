@@ -50,8 +50,22 @@ test('NIFTY PREP and fresh delta research are both production-owned',()=>{
   const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
   assert.match(scheduler,/prep_only:true/);
   assert.match(scheduler,/refreshPreopenPrepResearch/);
+  assert.match(scheduler,/RESEARCH_FIRST_THEN_DATA_THEN_RECONCILIATION/);
   assert.match(mobile,/DELTA_RESEARCH_READY/);
   assert.match(mobile,/acquireSystemResearch\(\)/);
+});
+
+test('Build 2.75 NIFTY fresh invocation executes system research before market acquisition dispatch',()=>{
+  const mobile=fs.readFileSync('src/mobile-v1-entry.ts','utf8');
+  const start=mobile.indexOf('export async function createAutomatedRun');
+  const end=mobile.indexOf('async function receiveAutomatedMarketEvidence',start);
+  assert.ok(start>=0&&end>start);
+  const createRun=mobile.slice(start,end);
+  const research=createRun.indexOf('researchFirstResponse=await systemResearch');
+  const acquisition=createRun.indexOf('dispatch5drAcquisition');
+  assert.ok(research>=0,'research-first gate missing');
+  assert.ok(acquisition>research,'market acquisition must occur only after research passes');
+  assert.match(createRun,/research_first:true/);
 });
 
 test('production entrypoint exposes the Cloudflare scheduled handler',()=>{
