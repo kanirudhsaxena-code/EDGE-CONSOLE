@@ -89,8 +89,13 @@ jobs:
         run: |
           set -euo pipefail
           AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
-          code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/edge-stocks/report?ticker=LTF" -o /tmp/ltf.json -w '%{http_code}')"
-          echo "ltf_http=$code"
+          code="000"
+          for attempt in $(seq 1 24); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/edge-stocks/report?ticker=LTF" -o /tmp/ltf.json -w '%{http_code}')"
+            echo "ltf_http=$code attempt=$attempt"
+            if [ "$code" != "500" ]; then break; fi
+            sleep 10
+          done
           cat /tmp/ltf.json
           echo
           test "$code" = "200"
