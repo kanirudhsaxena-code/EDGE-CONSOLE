@@ -61,8 +61,18 @@ const cleanExcerpt=(text:string)=>text.replace(/<script\b[^>]*>[\s\S]*?<\/script
 
 const nums=(value:string)=>[...value.matchAll(/-?\d+(?:\.\d+)?/g)].map(m=>Number(m[0])).filter(Number.isFinite);
 
-function rbiPolicyDocumentLinks(body:string):Array<{url:string;label:string;priority:number}>{
-  const out:Array<{url:string;label:string;priority:number}>=[];
+function rbiPolicyLabelRecency(label:string):number{
+  const years=[...label.matchAll(/\b(20\d{2})\b/g)].map(match=>Number(match[1])).filter(Number.isFinite);
+  const year=years.length?Math.max(...years):0;
+  const monthNames=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  let month=0;
+  for(let index=0;index<monthNames.length;index++)if(new RegExp('\\b'+monthNames[index]+'\\b','i').test(label))month=index+1;
+  const days=[...label.matchAll(/\b([0-3]?\d)\b/g)].map(match=>Number(match[1])).filter(day=>day>=1&&day<=31);
+  const day=days.length?Math.max(...days):0;
+  return year*10000+month*100+day;
+}
+function rbiPolicyDocumentLinks(body:string):Array<{url:string;label:string;priority:number;recency:number}>{
+  const out:Array<{url:string;label:string;priority:number;recency:number}>=[];
   for(const match of body.matchAll(/<a\b[^>]*href=["']([^"']+)["'][^>]*>([\s\S]*?)<\/a>/gi)){
     const href=String(match[1]||'').trim();
     const label=cleanExcerpt(String(match[2]||''));
@@ -71,10 +81,10 @@ function rbiPolicyDocumentLinks(body:string):Array<{url:string;label:string;prio
     let url:string;
     try{url=new URL(href,'https://www.rbi.org.in/').toString()}catch{continue}
     const priority=/Resolution of the Monetary Policy Committee/i.test(label)?0:/Monetary Policy Statement/i.test(label)?1:2;
-    out.push({url,label,priority});
+    out.push({url,label,priority,recency:rbiPolicyLabelRecency(label)});
   }
   const seen=new Set<string>();
-  return out.sort((a,b)=>a.priority-b.priority).filter(item=>seen.has(item.url)?false:(seen.add(item.url),true)).slice(0,5);
+  return out.sort((a,b)=>a.priority-b.priority||b.recency-a.recency).filter(item=>seen.has(item.url)?false:(seen.add(item.url),true)).slice(0,5);
 }
 function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<string,unknown>|undefined{
   try{
@@ -190,7 +200,7 @@ function extractFacts(source:ResearchSource,body:string,excerpt:string):Record<s
     }
     if(source.id==='RBI_LATEST_POLICY_DECISION'){
       const facts:Record<string,unknown>={};
-      const action=excerpt.match(/(?:MPC|Committee)[\s\S]{0,500}?decided to\s+(increase|raise|reduce|lower|keep|maintain)[\s\S]{0,260}?policy repo rate[\s\S]{0,180}?(?:by\s+(\d+(?:\.\d+)?)\s+basis points?\s+)?(?:to|at|unchanged at)\s+(\d+(?:\.\d+)?)\s*(?:per cent|%)/i);
+      const action=excerpt.match(/(?:MPC|Committee)[\s\S]{0,700}?decided to\s*:?\s*(increase|raise|reduce|lower|keep|maintain)[\s\S]{0,360}?policy repo rate[\s\S]{0,220}?(?:by\s+(\d+(?:\.\d+)?)\s+basis points?\s+)?(?:to|at|unchanged at)\s+(\d+(?:\.\d+)?)\s*(?:per cent|%)/i);
       const directRate=excerpt.match(/policy repo rate[\s\S]{0,120}?(?:to|at|unchanged at)\s+(\d+(?:\.\d+)?)\s*(?:per cent|%)/i);
       const stance=excerpt.match(/(?:stance|remain|shift(?:ed)?\s+to)[\s\S]{0,120}?(calibrated tightening|neutral|withdrawal of accommodation|accommodative)/i);
       const date=excerpt.match(/(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},\s+20\d{2}/i);
@@ -302,7 +312,7 @@ export async function acquireSystemResearch(fetcher:typeof fetch=fetch):Promise<
     by_category[category]={retrieved,unavailable:group.length-retrieved,ready_for_interpretation:retrieved>0};
   }
   const by_dimension={} as Record<NiftyResearchDimension,{retrieved:number;ready_for_interpretation:boolean;source_ids:string[]}>;
-  const rbiRateRows=snapshots.filter(item=>item.status==='RETRIEVED'&&['RBI_HOME','RBI_CURRENT_RATES'].includes(item.source_id)&&typeof item.facts?.policy_repo_rate_pct==='number');
+  const rbiRateRows=snapshots.filter(item=>item.status==='RETRIEVED'&&['RBI_HOME','RBI_CURRENT_RATES','RBI_LATEST_POLICY_DECISION'].includes(item.source_id)&&typeof item.facts?.policy_repo_rate_pct==='number');
   const rbiLatestLink=typeof rbiHome?.facts?.latest_policy_document_url==='string'&&!!rbiHome.facts.latest_policy_document_url;
   const rbiDecisionRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.source_id==='RBI_LATEST_POLICY_DECISION'&&typeof item.facts?.policy_repo_rate_pct==='number'&&typeof item.facts?.policy_action==='string');
   const fedDecisionRows=snapshots.filter(item=>item.status==='RETRIEVED'&&item.source_id==='FED_LATEST_FOMC_STATEMENT'&&!!item.facts&&(typeof item.facts.policy_action==='string'||typeof item.facts.target_range_text==='string'));
