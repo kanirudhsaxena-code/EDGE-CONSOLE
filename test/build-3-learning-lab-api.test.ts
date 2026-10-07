@@ -16,9 +16,8 @@ test('Build 3 Learning Lab API is owner-only, opt-in, scoped and persistent',()=
 });
 
 test('challenger event API records explicit approval but never applies production mutation',()=>{
-  assert.match(source,/api\\/build3\\/challengers/);
-  assert.match(source,/challengerEvent/);
-  assert.match(source,/events\$/);
+  assert.equal(source.includes("const challengerEvent=url.pathname.match(/^\\/api\\/build3\\/challengers"),true);
+  assert.equal(source.includes("if(challengerEvent&&request.method==='POST')"),true);
   assert.match(source,/prepareBuild3ChallengerEvent/);
   assert.match(source,/persistBuild3ChallengerEvent/);
   assert.match(source,/explicit_user_approval:body\.explicit_user_approval===true/);
