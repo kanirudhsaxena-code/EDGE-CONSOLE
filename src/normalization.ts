@@ -102,6 +102,16 @@ export function validateNormalizedEvidence(body: unknown): string[] {
       for(const detail of validateNormalizedInput(key,value))errors.push(`evidence[${index}].normalized.${key}: ${detail}`);
     }
   });
+  const merged:JsonRecord={};
+  for(const item of body.evidence){
+    if(!isObject(item)||!isObject(item.normalized))continue;
+    for(const [key,value] of Object.entries(item.normalized)){
+      if(!(key in merged))merged[key]=value;
+    }
+  }
+  if(isObject(merged.execution_inputs)&&isFiniteNumber(merged.expected_rr)&&Number(merged.expected_rr)===0&&isFiniteNumber(merged.execution_inputs.rr_score)&&Number(merged.execution_inputs.rr_score)!==0){
+    errors.push('normalized semantic invariant: execution_inputs.rr_score must be 0 when expected_rr is 0');
+  }
   return errors;
 }
 
