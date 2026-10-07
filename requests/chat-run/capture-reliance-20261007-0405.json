@@ -1,0 +1,6 @@
+{
+  "module": "EDGE_STOCKS",
+  "capture_only": true,
+  "ticker": "RELIANCE",
+  "expected_result_id": "EDGE-RELIANCE-20261007-040036-AUTO"
+}
