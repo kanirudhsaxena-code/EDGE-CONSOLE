@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {check5drWorkflowAccess,dispatch5drAssessmentRefresh,dispatch5drPreopenAcquisition,dispatch5drEngine} from '../src/engine-dispatch';
+import {check5drWorkflowAccess,dispatch5drAssessmentRefresh,dispatch5drPreopenAcquisition,dispatch5drEngine,dispatchBuild3RecommendationIntradayTruth} from '../src/engine-dispatch';
 
 test('fails closed when dispatch token is absent',async()=>{
   const result=await dispatch5drEngine({},'5drreq_test','https://edge-console.example.test/api/5dr/run-requests/5drreq_test/normalized',async()=>new Response(null,{status:204}) as any);
@@ -141,4 +141,46 @@ test('5DR workflow health checks assessment permission in its configured authori
   assert.match(urls[0],/EDGE---V1\/actions\/workflows\/5dr-console-acquire-proxy\.yml$/);
   assert.match(urls[1],/EDGE---V1\/actions\/workflows\/5dr-console-execute-proxy\.yml$/);
   assert.match(urls[2],/5DR-V2\/actions\/workflows\/assessment-refresh\.yml$/);
+});
+
+
+test('dispatches Build 3 one-minute truth on isolated configured workflow/ref',async()=>{
+  let seenUrl='';let seenInit:RequestInit|undefined;
+  const fetcher=async(url:RequestInfo|URL,init?:RequestInit)=>{seenUrl=String(url);seenInit=init;return new Response(null,{status:204});};
+  const result=await dispatchBuild3RecommendationIntradayTruth({
+    GITHUB_ACTIONS_TOKEN:'secret-value',
+    FIVEDR_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    BUILD3_TRUTH_REPOSITORY:'kanirudhsaxena-code/EDGE---V1',
+    BUILD3_TRUTH_WORKFLOW:'build3-recommendation-intraday-truth.yml',
+    BUILD3_TRUTH_REF:'build-3.0-accuracy-loop-20261006',
+  },{
+    engine:'5DR',
+    source_id:'5drreq_test',
+    provider_instrument_key:'NSE_FO|123',
+    session_date:'2026-10-07',
+  },'https://edge-console.example.test/api/build3/anything',fetcher as typeof fetch);
+  assert.equal(result.ok,true);
+  assert.match(seenUrl,/EDGE---V1\/actions\/workflows\/build3-recommendation-intraday-truth\.yml\/dispatches$/);
+  const body=JSON.parse(String(seenInit?.body));
+  assert.deepEqual(body,{
+    ref:'build-3.0-accuracy-loop-20261006',
+    inputs:{
+      engine:'5DR',
+      source_id:'5drreq_test',
+      instrument_key:'NSE_FO|123',
+      session_date:'2026-10-07',
+      console_url:'https://edge-console.example.test',
+    }
+  });
+  assert.equal(String(seenInit?.body).includes('secret-value'),false);
+});
+
+test('Build 3 truth dispatch fails closed on incomplete provider identity',async()=>{
+  const result=await dispatchBuild3RecommendationIntradayTruth({
+    GITHUB_ACTIONS_TOKEN:'secret-value',
+  },{
+    engine:'5DR',source_id:'5drreq_test',provider_instrument_key:'',session_date:'2026-10-07',
+  },'https://edge-console.example.test',async()=>new Response(null,{status:204}) as any);
+  assert.equal(result.ok,false);
+  assert.equal(result.status,'CONFIGURATION_BLOCKED');
 });
