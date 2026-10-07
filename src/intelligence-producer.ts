@@ -498,6 +498,17 @@ export async function produceIntelligence(ai:AiBinding,packet:unknown,allowedSou
     const initial=await runGovernedInference(ai,{messages:[{role:'system',content:system},{role:'user',content:userPrompt}],max_tokens:3200,temperature:0,chat_template_kwargs:{enable_thinking:false}});
     model=initial.model;
     let parsed=parseJson(initial.raw);let validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
+    if(!validation.judgment&&validation.errors.length===1&&validation.errors[0]==='execution_inputs.rr_score must be 0 when expected_rr is 0'&&isObject(parsed)&&isObject(parsed.execution_inputs)){
+      parsed={
+        ...parsed,
+        execution_inputs:{...parsed.execution_inputs,rr_score:0},
+        limitations:[
+          ...(Array.isArray(parsed.limitations)?parsed.limitations.filter(v=>typeof v==='string'):[]),
+          'Build 2.75 semantic invariant applied: rr_score forced to 0 because expected_rr is 0.'
+        ]
+      };
+      validation=validateIntelligenceJudgment(parsed,allowedSourceRefs);
+    }
     if(!validation.judgment&&validation.errors.length===1&&validation.errors[0]==='source_refs must only contain supplied evidence references'&&isObject(parsed)){
       const repairPrompt='Your prior JSON was rejected ONLY because source_refs contained a value that was not supplied. Do not change any evidence interpretation, scores, regime, limitations or horizon fields. Return the same JSON with source_refs corrected to use ONLY exact strings from this allowed list. If a family cannot be cited from this list, remove the unsupported claim by degrading verification/data_adequate rather than inventing a ref. Allowed source_refs: '+JSON.stringify(allowed)+'\nPrior JSON:\n'+JSON.stringify(parsed);
       const repaired=await runGovernedInference(ai,{messages:[{role:'system',content:system},{role:'user',content:repairPrompt}],max_tokens:3200,temperature:0,chat_template_kwargs:{enable_thinking:false}});
