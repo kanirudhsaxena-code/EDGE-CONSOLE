@@ -36,6 +36,8 @@ test('Stocks completion uses factor-driven SHADOW precision and exact persisted 
   assert.match(materializer,/persistBuild3PrecisionIssuance\(env\.DATABASE_URL,precision\.issuance\)/);
   assert.match(materializer,/buildStockBuild3Decision\(forecast/);
   assert.match(materializer,/persistBuild3Decision\(env\.DATABASE_URL,decision\)/);
+  assert.match(materializer,/target_sessions:rows\.map\(\(row,index\)=>\(\{horizon:BUILD3_HORIZONS\[index\],target_session:row\.target_trading_date\}\)\)/);
+  assert.doesNotMatch(materializer,/resolveBuild3TargetSessions/);
   assert.match(precision,/empirical_validation_state:'2C-02_OPEN'/);
   assert.match(precision,/CALIBRATION_PENDING/);
   assert.match(precision,/STOCK_CORE_ZONE_CHALLENGER_V0_1/);
