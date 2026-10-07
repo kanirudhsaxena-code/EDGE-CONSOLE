@@ -17,6 +17,8 @@ import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-outp
 import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
 import { isBuild3RuntimeEnabled } from './build-3-isolation';
 import { readBuild3Scorecard } from './build-3-scorecard';
+import { readBuild3LearningLab } from './build-3-learning-lab';
+import { prepareBuild3ChallengerEvent, persistBuild3ChallengerEvent } from './build-3-challenger-governance';
 import { persistBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -1114,6 +1116,76 @@ async function build3ScorecardApi(request:Request,env:Env):Promise<Response>{
   }
 }
 
+async function build3LearningLabApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 Learning Lab'},403);
+  }
+  let body:Record<string,unknown>={};
+  try{
+    const raw=await request.json();
+    if(!isObject(raw))return json({error:'Learning Lab scope body must be an object'},422);
+    body=raw;
+  }catch{
+    return json({error:'Learning Lab scope JSON body is required'},422);
+  }
+  try{
+    const result=await readBuild3LearningLab(env.DATABASE_URL,{
+      engine:String(body.engine??'ALL').toUpperCase() as 'ALL'|'5DR'|'EDGE_STOCKS',
+      instrument:body.instrument===null||body.instrument===undefined?null:String(body.instrument),
+      from_date:body.from_date===null||body.from_date===undefined?null:String(body.from_date),
+      to_date:body.to_date===null||body.to_date===undefined?null:String(body.to_date),
+    },true);
+    return json({...result,trading_enabled:false,production_mutation_allowed:false,build3_runtime:true},201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/SCOPE_/.test(detail)?422:/DATABASE_NOT_CONFIGURED/.test(detail)?503:500;
+    return json({error:'Build 3 Learning Lab unavailable',detail},status);
+  }
+}
+
+async function build3ChallengerEventApi(request:Request,env:Env,challengerId:string):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 challenger governance'},403);
+  }
+  let body:Record<string,unknown>={};
+  try{
+    const raw=await request.json();
+    if(!isObject(raw))return json({error:'Challenger event body must be an object'},422);
+    body=raw;
+  }catch{
+    return json({error:'Challenger event JSON body is required'},422);
+  }
+  const eventType=String(body.event_type??'').toUpperCase();
+  if(!['APPROVED','REJECTED','PROMOTED','WITHDRAWN'].includes(eventType)){
+    return json({error:'event_type must be APPROVED, REJECTED, PROMOTED or WITHDRAWN'},422);
+  }
+  try{
+    const event=prepareBuild3ChallengerEvent({
+      challenger_id:challengerId,
+      event_type:eventType as 'APPROVED'|'REJECTED'|'PROMOTED'|'WITHDRAWN',
+      explicit_user_approval:body.explicit_user_approval===true,
+      actor:actor.id,
+      details:isObject(body.details)?body.details:{},
+    });
+    const stored=await persistBuild3ChallengerEvent(env.DATABASE_URL,event);
+    return json({
+      event:stored,production_mutation_applied:false,
+      explicit_user_approval_recorded:stored.explicit_user_approval,
+      trading_enabled:false,build3_runtime:true,
+    },201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/EXPLICIT_USER_APPROVAL_REQUIRED/.test(detail)?403:/NOT_FOUND/.test(detail)?404:422;
+    return json({error:'Build 3 challenger event rejected',detail},status);
+  }
+}
+
 async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
@@ -1141,6 +1213,9 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
   if(url.pathname==='/api/build3/recommendation-intraday-source'&&request.method==='POST')return build3RecommendationIntradaySourceApi(request,env);
   if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
+  if(url.pathname==='/api/build3/learning-lab'&&request.method==='POST')return build3LearningLabApi(request,env);
+  const challengerEvent=url.pathname.match(/^\/api\/build3\/challengers\/([^/]+)\/events$/);
+  if(challengerEvent&&request.method==='POST')return build3ChallengerEventApi(request,env,decodeURIComponent(challengerEvent[1]));
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
   const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
