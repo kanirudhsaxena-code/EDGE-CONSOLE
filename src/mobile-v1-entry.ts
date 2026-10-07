@@ -17,6 +17,7 @@ import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-outp
 import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
 import { isBuild3RuntimeEnabled } from './build-3-isolation';
 import { readBuild3Scorecard } from './build-3-scorecard';
+import { persistBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -1053,6 +1054,40 @@ async function preopenStatus(request:Request,env:Env):Promise<Response>{
 }
 
 
+async function build3RecommendationIntradaySourceApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  let body:unknown;
+  try{body=await request.json()}catch{return json({error:'Valid JSON body is required'},422);}
+  if(!isObject(body))return json({error:'Object payload is required'},422);
+  try{
+    const stored=await persistBuild3RecommendationIntradaySource(
+      env.DATABASE_URL,
+      body as unknown as Build3RecommendationIntradaySourceInput,
+    );
+    return json({
+      ok:true,
+      source_version:stored.source_version,
+      engine:stored.engine,
+      instrument:stored.instrument,
+      source_id:stored.source_id,
+      provider_instrument_key:stored.provider_instrument_key,
+      session_date:stored.session_date,
+      provider_hash:stored.provider_hash,
+      candle_count:stored.candles.length,
+      trading_enabled:false,
+    },201);
+  }catch(error){
+    const detail=error instanceof Error?error.message:String(error);
+    const status=/DATABASE_NOT_CONFIGURED/.test(detail)?503:
+      /DECISION_NOT_FOUND|PROVIDER_KEY_MISMATCH|IMMUTABLE_CONFLICT|FROZEN_PROVIDER_KEY_MISSING/.test(detail)?409:422;
+    return json({error:'Build 3 intraday source rejected',detail},status);
+  }
+}
+
 async function build3ScorecardApi(request:Request,env:Env):Promise<Response>{
   if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
   if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
@@ -1104,6 +1139,7 @@ async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Respons
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
+  if(url.pathname==='/api/build3/recommendation-intraday-source'&&request.method==='POST')return build3RecommendationIntradaySourceApi(request,env);
   if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
