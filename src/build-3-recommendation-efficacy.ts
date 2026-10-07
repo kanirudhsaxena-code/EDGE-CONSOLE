@@ -99,7 +99,7 @@ export type Build3RecommendationEvaluationResult={
   engine:'5DR'|'EDGE_STOCKS';
   instrument:string;
   source_id:string;
-  status:'SCORED'|'PENDING_SOURCE'|'NOT_SCORABLE';
+  status:'SCORED'|'PENDING_SOURCE'|'NOT_SCORABLE'|'RETRYABLE_ERROR';
   reason:string|null;
   classification?:Build3RecommendationEfficacy['classification'];
 };
@@ -163,6 +163,7 @@ export async function evaluateMaturedBuild3Recommendations(
   const results:Build3RecommendationEvaluationResult[]=[];
   for(const raw of candidates){
     const decision=raw.payload as Build3DecisionRecord;
+    try{
     const lifecycleAt=Date.parse(String(decision.execution_snapshot?.lifecycle_end_at??''));
     if(Number.isNaN(lifecycleAt)||now.getTime()<lifecycleAt)continue;
 
@@ -219,6 +220,16 @@ export async function evaluateMaturedBuild3Recommendations(
     };
     await recordBuild3RecommendationObservationAttempt(databaseUrl,result,{observation,efficacy:persisted});
     results.push(result);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      const result:Build3RecommendationEvaluationResult={
+        engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+        status:'RETRYABLE_ERROR',reason:detail,
+      };
+      await recordBuild3RecommendationObservationAttempt(databaseUrl,result,{error:detail});
+      results.push(result);
+      continue;
+    }
   }
   return results;
 }
