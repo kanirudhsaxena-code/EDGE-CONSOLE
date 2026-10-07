@@ -48,6 +48,7 @@ export async function persistBuild3RecommendationEfficacy(
   row:Build3RecommendationEfficacyRecord,
 ):Promise<Build3RecommendationEfficacyRecord>{
   if(!databaseUrl?.trim())throw new Error('BUILD3_RECOMMENDATION_EFFICACY_DATABASE_NOT_CONFIGURED');
+  if(!row.lifecycle_complete)throw new Error('BUILD3_RECOMMENDATION_EFFICACY_FINAL_LIFECYCLE_REQUIRED');
   const sql=neon(databaseUrl);
   await sql`
     insert into build3_recommendation_efficacy(
