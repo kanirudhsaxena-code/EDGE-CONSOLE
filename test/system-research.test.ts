@@ -171,3 +171,29 @@ test('RBI latest policy decision parser extracts action, basis points and repo r
   assert.equal(result.facts?.policy_change_bps,25);
   assert.equal(result.facts?.policy_repo_rate_pct,5.5);
 });
+
+
+test('RBI research prefers the newest MPC resolution and accepts official decision rate as current policy fact',async()=>{
+  const fetcher=async(url:RequestInfo|URL)=>{
+    const u=String(url);
+    if(u.includes('/api/fiidiiTradeReact'))return new Response(JSON.stringify([
+      {category:'DII',date:'07-Oct-2026',buyValue:'100',sellValue:'90',netValue:'10'},
+      {category:'FII/FPI',date:'07-Oct-2026',buyValue:'80',sellValue:'90',netValue:'-10'}
+    ]),{status:200,headers:{'content-type':'application/json'}});
+    if(u.includes('federalreserve.gov/monetarypolicy.htm'))return new Response('<html>FOMC Statement: Released September 16, 2026</html>',{status:200});
+    if(u.includes('monetary20260916a.htm'))return new Response('<html>The Committee decided to maintain the target range for the federal funds rate at 3-3/4 to 4 percent.</html>',{status:200});
+    if(u==='https://www.rbi.org.in/')return new Response('<html><a href="/Scripts/BS_PressReleaseDisplay.aspx?prid=old">Monetary Policy Statement, 2020-21 Resolution of the Monetary Policy Committee October 7-9, 2020</a><a href="/Scripts/BS_PressReleaseDisplay.aspx?prid=current">Monetary Policy Statement, 2026-27 Resolution of the Monetary Policy Committee October 5 to 7, 2026</a></html>',{status:200});
+    if(u==='https://m.rbi.org.in/')return new Response('<html>official current-rates page without embedded rate table</html>',{status:200});
+    if(u.includes('prid=current'))return new Response('<html>The Monetary Policy Committee (MPC) decided to: keep the policy repo rate under the liquidity adjustment facility unchanged at 5.50 per cent. October 7, 2026</html>',{status:200});
+    if(u.includes('prid=old'))return new Response('<html>The Monetary Policy Committee decided to: keep the policy repo rate unchanged at 4.00 per cent. October 9, 2020</html>',{status:200});
+    if(u.includes('/api/'))return new Response('{"data":[],"marketState":[]}',{status:200,headers:{'content-type':'application/json'}});
+    return new Response('<html>current official evidence</html>',{status:200});
+  };
+  const result=await acquireSystemResearch(fetcher as typeof fetch);
+  const rbi=result.snapshots.find(row=>row.source_id==='RBI_LATEST_POLICY_DECISION');
+  assert.ok(rbi?.source_ref.includes('prid=current'),rbi);
+  assert.equal(rbi?.facts?.policy_action,'keep');
+  assert.equal(rbi?.facts?.policy_repo_rate_pct,5.5);
+  assert.ok(!result.fact_blockers.includes('RBI_CURRENT_POLICY_RATE_FACT_MISSING'),result.fact_blockers);
+  assert.ok(!result.fact_blockers.includes('RBI_LATEST_POLICY_DECISION_UNRESOLVED'),result.fact_blockers);
+});
