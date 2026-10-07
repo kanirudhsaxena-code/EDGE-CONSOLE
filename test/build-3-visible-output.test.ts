@@ -17,7 +17,8 @@ test('EDGE Stocks report joins Core Zones by exact lifecycle identity and checks
   const router=read('src/router.ts');
   assert.match(router,/from edge_run_lifecycles/);
   assert.match(router,/readBuild3OutputPrecision\(env\.DATABASE_URL,'EDGE_STOCKS',lifecycleId\)/);
-  assert.match(router,/BUILD3_OUTPUT_STOCK_PRECISION_PARITY_MISMATCH/);
+  assert.match(router,/BUILD3_OUTPUT_STOCK_OUTER_ZONE_PARITY_MISMATCH/);
+  assert.match(router,/readBuild3RunRegistryRecord\(env\.DATABASE_URL,'EDGE_STOCKS',lifecycleId\)/);
   assert.match(router,/core_zone:\{low:precision\.core_low,high:precision\.core_high\}/);
   assert.match(router,/build3_precision: build3Precision/);
 });
