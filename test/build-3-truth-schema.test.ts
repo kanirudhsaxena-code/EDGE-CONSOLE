@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const migration=readFileSync(new URL('../database/0010_build3_truth_outcomes.sql',import.meta.url),'utf8');
 const efficacy=readFileSync(new URL('../database/0011_build3_efficacy_scoring_contract.sql',import.meta.url),'utf8');
+const recommendationTruth=readFileSync(new URL('../database/0012_build3_recommendation_truth.sql',import.meta.url),'utf8');
 
 test('Wave 3 Truth migration defines immutable full-OHLC source evidence',()=>{
   assert.match(migration,/create table if not exists build3_session_ohlc_sources/i);
@@ -42,4 +43,12 @@ test('Efficacy migration adds zone deviation/traffic-light fields and immutable 
   assert.match(efficacy,/create table if not exists build3_recommendation_efficacy/i);
   assert.match(efficacy,/DUAL_TOUCH/);
   assert.match(efficacy,/prevent_build3_recommendation_efficacy_mutation/i);
+});
+
+
+test('recommendation Truth attempts are append-only and retryable',()=>{
+  assert.match(recommendationTruth,/create table if not exists build3_recommendation_observation_attempts/i);
+  assert.match(recommendationTruth,/PENDING_SOURCE/);
+  assert.match(recommendationTruth,/NOT_SCORABLE/);
+  assert.match(recommendationTruth,/prevent_build3_recommendation_observation_attempt_mutation/i);
 });
