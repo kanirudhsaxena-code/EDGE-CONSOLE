@@ -31,6 +31,7 @@ export type Build3ExecutionSnapshot={
   availability:'COMPLETE'|'PARTIAL'|'NOT_AVAILABLE';
   action:'LONG_ENTRY'|'LONG_EXIT'|'OPTION_CALL'|'OPTION_PUT'|'OPTION_CONVEXITY'|'NONE'|'UNKNOWN';
   instrument_expression:string|null;
+  provider_instrument_key:string|null;
   entry_low:number|null;
   entry_high:number|null;
   stop:number|null;
@@ -95,7 +96,7 @@ function emptyCounterfactual():Build3NoTradeCounterfactual{
 
 function emptyExecution(reason:string):Build3ExecutionSnapshot{
   return {
-    applicable:false,availability:'NOT_AVAILABLE',action:'NONE',instrument_expression:null,
+    applicable:false,availability:'NOT_AVAILABLE',action:'NONE',instrument_expression:null,provider_instrument_key:null,
     entry_low:null,entry_high:null,stop:null,target1:null,target2:null,time_exit:null,
     efficacy_target:null,efficacy_target_label:null,entry_activation_rule:null,lifecycle_end:null,lifecycle_end_at:null,
     exact_contract_verified:false,reason,
@@ -118,6 +119,7 @@ function niftyExecutionSnapshot(
     ?result.execution_snapshot
     :isObject(result.execution_plan)?result.execution_plan:{};
   const instrument=textOrNull(supplied.contract_symbol??supplied.instrument_expression??supplied.instrument);
+  const providerInstrumentKey=textOrNull(supplied.provider_instrument_key??supplied.instrument_key);
   const entryLow=num(supplied.entry_low??supplied.entry??supplied.observed_premium);
   const entryHigh=num(supplied.entry_high??supplied.entry??supplied.observed_premium);
   const stop=num(supplied.stop??supplied.stop_price??supplied.stop_premium);
@@ -130,7 +132,7 @@ function niftyExecutionSnapshot(
     :'UNKNOWN';
   const availability=executionAvailability([instrument,entryLow,entryHigh,stop,target1]);
   return {
-    applicable:true,availability,action,instrument_expression:instrument,
+    applicable:true,availability,action,instrument_expression:instrument,provider_instrument_key:providerInstrumentKey,
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
     efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
     entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
@@ -147,6 +149,7 @@ function stockExecutionSnapshot(
   const actionable=new Set(['STRONG BUY','BUY','ACCUMULATE','SELL','REDUCE']);
   if(!actionable.has(recommendation))return emptyExecution('NO_ISSUED_TRADE');
   const instrument=textOrNull(execution.instrument);
+  const providerInstrumentKey=textOrNull(execution.provider_instrument_key??execution.instrument_key);
   const entryLow=num(execution.entry_low);
   const entryHigh=num(execution.entry_high);
   const stop=num(execution.stop_price);
@@ -156,7 +159,7 @@ function stockExecutionSnapshot(
   const availability=executionAvailability([instrument,entryLow,entryHigh,stop,target1]);
   const action=['STRONG BUY','BUY','ACCUMULATE'].includes(recommendation)?'LONG_ENTRY':'LONG_EXIT';
   return {
-    applicable:true,availability,action,instrument_expression:instrument,
+    applicable:true,availability,action,instrument_expression:instrument,provider_instrument_key:providerInstrumentKey,
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
     efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
     entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
