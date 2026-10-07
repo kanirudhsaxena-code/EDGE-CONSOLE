@@ -1,4 +1,5 @@
 import { neon } from '@neondatabase/serverless';
+import { BUILD3_MARKET_PHASES, type Build3MarketPhase } from './build-3-run-contract';
 
 export const BUILD3_TRUTH_METRICS_VERSION='MDOS_BUILD_3_TRUTH_METRICS_V2' as const;
 
@@ -9,6 +10,7 @@ export type Build3TruthMetricRow={
   horizon:'D'|'D+1'|'D+2'|'D+3'|'D+4';
   target_session:string;
   issued_at:string;
+  run_time_bucket:Build3MarketPhase;
   direction_result:'HIT'|'MISS'|'NOT_SCORABLE';
   outer_touch:boolean;
   outer_close_hit:boolean;
@@ -76,6 +78,7 @@ export type Build3TruthMetrics={
   independent_metrics:MetricSet;
   all_observation_metrics:MetricSet;
   horizon_breakdown:Record<string,MetricSet>;
+  time_bucket_breakdown:Record<Build3MarketPhase,MetricSet>;
 };
 
 const finite=(value:unknown):value is number=>typeof value==='number'&&Number.isFinite(value);
@@ -90,6 +93,7 @@ function validateRow(row:Build3TruthMetricRow):void{
   if(!['D','D+1','D+2','D+3','D+4'].includes(row.horizon))throw new Error('BUILD3_TRUTH_METRICS_HORIZON_INVALID');
   if(!/^\d{4}-\d{2}-\d{2}$/.test(row.target_session))throw new Error('BUILD3_TRUTH_METRICS_TARGET_SESSION_INVALID');
   if(Number.isNaN(Date.parse(row.issued_at)))throw new Error('BUILD3_TRUTH_METRICS_ISSUED_AT_INVALID');
+  if(!BUILD3_MARKET_PHASES.includes(row.run_time_bucket))throw new Error('BUILD3_TRUTH_METRICS_TIME_BUCKET_INVALID');
   if(!finite(row.normalized_centre_error)||row.normalized_centre_error<0)throw new Error('BUILD3_TRUTH_METRICS_CENTRE_ERROR_INVALID');
   if(!finite(row.core_width_percent)||row.core_width_percent<0)throw new Error('BUILD3_TRUTH_METRICS_CORE_WIDTH_INVALID');
   if(!finite(row.outer_width_percent)||row.outer_width_percent<=0)throw new Error('BUILD3_TRUTH_METRICS_OUTER_WIDTH_INVALID');
@@ -184,6 +188,10 @@ export function summarizeBuild3Truth(
   for(const horizon of ['D','D+1','D+2','D+3','D+4'] as const){
     horizon_breakdown[horizon]=metricSet(independent.filter(row=>row.horizon===horizon));
   }
+  const time_bucket_breakdown={} as Record<Build3MarketPhase,MetricSet>;
+  for(const bucket of BUILD3_MARKET_PHASES){
+    time_bucket_breakdown[bucket]=metricSet(independent.filter(row=>row.run_time_bucket===bucket));
+  }
   return {
     metrics_version:BUILD3_TRUTH_METRICS_VERSION,
     generated_at:new Date(generatedAt).toISOString(),
@@ -201,6 +209,7 @@ export function summarizeBuild3Truth(
     independent_metrics:metricSet(independent),
     all_observation_metrics:metricSet(scorable),
     horizon_breakdown,
+    time_bucket_breakdown,
   };
 }
 
@@ -213,7 +222,7 @@ export async function readBuild3TruthMetrics(
   const rows=engine
     ?await sql`
       select o.engine,o.instrument,o.source_id,o.horizon,o.target_session,
-             f.issued_at,o.direction_result,o.outer_touch,o.outer_close_hit,
+             f.issued_at,r.market_phase as run_time_bucket,o.direction_result,o.outer_touch,o.outer_close_hit,
              o.core_touch,o.core_close_hit,
              o.outer_efficacy_state,o.core_efficacy_state,
              o.outer_deviation_hit,o.core_deviation_hit,
@@ -225,12 +234,14 @@ export async function readBuild3TruthMetrics(
         from build3_precision_outcomes o
         join build3_forecast_horizons f
           on f.engine=o.engine and f.source_id=o.source_id and f.horizon=o.horizon
+        join build3_run_registry r
+          on r.engine=o.engine and r.source_id=o.source_id
        where o.engine=${engine}
        order by o.target_session,f.issued_at,o.source_id,o.horizon
     `
     :await sql`
       select o.engine,o.instrument,o.source_id,o.horizon,o.target_session,
-             f.issued_at,o.direction_result,o.outer_touch,o.outer_close_hit,
+             f.issued_at,r.market_phase as run_time_bucket,o.direction_result,o.outer_touch,o.outer_close_hit,
              o.core_touch,o.core_close_hit,
              o.outer_efficacy_state,o.core_efficacy_state,
              o.outer_deviation_hit,o.core_deviation_hit,
@@ -242,6 +253,8 @@ export async function readBuild3TruthMetrics(
         from build3_precision_outcomes o
         join build3_forecast_horizons f
           on f.engine=o.engine and f.source_id=o.source_id and f.horizon=o.horizon
+        join build3_run_registry r
+          on r.engine=o.engine and r.source_id=o.source_id
        order by o.engine,o.instrument,o.target_session,f.issued_at,o.source_id,o.horizon
     `;
   const normalized=rows.map(row=>({
@@ -251,6 +264,7 @@ export async function readBuild3TruthMetrics(
     horizon:String(row.horizon) as Build3TruthMetricRow['horizon'],
     target_session:new Date(String(row.target_session)).toISOString().slice(0,10),
     issued_at:new Date(String(row.issued_at)).toISOString(),
+    run_time_bucket:String(row.run_time_bucket) as Build3MarketPhase,
     direction_result:String(row.direction_result) as Build3TruthMetricRow['direction_result'],
     outer_touch:Boolean(row.outer_touch),
     outer_close_hit:Boolean(row.outer_close_hit),
