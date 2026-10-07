@@ -9,7 +9,7 @@ import {
 function row(overrides:Partial<Build3TruthMetricRow>={}):Build3TruthMetricRow{
   return {
     engine:'5DR',instrument:'NIFTY',source_id:'a',horizon:'D',
-    target_session:'2026-10-07',issued_at:'2026-10-06T04:00:00.000Z',
+    target_session:'2026-10-07',issued_at:'2026-10-06T04:00:00.000Z',run_time_bucket:'PRE_OPEN',
     direction_result:'HIT',
     outer_touch:true,outer_close_hit:true,core_touch:true,core_close_hit:true,
     outer_efficacy_state:'SCORABLE',core_efficacy_state:'SCORABLE',
@@ -113,4 +113,21 @@ test('unscorable rows stay visible in population but never enter efficacy rates'
   assert.equal(summary.population.scorable_outcomes,1);
   assert.equal(summary.independent_metrics.samples,1);
   assert.equal(summary.independent_metrics.direction_accuracy_pct,100);
+});
+
+
+test('Truth metrics publish governed run-time buckets on the day-normalized population',()=>{
+  const rows=[
+    row({source_id:'pre',target_session:'2026-10-07',issued_at:'2026-10-06T03:30:00.000Z',run_time_bucket:'PRE_OPEN',direction_result:'HIT'}),
+    row({source_id:'intra',target_session:'2026-10-08',issued_at:'2026-10-07T06:00:00.000Z',run_time_bucket:'INTRADAY',direction_result:'MISS'}),
+    row({source_id:'post',target_session:'2026-10-09',issued_at:'2026-10-08T11:00:00.000Z',run_time_bucket:'POST_CLOSE',direction_result:'HIT'}),
+  ];
+  const summary=summarizeBuild3Truth(rows,'2026-10-10T00:00:00.000Z');
+  assert.equal(summary.time_bucket_breakdown.PRE_OPEN.samples,1);
+  assert.equal(summary.time_bucket_breakdown.PRE_OPEN.direction_accuracy_pct,100);
+  assert.equal(summary.time_bucket_breakdown.INTRADAY.samples,1);
+  assert.equal(summary.time_bucket_breakdown.INTRADAY.direction_accuracy_pct,0);
+  assert.equal(summary.time_bucket_breakdown.POST_CLOSE.samples,1);
+  assert.equal(summary.time_bucket_breakdown.OPEN.samples,0);
+  assert.equal(summary.time_bucket_breakdown.CLOSED_SESSION.samples,0);
 });
