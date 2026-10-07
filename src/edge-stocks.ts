@@ -59,6 +59,33 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
     }
   }
 
+  const build3Precision=body.build3_precision;
+  if(build3Precision!==null&&build3Precision!==undefined){
+    if(!isObject(build3Precision))errors.push('build3_precision must be an object when present');
+    else{
+      if(build3Precision.version!=='MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1')errors.push('build3_precision.version must be MDOS_BUILD_3_CORE_ZONE_OUTPUT_V1');
+      if(build3Precision.engine!=='EDGE_STOCKS')errors.push('build3_precision.engine must be EDGE_STOCKS');
+      if(build3Precision.shadow_only!==true)errors.push('build3_precision.shadow_only must be true');
+      if(build3Precision.production_methodology_changed!==false)errors.push('build3_precision.production_methodology_changed must be false');
+      if(!Array.isArray(build3Precision.rows)||build3Precision.rows.length!==5)errors.push('build3_precision.rows must contain exactly D through D+4');
+      else{
+        const expected=['D','D+1','D+2','D+3','D+4'];
+        build3Precision.rows.forEach((item,index)=>{
+          if(!isObject(item)){errors.push(`build3_precision.rows[${index}] must be an object`);return;}
+          if(item.horizon!==expected[index])errors.push(`build3_precision.rows[${index}].horizon must be ${expected[index]}`);
+          if(!isNonEmptyString(item.target_session))errors.push(`build3_precision.rows[${index}].target_session is mandatory`);
+          if(!isObject(item.core_zone))errors.push(`build3_precision.rows[${index}].core_zone is mandatory`);
+          if(!isObject(item.outer_zone))errors.push(`build3_precision.rows[${index}].outer_zone is mandatory`);
+          for(const key of ['core_width_points','core_width_percent','outer_width_points','outer_width_percent']){
+            if(typeof item[key]!=='number'||!Number.isFinite(item[key] as number))errors.push(`build3_precision.rows[${index}].${key} must be numeric`);
+          }
+          if(!isNonEmptyString(item.calibration_version))errors.push(`build3_precision.rows[${index}].calibration_version is mandatory`);
+          if(!isNonEmptyString(item.calibration_state))errors.push(`build3_precision.rows[${index}].calibration_state is mandatory`);
+        });
+      }
+    }
+  }
+
   if (!Array.isArray(body.active_calls)) errors.push('active_calls must be an array');
 
   const decision = body.current_stock_outcome;
@@ -86,6 +113,15 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
           if (!isNonEmptyString(row.evidence_basis)) errors.push(`current_stock_outcome.forecast_sessions[${index}].evidence_basis is mandatory`);
           if (!isNonEmptyString(row.verification_state)) errors.push(`current_stock_outcome.forecast_sessions[${index}].verification_state is mandatory`);
           if (!isObject(row.expected_zone)) errors.push(`current_stock_outcome.forecast_sessions[${index}].expected_zone is mandatory`);
+          if(isObject(build3Precision)){
+            if(!isObject(row.core_zone))errors.push(`current_stock_outcome.forecast_sessions[${index}].core_zone is mandatory when build3_precision is present`);
+            else{
+              const cz=row.core_zone as JsonRecord;
+              for(const key of ['low','high'])if(typeof cz[key]!=='number'||!Number.isFinite(cz[key] as number))errors.push(`current_stock_outcome.forecast_sessions[${index}].core_zone.${key} must be numeric`);
+              if(typeof cz.low==='number'&&typeof cz.high==='number'&&cz.low>cz.high)errors.push(`current_stock_outcome.forecast_sessions[${index}].core_zone must be ordered`);
+            }
+            if(!isObject(row.core_zone_calibration))errors.push(`current_stock_outcome.forecast_sessions[${index}].core_zone_calibration is mandatory when build3_precision is present`);
+          }
           if (!isObject(row.probabilities)) errors.push(`current_stock_outcome.forecast_sessions[${index}].probabilities is mandatory`);
           else {
             const p=row.probabilities as JsonRecord;
