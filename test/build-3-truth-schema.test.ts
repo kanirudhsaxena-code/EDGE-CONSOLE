@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const migration=readFileSync(new URL('../database/0010_build3_truth_outcomes.sql',import.meta.url),'utf8');
+const efficacy=readFileSync(new URL('../database/0011_build3_efficacy_scoring_contract.sql',import.meta.url),'utf8');
 
 test('Wave 3 Truth migration defines immutable full-OHLC source evidence',()=>{
   assert.match(migration,/create table if not exists build3_session_ohlc_sources/i);
@@ -28,4 +29,17 @@ test('Wave 3 outcome attempts and decision outcomes are append-only/idempotent s
   assert.match(migration,/create table if not exists build3_decision_outcomes/i);
   assert.match(migration,/unique\(engine,source_id\)/i);
   assert.match(migration,/prevent_build3_decision_outcome_mutation/i);
+});
+
+
+test('Efficacy migration adds zone deviation/traffic-light fields and immutable recommendation efficacy',()=>{
+  for(const field of [
+    'zone_efficacy_version','outer_high_breach_points','outer_low_breach_points',
+    'outer_range_deviation_pct','outer_deviation_hit','outer_challenger_3pct_hit','outer_quality_status',
+    'core_high_breach_points','core_low_breach_points','core_range_deviation_pct',
+    'core_deviation_hit','core_challenger_3pct_hit','core_quality_status'
+  ])assert.match(efficacy,new RegExp('add column if not exists '+field,'i'));
+  assert.match(efficacy,/create table if not exists build3_recommendation_efficacy/i);
+  assert.match(efficacy,/DUAL_TOUCH/);
+  assert.match(efficacy,/prevent_build3_recommendation_efficacy_mutation/i);
 });
