@@ -1,0 +1,97 @@
+name: Build 3.0 Historical Replay Acceptance
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/build-3-historical-replay.ts'
+      - 'src/mobile-v1-entry.ts'
+      - '.github/workflows/build-3-historical-replay-acceptance.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-3-historical-replay-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  replay:
+    if: github.head_ref == 'build-3.0-accuracy-loop-20261006'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    env:
+      BASE: https://build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+
+    steps:
+      - name: Wait for current preview deployment
+        run: |
+          set -euo pipefail
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          for attempt in $(seq 1 36); do
+            code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/historical-replay?probe=${{ github.sha }}" -o /tmp/replay.json -w '%{http_code}')"
+            if [ "$code" = "200" ] && python - <<'PY'
+          import json
+          d=json.load(open('/tmp/replay.json'))
+          raise SystemExit(0 if d.get('version')=='MDOS_BUILD_3_HISTORICAL_REPLAY_V1' else 1)
+          PY
+            then
+              break
+            fi
+            echo "historical replay preview not ready: http=$code attempt=$attempt"
+            sleep 10
+          done
+
+      - name: Validate complete historical acceptance population
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/replay.json'))
+          assert d.get('version')=='MDOS_BUILD_3_HISTORICAL_REPLAY_V1', d
+          assert d.get('mode')=='READ_ONLY_HISTORICAL_ACCEPTANCE', d
+          assert d.get('no_new_run_count_requirement') is True, d
+          assert d.get('live_dependency')=='ONE_PROSPECTIVE_AUTOMATION_SMOKE_ONLY', d
+
+          integrity=d.get('integrity') or {}
+          assert integrity.get('historical_records_mutated') is False, integrity
+          assert integrity.get('writes_performed') == 0, integrity
+          assert integrity.get('future_information_used_for_issuance') is False, integrity
+          assert integrity.get('reconstructed_core_enters_official_efficacy') is False, integrity
+          assert integrity.get('methodology_promotion_authorized') is False, integrity
+
+          acceptance=d.get('acceptance') or {}
+          assert acceptance.get('source_population_accounted') is True, acceptance
+          assert acceptance.get('official_vs_shadow_separated') is True, acceptance
+          assert acceptance.get('not_scorable_is_explicit') is True, acceptance
+          assert acceptance.get('historical_replay_can_close_engineering_population_gates') is True, acceptance
+
+          five=d.get('five_dr') or {}
+          edge=d.get('edge_stocks') or {}
+          fpop=five.get('source_population') or {}
+          epop=edge.get('source_population') or {}
+          assert int(fpop.get('valid_forecasts') or 0) > 0, fpop
+          assert int(fpop.get('horizon_rows') or 0) > 0, fpop
+          assert int(epop.get('recommendations') or 0) > 0, epop
+          assert int(five.get('accounted_forecasts') or 0) == int(fpop.get('valid_forecasts') or -1), five
+          assert int(edge.get('accounted_recommendations') or 0) == int(epop.get('recommendations') or -1), edge
+
+          print('BUILD3_HISTORICAL_REPLAY_ACCEPTANCE=PASS')
+          print('5DR_POPULATION',fpop)
+          print('5DR_RECOMMENDATIONS',five.get('recommendations'))
+          print('EDGE_POPULATION',epop)
+          print('EDGE_RECOMMENDATIONS',edge.get('recommendations'))
+          print('5DR_NATIVE',five.get('native_forecast_efficacy'))
+          print('EDGE_NATIVE',edge.get('native_forecast_efficacy'))
+          PY
+
+      - name: Preserve historical acceptance report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-3-historical-replay-${{ github.sha }}
+          path: /tmp/replay.json
+          retention-days: 30
+          if-no-files-found: error
