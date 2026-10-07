@@ -15,9 +15,10 @@ import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQ
 import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materializer';
 import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-output-read';
 import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
-type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
+type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const allowed=new Set<ScreenshotCategory>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const REQUIRED_FAMILIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
@@ -244,11 +245,12 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   }
   const requestId=`5drreq_${crypto.randomUUID()}`;
   const batchId=`auto_${crypto.randomUUID()}`;
+  const build3Enabled=isBuild3RuntimeEnabled(env);
   const build3RunTimestamp=new Date();
-  const build3Run=buildBuild3RunRegistryRecord({
+  const build3Run=build3Enabled?buildBuild3RunRegistryRecord({
     engine:'5DR',instrument:'NIFTY',source_id:requestId,model_version:'5DR_V2_1',
     run_timestamp:build3RunTimestamp,trigger_type:'AUTOMATIC',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
-  });
+  }):null;
   let metadata:Record<string,unknown>={
     actor:actorMetadata(runActor),
     identity_enforced:isAccessIdentityEnforced(env),
@@ -259,7 +261,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
     automated_market_evidence:{status:'PENDING'},
     invocation:{force_new:forceNew,client_invocation_id:clientInvocationId,requested_at:new Date().toISOString(),canonical_attempt:canonicalAttempt,canonical_attempt_slot:canonicalAttemptSlot,prep_only:prepOnly},
     preopen_prep_only:prepOnly,
-    build3_run:build3Run,
+    ...(build3Run?{build3_run:build3Run}:{}),
     run_provenance:{
       trigger_type:prepOnly?'SCHEDULED_PREP':canonicalAttempt?'SCHEDULED':'USER',
       evidence_mode:prepOnly?'PREOPEN_PREP':canonicalAttempt?'PREOPEN':null,
@@ -273,7 +275,7 @@ export async function createAutomatedRun(request:Request,env:Env):Promise<Respon
   };
   await sql`insert into analysis_requests (request_id,engine,batch_id,provenance_mode,framework_version,output_contract_version,status,metadata)
     values (${requestId},'5DR',${batchId},'AUTOMATED','5DR_V2_1','5DR_V2_1_2','READY_FOR_ENGINE',${JSON.stringify(metadata)}::jsonb)`;
-  await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+  if(build3Run)await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
   const dispatch=(canonicalAttempt||prepOnly)
     ?await dispatch5drPreopenAcquisition(env,requestId,request.url,fetch)
     :await dispatch5drAcquisition(env,requestId,request.url,fetch);
@@ -674,6 +676,17 @@ async function dispatchNormalizedReady(env:Env,requestId:string,requestUrl:strin
     return json({...normalizedBody,...executionPacket},packetResponse.status);
   }
   if(!Array.isArray(executionPacket.evidence)||!executionPacket.evidence.length)return json({error:'normalized evidence is missing at dispatch boundary'},409);
+  if(!isBuild3RuntimeEnabled(env)){
+    const dispatch=await dispatch5drEngine(env,requestId,requestUrl,fetch,executionPacket);
+    const dispatchRecord={...dispatch,attempted_at:new Date().toISOString()};
+    const nextMetadata={...metadata,engine_dispatch:dispatchRecord};
+    if(dispatch.ok){
+      await sql`update analysis_requests set status='PROCESSING',metadata=${JSON.stringify(nextMetadata)}::jsonb,error=null,updated_at=now() where request_id=${requestId}`;
+      return json({...normalizedBody,engine_dispatch:dispatchRecord,status:'PROCESSING'});
+    }
+    await sql`update analysis_requests set metadata=${JSON.stringify(nextMetadata)}::jsonb,updated_at=now() where request_id=${requestId}`;
+    return json({...normalizedBody,ok:false,engine_dispatch:dispatchRecord,next_step:'RETRY_ENGINE_DISPATCH'},503);
+  }
   let evidenceSnapshot;
   try{
     const issuanceContext={
@@ -762,7 +775,7 @@ export async function resumeProcessing(request:Request,env:Env,requestId:string)
     const completion=isObject(metadata.completion)?metadata.completion:{};
     const sandbox=completion.sandbox===true;
     let build3Forecast:Record<string,unknown>|null=null;
-    if(isObject(metadata.build3_run)){
+    if(isBuild3RuntimeEnabled(env)&&isObject(metadata.build3_run)){
       try{
         const forecast=await materializePersistedNiftyBuild3Forecast(env.DATABASE_URL,requestId);
         build3Forecast={
