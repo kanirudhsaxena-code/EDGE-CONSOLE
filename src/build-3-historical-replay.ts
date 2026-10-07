@@ -4,7 +4,7 @@ import { readBuild3OutcomeSource, type Build3OutcomeSourceEnv } from './build-3-
 import { buildStockBuild3Forecast, type Build3StockPathRow } from './build-3-stock-forecast';
 import { buildStockPrecisionPlan } from './build-3-precision';
 
-export const BUILD3_HISTORICAL_REPLAY_VERSION='MDOS_BUILD_3_HISTORICAL_REPLAY_V1' as const;
+export const BUILD3_HISTORICAL_REPLAY_VERSION='MDOS_BUILD_3_HISTORICAL_REPLAY_V2' as const;
 const HORIZONS=['D','D+1','D+2','D+3','D+4'] as const;
 const NIFTY_HALF_WIDTH_PERCENT=[0.50,0.55,0.60,0.65,0.75] as const;
 
