@@ -1,8 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { observeBuild3RecommendationFromDailySessions } from '../src/build-3-recommendation-observation';
+import { observeBuild3RecommendationFromDailySessions, observeBuild3RecommendationFromMinuteSources } from '../src/build-3-recommendation-observation';
 import type { Build3DecisionRecord } from '../src/build-3-decision';
 import type { Build3SessionOhlcSource } from '../src/build-3-outcome-types';
+import type { Build3RecommendationIntradaySource } from '../src/build-3-recommendation-intraday-source';
 
 const baseDecision:Build3DecisionRecord={
   decision_version:'MDOS_BUILD_3_DECISION_V1',engine:'EDGE_STOCKS',instrument:'LTF',source_id:'life-1',
@@ -14,7 +15,7 @@ const baseDecision:Build3DecisionRecord={
     expected_rr:null,target1:null,target2:null,rejecting_gates:[],
   },
   execution_snapshot:{
-    applicable:true,availability:'COMPLETE',action:'LONG_ENTRY',instrument_expression:'EQUITY',
+    applicable:true,availability:'COMPLETE',action:'LONG_ENTRY',instrument_expression:'EQUITY',provider_instrument_key:'NSE_EQ|LTF',
     entry_low:100,entry_high:101,stop:95,target1:110,target2:115,time_exit:null,
     efficacy_target:110,efficacy_target_label:'T1',
     entry_activation_rule:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
@@ -103,4 +104,85 @@ test('5DR option recommendation cannot be scored from NIFTY index OHLC',()=>{
   const o=observeBuild3RecommendationFromDailySessions({decision,expected_sessions:expected,now,sessions:[]});
   assert.equal(o.state,'NOT_SCORABLE');
   assert.equal(o.reason,'OPTION_CONTRACT_LEVEL_OHLC_REQUIRED');
+});
+
+
+function minuteSource(
+  decision:Build3DecisionRecord,
+  date:string,
+  rows:Array<[string,number,number,number,number]>,
+):Build3RecommendationIntradaySource{
+  return {
+    source_version:'MDOS_BUILD_3_RECOMMENDATION_INTRADAY_SOURCE_V1',
+    engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+    provider_instrument_key:String(decision.execution_snapshot.provider_instrument_key),
+    session_date:date,captured_at:date+'T11:00:00.000Z',
+    source_ref:'upstox:minute:'+date,provider_hash:(date.replaceAll('-','')+'c'.repeat(64)).slice(0,64),
+    candle_interval_minutes:1,
+    candles:rows.map(([timestamp,open,high,low,close])=>({
+      timestamp:new Date(timestamp).toISOString(),open,high,low,close,volume:10,open_interest:100,
+    })),
+  };
+}
+
+test('one-minute option truth scores post-entry target and SL without first-touch ordering',()=>{
+  const decision:Build3DecisionRecord={
+    ...baseDecision,engine:'5DR',instrument:'NIFTY',source_id:'n-minute',
+    issued_at:'2026-10-07T03:30:00.000Z',recommendation:'BUY_CE',
+    execution_snapshot:{
+      ...baseDecision.execution_snapshot,action:'OPTION_CALL',instrument_expression:'NIFTY 08 OCT 25000 CE',
+      provider_instrument_key:'NSE_FO|CE25000',
+    },
+  };
+  const sources=[
+    minuteSource(decision,'2026-10-07',[
+      ['2026-10-07T09:15:00+05:30',100.5,102,100,101],
+      ['2026-10-07T10:00:00+05:30',105,111,104,110],
+    ]),
+    minuteSource(decision,'2026-10-08',[
+      ['2026-10-08T09:15:00+05:30',108,109,94,96],
+    ]),
+    minuteSource(decision,'2026-10-09',[
+      ['2026-10-09T09:15:00+05:30',96,99,95,98],
+    ]),
+  ];
+  const o=observeBuild3RecommendationFromMinuteSources({decision,expected_sessions:expected,sources,now});
+  assert.equal(o.state,'SCORABLE');
+  assert.equal(o.evidence_mode,'ONE_MINUTE');
+  assert.equal(o.entry_triggered,true);
+  assert.equal(o.target_hit,true);
+  assert.equal(o.sl_hit,true);
+});
+
+test('one-minute truth still fails closed when entry and target share an unresolved entry minute',()=>{
+  const decision={...baseDecision,source_id:'minute-ambiguous'};
+  const sources=[
+    minuteSource(decision,'2026-10-07',[
+      ['2026-10-07T09:15:00+05:30',103,111,99,105],
+    ]),
+    minuteSource(decision,'2026-10-08',[
+      ['2026-10-08T09:15:00+05:30',105,106,104,105],
+    ]),
+    minuteSource(decision,'2026-10-09',[
+      ['2026-10-09T09:15:00+05:30',105,106,104,105],
+    ]),
+  ];
+  const o=observeBuild3RecommendationFromMinuteSources({decision,expected_sessions:expected,sources,now});
+  assert.equal(o.state,'NOT_SCORABLE');
+  assert.equal(o.reason,'ENTRY_MINUTE_TARGET_SL_SEQUENCE_AMBIGUOUS');
+});
+
+test('one-minute truth requires every governed lifecycle session before final classification',()=>{
+  const decision={...baseDecision,source_id:'minute-missing'};
+  const sources=[
+    minuteSource(decision,'2026-10-07',[
+      ['2026-10-07T09:15:00+05:30',100.5,102,100,101],
+    ]),
+    minuteSource(decision,'2026-10-08',[
+      ['2026-10-08T09:15:00+05:30',101,105,100,103],
+    ]),
+  ];
+  const o=observeBuild3RecommendationFromMinuteSources({decision,expected_sessions:expected,sources,now});
+  assert.equal(o.state,'PENDING');
+  assert.match(String(o.reason),/INTRADAY_SOURCE_MISSING:2026-10-09/);
 });
