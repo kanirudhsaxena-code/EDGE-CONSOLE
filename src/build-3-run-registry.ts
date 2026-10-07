@@ -138,17 +138,19 @@ export async function persistBuild3RunRegistryRecord(
      limit 1
   `;
   if(!rows.length)throw new Error('BUILD3_RUN_REGISTRY_READBACK_MISSING');
-  const row=rows[0];
+  const stored=rows[0].payload as Build3RunRegistryRecord;
+  const storedErrors=validateBuild3RunRegistryRecord(stored);
+  if(storedErrors.length)throw new Error(`BUILD3_RUN_REGISTRY_STORED_INVALID:${storedErrors.join('|')}`);
   const same=
-    String(row.engine)===record.engine&&
-    String(row.source_id)===record.source_id&&
-    String(row.instrument)===record.instrument&&
-    String(row.registry_schema_version)===record.registry_schema_version&&
-    String(row.contract_version)===record.contract_version&&
-    String(row.model_version)===record.model_version&&
-    Date.parse(String(row.run_timestamp))===Date.parse(record.run_timestamp)&&
-    String(row.trigger_type)===record.trigger_type&&
-    String(row.market_phase)===record.market_phase;
+    stored.registry_schema_version===record.registry_schema_version&&
+    stored.contract_version===record.contract_version&&
+    stored.engine===record.engine&&
+    stored.instrument===record.instrument&&
+    stored.source_id===record.source_id&&
+    stored.model_version===record.model_version&&
+    Date.parse(stored.run_timestamp)===Date.parse(record.run_timestamp)&&
+    stored.trigger_type===record.trigger_type&&
+    stored.market_phase===record.market_phase;
   if(!same)throw new Error('BUILD3_RUN_REGISTRY_IDENTITY_CONFLICT');
-  return record;
+  return stored;
 }
