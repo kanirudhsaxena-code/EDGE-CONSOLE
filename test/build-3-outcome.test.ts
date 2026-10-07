@@ -47,6 +47,12 @@ test('direction uses frozen P0 and Core/Outer touch and close stay separate',()=
   assert.equal(o.centre_error,2);
   assert.equal(o.normalized_centre_error,2);
   assert.equal(o.miss_distance,1);
+  assert.equal(o.outer_efficacy.close_hit,true);
+  assert.equal(o.outer_efficacy.deviation_hit,false);
+  assert.equal(o.outer_efficacy.quality_status,'AMBER');
+  assert.equal(o.core_efficacy.close_hit,false);
+  assert.equal(o.core_efficacy.deviation_hit,false);
+  assert.equal(o.core_efficacy.quality_status,'RED');
 });
 
 test('probability calibration is three-class Brier from frozen issuance width only',()=>{
@@ -92,4 +98,6 @@ test('centre-only Core remains direction/zone scorable but Brier fails closed',(
   assert.equal(o.direction_result,'HIT');
   assert.equal(o.probability_state,'NOT_SCORABLE');
   assert.equal(o.brier_score,null);
+  assert.equal(o.core_efficacy.scorability_state,'NOT_SCORABLE');
+  assert.equal(o.core_efficacy.quality_status,'NOT_SCORABLE');
 });
