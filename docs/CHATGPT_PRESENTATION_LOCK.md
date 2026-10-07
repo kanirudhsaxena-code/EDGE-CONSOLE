@@ -42,3 +42,19 @@ For EDGE Stocks, the governed chat runner must wait for the complete five-sessio
 The captured presentation must include all five rows with trading date, direction, Bull/Base/Bear probabilities, expected zone, regime context, evidence basis and verification state, and must parity-check them against the governed API read model.
 
 A VERIFIED drill-down row with missing persisted key outcome or interpretation is a presentation failure. ChatGPT must not substitute score-derived prose.
+
+
+## Build 2.75 NIFTY invocation lock — 7 Oct 2026
+
+A user command to run EDGE NIFTY / NIFTY EDGE is an execution request, not an inspection request.
+
+The canonical ChatGPT execution path is:
+1. update the permanent launcher file `requests/chat-run/nifty.json` on branch `chat-edge-production` with a fresh `client_invocation_id`, `module: EDGE_NIFTY`, and no `capture_only`;
+2. allow `EDGE Chat · Console-rendered Production Run` to create the governed Console request;
+3. preserve the exact request_id through acquisition, normalization, engine execution and publication;
+4. capture the exact published run from the live Console DOM;
+5. return only the validated Console presentation.
+
+Inspection of Drive, GitHub state, assessment handoff or market data is not execution and must never be described as a completed run. A NIFTY execution response is invalid unless a fresh request_id exists, or the user explicitly requested capture-only readback of an existing request.
+
+The permanent launcher is an orchestration simplification only. It does not change 5DR methodology, probabilities, DES5, Market Trust, Execution Edge, efficacy, canonical selection or Learning Lab governance.

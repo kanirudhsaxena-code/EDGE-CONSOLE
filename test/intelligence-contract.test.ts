@@ -71,3 +71,12 @@ test('selected daily direction must match the highest scenario probability',()=>
   const errors=validateIntelligenceHandoff(body);
   assert.ok(errors.some(error=>error.includes('highest scenario probability')));
 });
+
+
+test('handoff rejects zero expected R:R with non-zero rr_score',()=>{
+  const body:any=packet();
+  body.normalized.expected_rr=0;
+  body.normalized.execution_inputs.rr_score=60;
+  const errors=validateIntelligenceHandoff(body);
+  assert.ok(errors.some(error=>error.includes('rr_score must be 0 when normalized.expected_rr is 0')));
+});

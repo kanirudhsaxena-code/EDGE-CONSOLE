@@ -182,3 +182,22 @@ test('deterministic quota fallback remains fail closed if a required evidence fa
   assert.equal(result.normalized,null);
   assert.ok(result.errors[0].includes('intelligence inference unavailable'));
 });
+
+
+test('rejects intelligence judgment with zero expected R:R and non-zero rr_score',()=>{
+  const bad={...judgment,expected_rr:0,execution_inputs:{...judgment.execution_inputs,rr_score:60}};
+  const result=validateIntelligenceJudgment(bad,new Set(judgment.source_refs));
+  assert.equal(result.judgment,null);
+  assert.ok(result.errors.some(error=>error.includes('rr_score must be 0 when expected_rr is 0')));
+});
+
+
+test('producer conservatively repairs only the zero-RR semantic mismatch',async()=>{
+  const bad={...judgment,expected_rr:0,execution_inputs:{...judgment.execution_inputs,rr_score:60}};
+  const ai={run:async()=>({response:JSON.stringify(bad)})};
+  const result=await produceIntelligence(ai,{demo:true},new Set(judgment.source_refs));
+  assert.ok(result.judgment);
+  assert.equal(result.judgment?.expected_rr,0);
+  assert.equal(result.judgment?.execution_inputs.rr_score,0);
+  assert.ok(result.judgment?.limitations.some(x=>x.includes('Build 2.75 semantic invariant')));
+});
