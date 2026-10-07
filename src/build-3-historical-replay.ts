@@ -2,6 +2,7 @@ import { neon } from '@neondatabase/serverless';
 import { scoreBuild3ZoneEfficacy, scoreBuild3RecommendationEfficacy, summarizeBuild3RecommendationEfficacy, type Build3RecommendationEfficacy } from './build-3-efficacy-contract';
 import { buildStockBuild3Forecast, type Build3StockPathRow } from './build-3-stock-forecast';
 import { buildStockPrecisionPlan } from './build-3-precision';
+import { readBuild3OutcomeSource } from './build-3-outcome-source';
 
 export const BUILD3_HISTORICAL_REPLAY_VERSION='MDOS_BUILD_3_HISTORICAL_REPLAY_V2' as const;
 const HORIZONS=['D','D+1','D+2','D+3','D+4'] as const;
