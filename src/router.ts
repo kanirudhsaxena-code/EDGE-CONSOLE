@@ -1241,7 +1241,8 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
            coalesce(b.decision_ladder, r.decision_ladder) as resolved_decision_ladder,
            e.instrument, e.entry_low, e.entry_high, e.stop_price, e.invalidation_text,
            e.target1, e.target2, e.rr_t1, e.rr_t2, e.risk_unit_category, e.time_exit, e.option_strike, e.option_expiry,
-           e.observed_premium, e.option_suitability_status, e.execution_quality_score, e.execution_quality_level
+           e.observed_premium, e.option_suitability_status, e.execution_quality_score, e.execution_quality_level,
+           e.notes as execution_notes
       from recommendations r
       join recommendation_lifecycle l using (recommendation_id)
       left join recommendation_performance p using (recommendation_id)
@@ -1375,16 +1376,44 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     return json({ error: 'EDGE Stocks V1.3 publication blocked: drill-down is empty', ticker: symbol }, 409);
   }
 
-  const parseNotes = (value: unknown): { key_outcome?: string; interpretation?: string } => {
+  const parseNotes = (value: unknown): {
+    key_outcome?: string;
+    interpretation?: string;
+    evidence_verification?: string;
+    score_eligibility?: string;
+    score_exclusion_reason?: string;
+  } => {
     if (!isNonEmptyString(value)) return {};
     try {
       const parsed = JSON.parse(value);
       return isObject(parsed) ? {
         key_outcome: isNonEmptyString(parsed.key_outcome) ? String(parsed.key_outcome) : undefined,
         interpretation: isNonEmptyString(parsed.interpretation) ? String(parsed.interpretation) : undefined,
+        evidence_verification: isNonEmptyString(parsed.evidence_verification) ? String(parsed.evidence_verification) : undefined,
+        score_eligibility: isNonEmptyString(parsed.score_eligibility) ? String(parsed.score_eligibility) : undefined,
+        score_exclusion_reason: isNonEmptyString(parsed.score_exclusion_reason) ? String(parsed.score_exclusion_reason) : undefined,
       } : {};
     } catch {
       return { interpretation: String(value) };
+    }
+  };
+
+  const parseExecutionNotes = (value: unknown): {
+    candidate_instrument?: string;
+    dominant_rejection_reason?: string;
+    gate_results: Record<string, unknown>[];
+  } => {
+    if (!isNonEmptyString(value)) return { gate_results: [] };
+    try {
+      const parsed=JSON.parse(String(value));
+      if(!isObject(parsed)) return { gate_results: [] };
+      return {
+        candidate_instrument:isNonEmptyString(parsed.candidate_instrument)?String(parsed.candidate_instrument):undefined,
+        dominant_rejection_reason:isNonEmptyString(parsed.dominant_rejection_reason)?String(parsed.dominant_rejection_reason):undefined,
+        gate_results:Array.isArray(parsed.gate_results)?parsed.gate_results.filter(isObject):[],
+      };
+    } catch {
+      return { dominant_rejection_reason:String(value), gate_results:[] };
     }
   };
 
@@ -1494,6 +1523,12 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
       conflict_flag: row.conflict_flag === true,
       gate_override_flag: row.gate_override_flag ?? null,
       verification_status: verification,
+      score_eligibility: isNonEmptyString(notes.score_eligibility)
+        ? String(notes.score_eligibility).toUpperCase()
+        : (row.raw_score == null ? 'EXCLUDED' : 'INCLUDED'),
+      score_exclusion_reason: row.raw_score == null
+        ? (notes.score_exclusion_reason || interpretation || 'Component is excluded from frozen scoring for this run.')
+        : null,
       key_outcome: keyOutcome,
       finding: plainFinding(row.component,row.raw_score,verification,notes),
       interpretation,
@@ -1674,6 +1709,36 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
      limit 1
   `;
   const canonical = canonicalRows.length ? canonicalRows[0] as Record<string, unknown> : null;
+
+  const executionDiagnostics=parseExecutionNotes(active.execution_notes);
+  const persistedInstrument=String(active.instrument ?? 'NONE').toUpperCase();
+  const persistedForecast=String(active.definitive_forecast ?? '').toUpperCase();
+  const legacyNonExecutable=persistedInstrument==='NONE' && executionDiagnostics.gate_results.length===0;
+  const derivedDominantReason=executionDiagnostics.dominant_rejection_reason ?? (
+    persistedForecast.includes('BASE') || persistedForecast.includes('RANGE')
+      ? 'base/range has no directional edge'
+      : 'Persisted legacy run did not contain a complete executable candidate.'
+  );
+  const derivedGateResults=executionDiagnostics.gate_results.length
+    ? executionDiagnostics.gate_results
+    : (persistedInstrument==='NONE' ? [
+        {
+          gate:'DIRECTIONAL_EDGE',
+          status:(persistedForecast==='BULLISH'||persistedForecast==='BEARISH')?'PASS':'FAIL',
+          observed:persistedForecast || 'UNKNOWN',
+          threshold:'BULLISH or BEARISH',
+          reason:(persistedForecast==='BULLISH'||persistedForecast==='BEARISH')
+            ? null
+            : 'base/range has no directional edge',
+        },
+        {
+          gate:'STRUCTURE',
+          status:'FAIL',
+          observed:'LEGACY_NOT_PERSISTED',
+          threshold:'verified candidate entry/invalidation/target structure',
+          reason:'Legacy run did not persist a complete candidate execution structure; Build 2.5 does not reconstruct missing levels.',
+        },
+      ] : []);
 
   const payload = {
     contract_version: 'EDGE_STOCKS_V1_3',
@@ -1858,8 +1923,13 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
         option_expiry: active.option_expiry ?? null,
         observed_premium: numberOrNull(active.observed_premium),
         option_suitability_status: active.option_suitability_status ?? null,
-        execution_quality_score: numberOrNull(active.execution_quality_score),
-        execution_quality_level: active.execution_quality_level ?? null
+        execution_quality_score: legacyNonExecutable ? 0 : numberOrNull(active.execution_quality_score),
+        execution_quality_level: legacyNonExecutable ? 'NOT_EXECUTABLE' : (active.execution_quality_level ?? null),
+        candidate_instrument: executionDiagnostics.candidate_instrument ?? (
+          persistedInstrument === 'NONE' ? null : String(active.instrument)
+        ),
+        dominant_rejection_reason: persistedInstrument==='NONE' ? derivedDominantReason : (executionDiagnostics.dominant_rejection_reason ?? null),
+        gate_results: derivedGateResults
       },
       current_price: numberOrNull(active.current_price),
       current_return_pct: numberOrNull(active.current_return_pct),

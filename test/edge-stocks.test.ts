@@ -45,7 +45,14 @@ const valid = {
     bot:{score:68.941,grade:'B',subscores:{forecast_edge:60,market_trust:69.474,structure_pattern_quality:75,pv_pvpo_confirmation:65,catalyst_asymmetry:70,execution_quality:70},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},
     risk_override:{status:'CLEAR',code:null},
     expected_price_zone:{low:2162.5,high:2240.86},
-    execution:{instrument:'NONE',execution_quality_score:70},
+    execution:{
+      instrument:'NONE',execution_quality_score:0,execution_quality_level:'NOT_EXECUTABLE',
+      candidate_instrument:null,dominant_rejection_reason:'base/range has no directional edge',
+      gate_results:[
+        {gate:'DIRECTIONAL_EDGE',status:'FAIL',observed:'BASE_RANGE',threshold:'BULLISH or BEARISH',reason:'base/range has no directional edge'},
+        {gate:'STRUCTURE',status:'FAIL',observed:'NONE',threshold:'verified candidate entry/invalidation/target structure',reason:'verified candidate execution structure is unavailable'}
+      ]
+    },
     probabilities:{bull:4.02,base:73.663,bear:22.317},
     definitive_forecast:'BASE_RANGE',
     forecast_horizon:'D:D+4',
@@ -63,7 +70,7 @@ const valid = {
     decision_ladder:'INVESTIGATION'
   },
   drilldown:[
-    {component:'PRICE_STRUCTURE',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:false,finding:'Price structure weakened below the governed range.',verification_status:'VERIFIED',key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
+    {component:'PRICE_STRUCTURE',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:false,finding:'Price structure weakened below the governed range.',verification_status:'VERIFIED',score_eligibility:'INCLUDED',score_exclusion_reason:null,key_outcome:'NEGATIVE',interpretation:'Price structure is negative under the frozen trend rules; latest structure pattern is FAILED_BREAKDOWN.'}
   ]
 };
 
@@ -113,7 +120,9 @@ test('empty drill-down is rejected',()=>{
 test('component verification status fails unknown states closed',()=>{
   assert.equal(componentVerificationStatus('AVAILABLE','HIGH'),'VERIFIED');
   assert.equal(componentVerificationStatus('AVAILABLE',null),'NOT_VERIFIED');
-  assert.equal(componentVerificationStatus('NOT_AVAILABLE','HIGH'),'NOT_AVAILABLE');
+  assert.equal(componentVerificationStatus('NOT_AVAILABLE','HIGH'),'VERIFIED');
+  assert.equal(componentVerificationStatus('NOT_AVAILABLE','NOT_VERIFIED'),'NOT_AVAILABLE');
+  assert.equal(componentVerificationStatus('NOT_VERIFIED','CONFLICTED'),'CONFLICTED');
 });
 
 
@@ -124,4 +133,24 @@ test('standard output requires exact visible D:D+4 regime and evidence semantics
   const errors=validateEdgeStocksResult(bad);
   assert.ok(errors.some(x=>x.includes('regime_context is mandatory')));
   assert.ok(errors.some(x=>x.includes('evidence_basis is mandatory')));
+});
+
+
+test('verified evidence can be score-excluded without becoming NOT_VERIFIED',()=>{
+  const current=structuredClone(valid);
+  current.drilldown[0].score_or_level='N/A';
+  current.drilldown[0].verification_status='VERIFIED';
+  current.drilldown[0].score_eligibility='EXCLUDED';
+  current.drilldown[0].score_exclusion_reason='Provider component score unavailable under frozen methodology.';
+  current.drilldown[0].evidence_quality='HIGH';
+  assert.deepEqual(validateEdgeStocksResult(current),[]);
+});
+
+test('non-executable outcome cannot omit rejection diagnostics',()=>{
+  const bad=structuredClone(valid);
+  delete bad.current_stock_outcome.execution.dominant_rejection_reason;
+  bad.current_stock_outcome.execution.gate_results=[];
+  const errors=validateEdgeStocksResult(bad);
+  assert.ok(errors.some(x=>x.includes('dominant_rejection_reason')));
+  assert.ok(errors.some(x=>x.includes('gate_results')));
 });

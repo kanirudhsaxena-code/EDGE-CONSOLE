@@ -1,0 +1,22 @@
+{
+  "requested_at": "2026-10-07T09:17:00Z",
+  "reason": "Final Build 2.5 live Console parity and contradiction proof after PR #107 corrected missing-structure execution semantics to NOT_EXECUTABLE",
+  "production_console_main": "636837cbc6a7cd74aa8a305ec2fc07525f4825a0",
+  "edge_engine_main": "8f18841334083d56471f18f36eaa3f8dbbe6d9fb",
+  "required_assets": [
+    "NIFTY",
+    "LTF",
+    "CUPID",
+    "RELIANCE"
+  ],
+  "required_stock_result": "3/3 PASS",
+  "required_four_asset_output": "PASS",
+  "build_2_5_acceptance": {
+    "verified_evidence_separate_from_score_eligibility": true,
+    "no_trade_full_rejection_diagnostics": true,
+    "missing_candidate_structure_is_not_executable": true,
+    "boilerplate_research_rejected": true
+  },
+  "fail_closed": true,
+  "trading_enabled": false
+}
