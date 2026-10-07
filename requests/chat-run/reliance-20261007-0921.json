@@ -1,0 +1,138 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE RELIANCE",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-reliance-20261007-035000z",
+    "ticker": "RELIANCE",
+    "command": "EDGE RELIANCE",
+    "created_at": "2026-10-07T03:50:00Z",
+    "research_fresh_at": "2026-10-07T03:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "RIL_OFFICIAL_Q1",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/news-media/press-releases/ril-q1-fy2026-27-financial-and-operational-performance",
+        "title": "Reliance Industries Q1 FY2026-27 financial and operational performance",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-07-17T00:00:00Z"
+      },
+      {
+        "source_id": "RIL_OFFICIAL_FINANCIALS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/financial-reporting?page=2",
+        "title": "Reliance Industries financial reporting",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "RIL_OFFICIAL_SHAREHOLDING",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ril.com/investors/shareholders-information/shareholding-pattern",
+        "title": "Reliance Industries shareholding pattern",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "RIL_BS_20261006",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.business-standard.com/markets/news/reliance-industries-gains-3-as-jio-ipo-plan-fuels-hopes-of-value-unlocking-126100600608_1.html",
+        "title": "Reliance Industries gains as Jio IPO plan fuels value-unlocking hopes",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-10-06T00:00:00Z"
+      },
+      {
+        "source_id": "RIL_REUTERS_20260930",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.reuters.com/world/india/state-bank-india-buys-nearly-40-reliances-135-billion-debt-sale-2026-09-30/",
+        "title": "State Bank of India buys nearly 40% of Reliance debt sale",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-09-30T00:00:00Z"
+      },
+      {
+        "source_id": "RIL_SCREENER",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/RELIANCE/",
+        "title": "Reliance Industries financial and valuation snapshot",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ril-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Reliance reported Q1 FY27 gross revenue of about ₹340,257 crore, EBITDA of about ₹54,067 crore and profit after tax of about ₹23,196 crore, confirming the scale and earnings base of the diversified group.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "RIL_OFFICIAL_Q1",
+          "RIL_OFFICIAL_FINANCIALS"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "Reliance's September 2026 ten-year bond issue drew significant institutional participation, with State Bank of India reported to have bought nearly 40% of the issue and other large domestic institutions also participating; this supports debt-market demand but is not direct evidence of current equity flow.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "RIL_REUTERS_20260930",
+          "RIL_OFFICIAL_SHAREHOLDING"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-catalysts",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Market attention is focused on media reports of a possible Jio Platforms IPO in October 2026, which has been interpreted as a potential value-unlocking catalyst; the timing and valuation remain report-driven until formally confirmed.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "RIL_BS_20261006"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "A recent market snapshot placed Reliance around 40x earnings and roughly 2.8x book value, indicating a meaningful valuation premium that should be considered alongside its diversified earnings base.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "RIL_SCREENER"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ril-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No verified adverse corporate shock was identified in the bounded source set; the principal near-term binary event is confirmation, timing and valuation of the reported Jio IPO, while the recent large debt placement showed strong institutional demand.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "RIL_BS_20261006",
+          "RIL_REUTERS_20260930"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "The reported Jio IPO schedule and valuation are media-reported and should not be treated as formally confirmed until Reliance or a regulator publishes definitive terms.",
+      "Current price, volume and market microstructure are delegated to EDGE live market-data acquisition."
+    ]
+  }
+}
