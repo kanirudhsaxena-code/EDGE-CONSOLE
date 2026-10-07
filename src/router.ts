@@ -21,6 +21,7 @@ import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3R
 import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-stock-evidence';
 import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
+import { build3PrecisionOutput, readBuild3NiftyPrecisionByRunId, readBuild3OutputPrecision } from './build-3-output-read';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -1588,6 +1589,50 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     };
   }
 
+  let build3Precision: ReturnType<typeof build3PrecisionOutput> = null;
+  if (env.DATABASE_URL && forecastSessions) {
+    const lifecycleRows = await sql`
+      select lifecycle_id
+        from edge_run_lifecycles
+       where recommendation_id=${String(active.recommendation_id)}
+       order by updated_at desc
+       limit 1
+    `;
+    if (lifecycleRows.length) {
+      const lifecycleId=String(lifecycleRows[0].lifecycle_id);
+      const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'EDGE_STOCKS',lifecycleId);
+      if (precisionRows.length) {
+        const byHorizon=new Map(precisionRows.map(row=>[row.horizon,row]));
+        forecastSessions=forecastSessions.map((session:Record<string,unknown>)=>{
+          const label=String(session.session_label);
+          const precision=byHorizon.get(label as 'D'|'D+1'|'D+2'|'D+3'|'D+4');
+          if(!precision)throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_HORIZON_MISSING:'+label);
+          const expectedZone=isObject(session.expected_zone)?session.expected_zone as JsonRecord:{};
+          const same=(a:unknown,b:number)=>typeof a==='number'&&Math.abs(a-b)<1e-8;
+          if(
+            String(session.trading_date)!==precision.target_session||
+            !same(expectedZone.low,precision.outer_low)||
+            !same(expectedZone.high,precision.outer_high)
+          )throw new Error('BUILD3_OUTPUT_STOCK_PRECISION_PARITY_MISMATCH:'+label);
+          return {
+            ...session,
+            core_zone:{low:precision.core_low,high:precision.core_high},
+            core_zone_width_points:precision.core_width_points,
+            core_zone_width_percent:precision.core_width_percent,
+            core_zone_calibration:{
+              version:precision.calibration_version,
+              state:precision.calibration_state,
+              normalization_basis:precision.normalization_basis,
+              shadow_only:true,
+              production_methodology_changed:false,
+            },
+          };
+        });
+        build3Precision=build3PrecisionOutput(precisionRows);
+      }
+    }
+  }
+
   const canonicalRows = await sql`
     select canonical_key,target_trading_date,forecast_horizon,selection_status,canonical_type,
            selected_recommendation_id,selected_at,selection_reason
@@ -1606,6 +1651,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
     ticker: symbol,
     run_id: String(active.recommendation_id),
     generated_at: new Date(String(active.run_timestamp ?? new Date().toISOString())).toISOString(),
+    build3_precision: build3Precision,
     run_provenance: currentGovernance ? {
       trigger_type: currentGovernance.trigger_type ?? null,
       evidence_mode: currentGovernance.evidence_mode ?? null,
@@ -1917,6 +1963,25 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
   if (packet && request.method === 'GET') return executionPacket(env, decodeURIComponent(packet[1]));
   const failed = url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)\/fail$/);
   if (failed && request.method === 'POST') return failRequest(request, env, decodeURIComponent(failed[1]));
+  if (url.pathname === '/api/5dr/latest' && request.method === 'GET') {
+    if(!env.DATABASE_URL)return json({run:null,note:'DATABASE_URL not configured yet'},503);
+    const sql=neon(env.DATABASE_URL);
+    const rows=await sql`
+      select run_id,contract_version,framework_version,status,provenance_mode,sources,
+             freshness_at,generated_at,result,warnings,published
+        from analysis_runs
+       where engine='5DR' and published=true
+       order by generated_at desc
+       limit 1
+    `;
+    if(!rows.length)return json({run:null,note:'No published 5DR run yet'});
+    const run=rows[0] as Record<string,unknown>;
+    const precision=await readBuild3NiftyPrecisionByRunId(env.DATABASE_URL,String(run.run_id));
+    return json({
+      run:{...run,build3_precision:precision?build3PrecisionOutput(precision.rows):null},
+      note:undefined
+    });
+  }
   if (url.pathname === '/api/5dr/canonical-handoff' && request.method === 'GET') return fiveDrCanonicalHandoff(env);
   if (url.pathname === '/api/5dr/assessment-import' && request.method === 'POST') return fiveDrAssessmentImport(request, env);
   if (url.pathname.startsWith('/api/edge-stocks/') && isAccessIdentityEnforced(env)) {
