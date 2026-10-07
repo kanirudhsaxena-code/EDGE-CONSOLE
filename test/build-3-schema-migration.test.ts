@@ -20,7 +20,7 @@ test('Build 3.0 schema status covers every Wave 1 through Wave 3 persistence sur
     'build3_run_registry','build3_evidence_snapshots','build3_data_quality_assessments',
     'build3_forecast_horizons','build3_precision_issuance','build3_precision_outcomes',
     'build3_decisions','build3_session_ohlc_sources','build3_outcome_attempts','build3_decision_outcomes',
-    'build3_recommendation_efficacy','build3_recommendation_observation_attempts','build3_recommendation_intraday_sources'
+    'build3_recommendation_efficacy','build3_recommendation_observation_attempts','build3_recommendation_intraday_sources','build3_recommendation_intraday_dispatch_attempts'
   ]);
   assert.ok(BUILD3_SCHEMA_REQUIRED_COLUMNS.some(([table,column])=>table==='build3_decisions'&&column==='execution_snapshot'));
   assert.ok(BUILD3_SCHEMA_REQUIRED_COLUMNS.some(([table,column])=>table==='build3_precision_outcomes'&&column==='brier_score'));
