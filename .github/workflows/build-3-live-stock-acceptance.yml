@@ -15,7 +15,7 @@ concurrency:
 
 jobs:
   live-ltf:
-    if: github.head_ref == 'build-3.0-accuracy-loop-20261006'
+    if: github.head_ref == 'build-3.0-accuracy-loop-20261006' && vars.MDOS_BUILD3_PREVIEW_ENABLED == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
