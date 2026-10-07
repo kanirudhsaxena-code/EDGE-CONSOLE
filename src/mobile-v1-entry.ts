@@ -1290,7 +1290,7 @@ async function build3HistoricalReplayApi(request:Request,env:Env):Promise<Respon
 
 async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
-  if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
+  if(!['build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev','edge-console.k-anirudhsaxena.workers.dev'].includes(url.hostname)){
     return json({error:'Not found'},404);
   }
   const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
