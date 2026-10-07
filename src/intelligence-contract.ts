@@ -71,6 +71,11 @@ export function validateIntelligenceHandoff(body: unknown): string[] {
         errors.push(`normalized.${key}: ${detail}`);
       }
     }
+    const execution=body.normalized.execution_inputs;
+    const rr=body.normalized.expected_rr;
+    if(isObject(execution)&&typeof rr==='number'&&Number.isFinite(rr)&&rr===0&&typeof execution.rr_score==='number'&&Number.isFinite(execution.rr_score)&&execution.rr_score!==0){
+      errors.push('normalized.execution_inputs.rr_score must be 0 when normalized.expected_rr is 0');
+    }
   }
   return errors;
 }
