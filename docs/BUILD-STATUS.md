@@ -1,6 +1,6 @@
 # EDGE Console — Build Status
 
-Last updated: 21 September 2026
+Last updated: 7 October 2026
 
 ## Production priority
 
@@ -111,22 +111,36 @@ Production remains fail-closed. Trading execution remains disabled. Future metho
 
 ## Build 2.75 corrective status — 7 October 2026
 
-Status: **RELEASE BLOCKED UNTIL USER-OUTPUT ACCEPTANCE PASSES**
+Status: **PRODUCTION ACCEPTED / CLOSED — FINAL USER-OUTPUT PROOF VALID**
 
 Closed corrective controls:
 - fresh NIFTY research is required before market acquisition/scoring;
 - research transport success is distinct from FACT_READY evidence;
 - current RBI policy/rate evidence and latest Fed policy evidence are factual gates;
 - unresolved policy facts fail closed rather than silently becoming neutral/zero;
-- exact NIFTY request/run identity is preserved through publication.
-
-New release-blocking user-output controls:
-- every standard NIFTY chat run must generate `chat-user-output.md` from the exact published run and its frozen assessment snapshot;
-- the file must contain exactly two tables: 5DR Assessment & Efficacy, then Current 5DR Run;
+- exact NIFTY request/run identity is preserved through publication;
+- every standard NIFTY chat run deterministically generates `chat-user-output.md` from the exact published run and its frozen assessment snapshot;
+- the standard user payload contains exactly two tables: 5DR Assessment & Efficacy, then Current 5DR Run;
 - user-facing horizons are exactly D through D+4;
 - diagnostic Console narrative is excluded from the standard response unless drill-down is requested;
 - `chat-user-output-manifest.json` binds request_id, run_id, horizon contract and SHA-256 output hash;
 - Console render success is parity evidence only and cannot be reported as end-to-end user success;
-- ChatGPT must return the validated `chat-user-output.md` content for the invocation without reconstruction.
+- envelope contract and governed 5DR output contract identities are stored separately.
 
-Build 2.75 cannot be marked CLOSED until CI passes and at least one fresh governed NIFTY invocation produces and returns the exact validated two-table payload to the user.
+Final production proof:
+- GitHub workflow: `EDGE Chat · Console-rendered Production Run`, run `37658652763` — SUCCESS;
+- fresh request: `5drreq_73eea724-aeaa-40a5-a611-0be5d2b2f60c` — COMPLETED;
+- exact published run: `5drrun_ca1df57c-c187-44ff-9cbc-5e0637a4d341`;
+- research manifest: `NIFTY_G5_1_V2_FACT_COMPLETE` — complete, no fact blockers and no missing dimensions;
+- market evidence: `AUTOMATED_MARKET_DATA_READY` — no blockers;
+- reconciliation: `NORMALIZED_AND_DISPATCHED`;
+- exact user-output contract: `BUILD_2_75_NIFTY_CHAT_USER_OUTPUT_V1`;
+- envelope contract: `1.0`;
+- governed 5DR output contract: `5DR_V2_1_2`;
+- output sections: exactly `TABLE_1_5DR_ASSESSMENT_EFFICACY` + `TABLE_2_CURRENT_5DR_RUN`;
+- display horizons: exactly `D, D+1, D+2, D+3, D+4`;
+- exact user-output SHA-256: `b29f374e301ae7940e18ce4cb2307a81e15ae2a4d0c9dfdda4d37ce965bec44e`;
+- proof artifact: GitHub Actions artifact `11500007447`.
+
+Closure condition:
+The active ChatGPT closure response must return the exact validated `chat-user-output.md` from the proof artifact without reconstruction. If that exact payload is not returned, `USER DELIVERED` has not occurred and Build 2.75 must be treated as reopened.
