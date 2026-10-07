@@ -6,7 +6,7 @@ import { persistBuild3Forecast, type Build3Forecast } from './build-3-forecast-c
 import { buildStockBuild3Forecast, BUILD3_STOCK_SOURCE_PATH_VERSION, type Build3StockPathRow } from './build-3-stock-forecast';
 import { buildStockPrecisionPlan, persistBuild3PrecisionIssuance } from './build-3-precision';
 import { readBuild3RunRegistryRecord } from './build-3-run-registry';
-import { resolveBuild3TargetSessions } from './build-3-session-resolver';
+import { BUILD3_HORIZONS } from './build-3-run-contract';
 import { getStockLifecycle } from './stock-lifecycle';
 
 type Env={DATABASE_URL?:string;EDGE_DATABASE_URL?:string};
@@ -111,7 +111,7 @@ export async function materializePersistedStockBuild3Forecast(
     source_id:lifecycleId,
     path_version:String(header.path_version),
     issued_at:new Date(String(header.issued_at)).toISOString(),
-    target_sessions:resolveBuild3TargetSessions(new Date(String(header.issued_at)).toISOString()),
+    target_sessions:rows.map((row,index)=>({horizon:BUILD3_HORIZONS[index],target_session:row.target_trading_date})),
     rows,
     evidence_snapshot_id:evidence.snapshot_id,
     evidence_hash:evidence.evidence_hash,
