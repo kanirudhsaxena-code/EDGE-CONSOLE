@@ -300,7 +300,8 @@ function deterministicSourceGroundedClaims(
 ):{claims:EdgeResearchClaim[];limitations:string[]}{
   const fundamentalsSources=pickSources(sources,[/OFFICIAL_(INVESTORS|FINANCIALS)/,/SCREENER$/]);
   const institutionalSources=pickSources(sources,[/SCREENER$/,/NSE_QUOTE$/]);
-  const directNewsSources=pickSources(sources,[/OFFICIAL_(NEWSROOM|PRESS|NOTICES)/,/NEWS_RSS$/]);
+  const directNewsSources=pickSources(sources,[/OFFICIAL_(NEWSROOM|PRESS|NOTICES)/,/NEWS_RSS$/])
+    .filter(source=>!isLikelyBoilerplate(source.excerpt));
   // Some issuer/news endpoints can be unavailable from the Worker runtime even when
   // another independently retrieved page contains fresh announcements. Do not
   // infer coverage from a source ID alone: promote a surviving source to
