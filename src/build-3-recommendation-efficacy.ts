@@ -2,7 +2,8 @@ import { neon } from '@neondatabase/serverless';
 import { canonicalBuild3EvidenceJson } from './build-3-evidence-snapshot';
 import type { Build3DecisionRecord } from './build-3-decision';
 import type { Build3SessionOhlcSource } from './build-3-outcome-types';
-import { observeBuild3RecommendationFromDailySessions } from './build-3-recommendation-observation';
+import { observeBuild3RecommendationFromDailySessions, observeBuild3RecommendationFromMinuteSources } from './build-3-recommendation-observation';
+import { readBuild3RecommendationIntradaySources } from './build-3-recommendation-intraday-source';
 import {
   BUILD3_EFFICACY_SCORING_VERSION,
   scoreBuild3RecommendationEfficacy,
@@ -180,9 +181,16 @@ export async function evaluateMaturedBuild3Recommendations(
     const sessions=truth
       .map(row=>restoredSessionSource(row,decision.engine,decision.instrument))
       .filter((row):row is Build3SessionOhlcSource=>!!row);
-    const observation=observeBuild3RecommendationFromDailySessions({
-      decision,expected_sessions:expectedSessions,sessions,now,
-    });
+    const intradaySources=await readBuild3RecommendationIntradaySources(
+      databaseUrl,decision.engine,decision.source_id,
+    );
+    const observation=decision.engine==='5DR'||intradaySources.length>0
+      ?observeBuild3RecommendationFromMinuteSources({
+        decision,expected_sessions:expectedSessions,sources:intradaySources,now,
+      })
+      :observeBuild3RecommendationFromDailySessions({
+        decision,expected_sessions:expectedSessions,sessions,now,
+      });
 
     if(observation.state!=='SCORABLE'){
       const result:Build3RecommendationEvaluationResult={
