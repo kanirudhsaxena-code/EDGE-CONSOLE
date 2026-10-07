@@ -244,19 +244,20 @@ export function buildBuild3ModelFeedback(input:{
   const rec=scorecard.recommendation;
   if(rec.finalized_triggered>=20&&(rec.dual_touch_pct??0)>=15){
     feedback.push({
-      action:'CHALLENGER',topic:'ENTRY_SL_GEOMETRY',
+      action:'INVESTIGATE',topic:'ENTRY_SL_GEOMETRY',
       evidence_strength:strength(rec.finalized_triggered),sample_size:rec.finalized_triggered,
       evidence:{
         conservative_hit_rate_pct:rec.conservative_hit_rate_pct,
         liberal_hit_rate_pct:rec.liberal_hit_rate_pct,
         hit_rate_gap_pct:rec.hit_rate_gap_pct,
         dual_touch_pct:rec.dual_touch_pct,
+        challenger_not_created_reason:'EXACT_ENTRY_SL_GEOMETRY_NOT_YET_DEFINED',
       },
-      expected_benefit:'Test whether entry/SL geometry can reduce dual-touch ambiguity without sacrificing target capture.',
-      risk:'Changing stops or entries can worsen expectancy, drawdown or missed-entry rate.',
+      expected_benefit:'Determine an exact entry/SL geometry hypothesis before any challenger is registered.',
+      risk:'Inventing a vague or post-hoc geometry change would overfit; exact entry, stop and target transformation must be frozen first.',
       affected_cohort:'FINALIZED_TRIGGERED_RECOMMENDATIONS',
       next_observations_needed:Math.max(0,30-rec.finalized_triggered),
-      comparison_state:'NEEDS_FORWARD_SHADOW',
+      comparison_state:'OBSERVED_BASELINE',
     });
   }
 
