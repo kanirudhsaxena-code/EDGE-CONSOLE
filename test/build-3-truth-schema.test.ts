@@ -6,6 +6,7 @@ const migration=readFileSync(new URL('../database/0010_build3_truth_outcomes.sql
 const efficacy=readFileSync(new URL('../database/0011_build3_efficacy_scoring_contract.sql',import.meta.url),'utf8');
 const recommendationTruth=readFileSync(new URL('../database/0012_build3_recommendation_truth.sql',import.meta.url),'utf8');
 const intradayTruth=readFileSync(new URL('../database/0013_build3_recommendation_intraday_sources.sql',import.meta.url),'utf8');
+const intradayDispatch=readFileSync(new URL('../database/0014_build3_intraday_dispatch_attempts.sql',import.meta.url),'utf8');
 
 test('Wave 3 Truth migration defines immutable full-OHLC source evidence',()=>{
   assert.match(migration,/create table if not exists build3_session_ohlc_sources/i);
@@ -60,4 +61,12 @@ test('one-minute recommendation truth sources are immutable and provider-key bou
   assert.match(intradayTruth,/provider_instrument_key text not null/i);
   assert.match(intradayTruth,/candle_interval_minutes integer not null check \(candle_interval_minutes=1\)/i);
   assert.match(intradayTruth,/prevent_build3_recommendation_intraday_source_mutation/i);
+});
+
+
+test('intraday truth dispatch attempts are append-only and retry-auditable',()=>{
+  assert.match(intradayDispatch,/create table if not exists build3_recommendation_intraday_dispatch_attempts/i);
+  assert.match(intradayDispatch,/DISPATCHED/);
+  assert.match(intradayDispatch,/CONFIGURATION_BLOCKED/);
+  assert.match(intradayDispatch,/prevent_build3_intraday_dispatch_attempt_mutation/i);
 });
