@@ -10,6 +10,17 @@ import { gateCanonicalHistoryResponse } from './canonical-history-release-gate';
 import { recoverBlocked5drAcquisition } from './5dr-acquisition-recovery';
 import { runPreopenScheduledTick } from './preopen-scheduler';
 import { progressPendingNormalStockLifecycles } from './router';
+import { handleMarketCalendarRequest } from './nse-trading-calendar';
+import { dispatchEdgeCalendarWorkflow } from './edge-command';
+
+function istDate(now=new Date()):string{
+  const parts=Object.fromEntries(
+    new Intl.DateTimeFormat('en-US',{
+      timeZone:'Asia/Kolkata',year:'numeric',month:'2-digit',day:'2-digit'
+    }).formatToParts(now).filter(p=>p.type!=='literal').map(p=>[p.type,p.value])
+  );
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
 
 /**
  * Production entrypoint shim.
@@ -38,6 +49,9 @@ import { progressPendingNormalStockLifecycles } from './router';
  */
 export default {
   async fetch(request: Request, env: any, ctx: ExecutionContext): Promise<Response> {
+    const calendar = await handleMarketCalendarRequest(request, env);
+    if (calendar) return calendar;
+
     const p0Current = await handleP0CurrentRead(request, env);
     if (p0Current) return p0Current;
 
@@ -93,6 +107,20 @@ export default {
   },
   async scheduled(controller: ScheduledController, env: any, ctx: ExecutionContext): Promise<void> {
     const cron=String((controller as any).cron??'');
+    if(cron==='35 2 * * *'||cron==='0 3 * * *'){
+      ctx.waitUntil((async()=>{
+        const targetDate=istDate(new Date());
+        const result=await dispatchEdgeCalendarWorkflow(env.EDGE_GITHUB_TOKEN??'',{target_date:targetDate});
+        console.log(JSON.stringify({
+          status:result.ok?'NSE_CALENDAR_REFRESH_DISPATCHED':'NSE_CALENDAR_REFRESH_BLOCKED',
+          target_date:targetDate,
+          dispatch_status:result.status,
+          error:result.error??null,
+          trading_enabled:false
+        }));
+      })());
+      return;
+    }
     if(cron==='7,22,37,52 * * * 1-5'){
       ctx.waitUntil((async()=>{
         const results=await progressPendingNormalStockLifecycles(env,12);

@@ -23,8 +23,45 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Resolve governed NSE session state
+        env:
+          CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+          CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+          CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
         run: |
-          python scripts/nse-session-state.py | tee /tmp/nse-session.json
+          set -euo pipefail
+          TARGET_DATE="$(TZ=Asia/Kolkata date +%F)"
+          code="$(curl --location --silent --show-error             -H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID"             -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET"             -H "Accept: application/json"             "$CONSOLE_URL/api/market-calendar/session?date=$TARGET_DATE"             -o /tmp/nse-calendar.json -w '%{http_code}')"
+          cat /tmp/nse-calendar.json
+          echo
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          from datetime import datetime, time
+          from zoneinfo import ZoneInfo
+          IST=ZoneInfo("Asia/Kolkata")
+          cal=json.load(open("/tmp/nse-calendar.json"))
+          state=cal.get("session_state")
+          if state=="CALENDAR_COVERAGE_MISSING":
+              raise SystemExit("governed NSE session authority unavailable")
+          now=datetime.now(IST)
+          opened=cal.get("market_open_at")
+          closed=cal.get("market_close_at")
+          if opened and closed:
+              start=datetime.fromisoformat(str(opened).replace("Z","+00:00")).astimezone(IST)
+              end=datetime.fromisoformat(str(closed).replace("Z","+00:00")).astimezone(IST)
+              live=start <= now < end
+          else:
+              live=state=="TRADING_DAY" and time(9,15) <= now.time().replace(tzinfo=None) < time(15,30)
+          out={
+              **cal,
+              "schema":"NSE_SESSION_STATE_DYNAMIC_V2",
+              "as_of_ist":now.isoformat(),
+              "market_phase":"LIVE_INTRADAY" if live else "CLOSED_SESSION",
+              "expected_live_market_data":live,
+          }
+          json.dump(out,open("/tmp/nse-session.json","w"),indent=2,sort_keys=True)
+          print(json.dumps(out,sort_keys=True))
+          PY
 
       - name: Start sandbox zero-upload 5DR run
         env:
