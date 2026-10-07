@@ -182,3 +182,11 @@ test('deterministic quota fallback remains fail closed if a required evidence fa
   assert.equal(result.normalized,null);
   assert.ok(result.errors[0].includes('intelligence inference unavailable'));
 });
+
+
+test('rejects intelligence judgment with zero expected R:R and non-zero rr_score',()=>{
+  const bad={...judgment,expected_rr:0,execution_inputs:{...judgment.execution_inputs,rr_score:60}};
+  const result=validateIntelligenceJudgment(bad,new Set(judgment.source_refs));
+  assert.equal(result.judgment,null);
+  assert.ok(result.errors.some(error=>error.includes('rr_score must be 0 when expected_rr is 0')));
+});
