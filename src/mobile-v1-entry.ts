@@ -19,7 +19,7 @@ import { isBuild3RuntimeEnabled } from './build-3-isolation';
 import { readBuild3Scorecard } from './build-3-scorecard';
 import { readBuild3LearningLab } from './build-3-learning-lab';
 import { prepareBuild3ChallengerEvent, persistBuild3ChallengerEvent } from './build-3-challenger-governance';
-import { persistBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
+import { persistBuild3RecommendationIntradaySource, prepareBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
 import { readBuild3HistoricalReplay } from './build-3-historical-replay';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
@@ -1187,6 +1187,52 @@ async function build3ChallengerEventApi(request:Request,env:Env,challengerId:str
   }
 }
 
+async function build3TruthSmokeApi(request:Request,env:Env):Promise<Response>{
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  let raw:unknown;
+  try{raw=await request.json();}catch{return json({error:'Build 3 truth smoke JSON body is required'},422);}
+  if(!isObject(raw))return json({error:'Build 3 truth smoke body must be an object'},422);
+  const engine=String(raw.engine??'');
+  if(engine!=='5DR'&&engine!=='EDGE_STOCKS')return json({error:'engine must be 5DR or EDGE_STOCKS'},422);
+  const input:Build3RecommendationIntradaySourceInput={
+    engine,
+    source_id:String(raw.source_id??''),
+    provider_instrument_key:String(raw.provider_instrument_key??''),
+    session_date:String(raw.session_date??''),
+    captured_at:String(raw.captured_at??''),
+    source_ref:String(raw.source_ref??''),
+    candles:Array.isArray(raw.candles)?raw.candles:[],
+  };
+  const instrument=String(raw.instrument??(engine==='5DR'?'NIFTY':'')).trim();
+  if(!instrument)return json({error:'instrument is required'},422);
+  try{
+    const prepared=await prepareBuild3RecommendationIntradaySource(input,instrument);
+    return json({
+      version:'MDOS_BUILD_3_TRUTH_SMOKE_V1',
+      status:'PASS',
+      live_provider_payload_valid:true,
+      callback_authenticated:true,
+      persistence_applied:false,
+      writes_performed:0,
+      engine:prepared.engine,
+      instrument:prepared.instrument,
+      source_id:prepared.source_id,
+      provider_instrument_key:prepared.provider_instrument_key,
+      session_date:prepared.session_date,
+      source_ref:prepared.source_ref,
+      provider_hash:prepared.provider_hash,
+      candle_count:prepared.candles.length,
+      first_candle_at:prepared.candles[0]?.timestamp??null,
+      last_candle_at:prepared.candles.at(-1)?.timestamp??null,
+      trading_enabled:false,
+    });
+  }catch(error){
+    return json({error:'Build 3 truth smoke validation failed',detail:error instanceof Error?error.message:String(error)},422);
+  }
+}
+
 async function build3HistoricalReplayApi(request:Request,env:Env):Promise<Response>{
   const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
     ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
@@ -1227,6 +1273,7 @@ export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
   if(url.pathname==='/api/build3/historical-replay'&&request.method==='GET')return build3HistoricalReplayApi(request,env);
+  if(url.pathname==='/api/build3/truth-smoke'&&request.method==='POST')return build3TruthSmokeApi(request,env);
   if(url.pathname==='/api/build3/recommendation-intraday-source'&&request.method==='POST')return build3RecommendationIntradaySourceApi(request,env);
   if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
   if(url.pathname==='/api/build3/learning-lab'&&request.method==='POST')return build3LearningLabApi(request,env);
