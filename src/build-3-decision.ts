@@ -37,6 +37,10 @@ export type Build3ExecutionSnapshot={
   target1:number|null;
   target2:number|null;
   time_exit:string|null;
+  efficacy_target:number|null;
+  efficacy_target_label:'T1'|null;
+  entry_activation_rule:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE'|null;
+  lifecycle_end:string|null;
   exact_contract_verified:boolean;
   reason:string|null;
 };
@@ -92,6 +96,7 @@ function emptyExecution(reason:string):Build3ExecutionSnapshot{
   return {
     applicable:false,availability:'NOT_AVAILABLE',action:'NONE',instrument_expression:null,
     entry_low:null,entry_high:null,stop:null,target1:null,target2:null,time_exit:null,
+    efficacy_target:null,efficacy_target_label:null,entry_activation_rule:null,lifecycle_end:null,
     exact_contract_verified:false,reason,
   };
 }
@@ -126,6 +131,9 @@ function niftyExecutionSnapshot(
   return {
     applicable:true,availability,action,instrument_expression:instrument,
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
+    efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
+    entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
+    lifecycle_end:timeExit,
     exact_contract_verified:availability==='COMPLETE'&&!!instrument,
     reason:availability==='COMPLETE'?null:'EXACT_ISSUED_EXECUTION_PACKET_NOT_BOUND',
   };
@@ -149,6 +157,9 @@ function stockExecutionSnapshot(
   return {
     applicable:true,availability,action,instrument_expression:instrument,
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
+    efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
+    entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
+    lifecycle_end:timeExit,
     exact_contract_verified:availability==='COMPLETE'&&['EQUITY','EQUITY_EXIT'].includes(String(instrument??'').toUpperCase()),
     reason:availability==='COMPLETE'?null:'ISSUED_EXECUTION_LEVELS_INCOMPLETE',
   };
