@@ -2,6 +2,7 @@ import { evaluateMaturedBuild3Outcomes, type Build3OutcomeEvaluatorEnv } from '.
 import { readBuild3TruthMetrics } from './build-3-truth-metrics';
 import { evaluateMaturedBuild3Recommendations } from './build-3-recommendation-efficacy';
 import { dispatchDueBuild3RecommendationIntradayTruth } from './build-3-recommendation-intraday-dispatch';
+import { recoverDispatchedBuild3TruthHandoffs } from './build-3-truth-handoff';
 import { evaluateMaturedBuild3NoTrades } from './build-3-no-trade-efficacy';
 import type { EngineDispatchEnv } from './engine-dispatch';
 
@@ -15,6 +16,7 @@ export async function runBuild3TruthScheduledTick(
   const now=scheduledTime instanceof Date?scheduledTime:new Date(scheduledTime);
   if(Number.isNaN(now.getTime()))throw new Error('BUILD3_TRUTH_SCHEDULED_TIME_INVALID');
   const results=await evaluateMaturedBuild3Outcomes(env,{now,limit:100});
+  const intradayHandoffResults=await recoverDispatchedBuild3TruthHandoffs(env,{limit:100});
   const intradayDispatchResults=await dispatchDueBuild3RecommendationIntradayTruth(env,{now,limit:100});
   const recommendationResults=await evaluateMaturedBuild3Recommendations(env.DATABASE_URL,{now,limit:100});
   const noTradeResults=await evaluateMaturedBuild3NoTrades(env.DATABASE_URL,{now,limit:100});
@@ -30,6 +32,8 @@ export async function runBuild3TruthScheduledTick(
     evaluated:results.length,
     counts,
     results,
+    intraday_truth_recovered:intradayHandoffResults.filter(row=>row.status==='RECOVERED').length,
+    intraday_handoff_results:intradayHandoffResults,
     intraday_truth_dispatched:intradayDispatchResults.length,
     intraday_dispatch_results:intradayDispatchResults,
     recommendation_evaluated:recommendationResults.length,
