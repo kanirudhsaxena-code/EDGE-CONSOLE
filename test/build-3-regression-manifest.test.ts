@@ -3,11 +3,12 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const read=(name:string)=>readFileSync(new URL('../test/'+name,import.meta.url),'utf8');
+const readSrc=(name:string)=>readFileSync(new URL('../src/'+name,import.meta.url),'utf8');
 
 test('Build 3 regression suite retains the efficacy boundary matrix',()=>{
   const zone=read('build-3-efficacy-contract.test.ts');
-  assert.match(zone,/5%|5\.00|5pct|5PCT/i);
-  assert.match(zone,/3%|3pct|3PCT/i);
+  assert.match(zone,/BUILD3_ZONE_PRIMARY_TOLERANCE_PCT,5/);
+  assert.match(zone,/challenger_deviation_hit/);
   assert.match(zone,/GREEN/);
   assert.match(zone,/AMBER/);
   assert.match(zone,/RED/);
@@ -15,12 +16,15 @@ test('Build 3 regression suite retains the efficacy boundary matrix',()=>{
 });
 
 test('Build 3 regression suite retains recommendation dual-hit semantics',()=>{
-  const rec=read('build-3-recommendation-efficacy.test.ts')+read('build-3-recommendation-observation.test.ts');
+  const contract=readSrc('build-3-efficacy-contract.ts');
+  const rec=read('build-3-recommendation-efficacy.test.ts')+read('build-3-recommendation-observation.test.ts')+read('build-3-efficacy-contract.test.ts');
   for(const label of ['TARGET_ONLY','SL_ONLY','DUAL_TOUCH','TIMEOUT_NO_TARGET','UNTRIGGERED']){
-    assert.match(rec,new RegExp(label));
+    assert.match(contract,new RegExp(label));
   }
   assert.match(rec,/ONE_MINUTE/);
   assert.match(rec,/ENTRY_MINUTE_TARGET_SL_SEQUENCE_AMBIGUOUS/);
+  assert.match(rec,/conservative_hit_rate_pct/);
+  assert.match(rec,/liberal_hit_rate_pct/);
 });
 
 test('Build 3 regression suite retains NO TRADE and learning-governance coverage',()=>{
