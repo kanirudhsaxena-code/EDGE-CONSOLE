@@ -39,6 +39,6 @@
     "FIVEDR_CALLBACK_URL": "https://edge-console.k-anirudhsaxena.workers.dev",
     "BUILD3_TRUTH_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
     "BUILD3_TRUTH_WORKFLOW": "build3-recommendation-intraday-truth.yml",
-    "BUILD3_TRUTH_REF": "build-3.0-accuracy-loop-20261006"
+    "BUILD3_TRUTH_REF": "main"
   }
 }
