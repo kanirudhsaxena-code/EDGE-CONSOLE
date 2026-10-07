@@ -53,7 +53,14 @@ function stockWhyCards(report){
   if(!rows.length)return'<div class="why-card"><strong>Evidence detail unavailable</strong><p>No component drill-down was published for this run.</p></div>';
   return rows.map(row=>{
     const legacy=row.narrative_source==='LEGACY_SCORE_RECONSTRUCTION';
-    return '<div class="why-card stock-why-card"><div class="stock-factor-head"><strong>'+esc(human(row.component))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(scoreText(row.score_or_level))+' · '+esc(row.score_or_level)+'</span></div><p>'+esc(row.interpretation||row.key_outcome||'No interpretation published.')+'</p><div class="stock-factor-foot"><span class="evidence-chip '+(String(row.verification_status)==='VERIFIED'?'verified':'limited')+'">'+esc(human(row.verification_status||'NOT VERIFIED'))+'</span>'+(legacy?'<small>Legacy narrative reconstructed from immutable score; original prose was not persisted.</small>':'')+'</div></div>'
+    const verification=String(row.verification_status||'NOT_VERIFIED').toUpperCase();
+    const eligibility=String(row.score_eligibility||'EXCLUDED').toUpperCase();
+    const verificationClass=verification==='VERIFIED'?'verified':'limited';
+    const eligibilityText=eligibility==='INCLUDED'?'Included in score':'Excluded from score';
+    const exclusion=eligibility==='EXCLUDED'
+      ?'<small><b>Score exclusion:</b> '+esc(row.score_exclusion_reason||'This factor was not eligible for frozen scoring in this run.')+'</small>'
+      :'';
+    return '<div class="why-card stock-why-card"><div class="stock-factor-head"><strong>'+esc(human(row.component))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(scoreText(row.score_or_level))+' · '+esc(row.score_or_level)+'</span></div><p>'+esc(row.interpretation||row.key_outcome||'No interpretation published.')+'</p><div class="stock-factor-foot"><span class="evidence-chip '+verificationClass+'">Evidence: '+esc(human(verification))+'</span><span class="evidence-chip '+(eligibility==='INCLUDED'?'verified':'limited')+'">Score: '+esc(eligibilityText)+'</span>'+exclusion+(legacy?'<small>Legacy narrative reconstructed from immutable score; original prose was not persisted.</small>':'')+'</div></div>'
   }).join('')
 }
 function stockChangeItems(report){
@@ -74,14 +81,45 @@ function activeCallCards(calls,currentTicker){
 }
 function executionCard(d){
   const e=d.execution||{},none=String(e.instrument||'NONE')==='NONE';
-  const quality=num(e.execution_quality_score,1)+'/100';
+  const notExecutable=String(e.execution_quality_level||'').toUpperCase()==='NOT_EXECUTABLE';
+  const quality=notExecutable?'Not executable':num(e.execution_quality_score,1)+'/100';
   const optionFit=human(e.option_suitability_status||'NO OPTION TRADE');
   const key='<div class="execution-key-grid">'+
-    '<div class="execution-metric"><span>Trade setup quality</span><strong>'+quality+'</strong><small>Measures how complete and usable the governed entry, stop, target and risk structure is.</small></div>'+
+    '<div class="execution-metric"><span>Trade setup quality</span><strong>'+esc(quality)+'</strong><small>Measures how complete and usable the governed entry, stop, target and risk structure is.</small></div>'+
     '<div class="execution-metric"><span>Options fit</span><strong>'+esc(optionFit)+'</strong><small>Shows whether an options trade is suitable for this stock view and current evidence.</small></div>'+
   '</div>';
-  if(none)return '<section class="stock-section execution-section"><div class="stock-section-title"><div><span>Execution</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div><p class="stock-section-copy">EDGE has a stock view, but no governed entry/stop/target structure currently passes the execution gate. A forecast is not automatically a trade.</p>'+key+
-    '<div class="execution-support-grid"><div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong><small>The forecast remains valid only for its governed time window unless invalidated earlier.</small></div></div></section>';
+  if(none){
+    const gates=Array.isArray(e.gate_results)?e.gate_results:[];
+    const failed=gates.filter(g=>String(g?.status||'').toUpperCase()==='FAIL');
+    const structureGate=gates.find(g=>String(g?.gate||'').toUpperCase()==='STRUCTURE');
+    const unavailableReason=structureGate?.reason||e.invalidation||e.dominant_rejection_reason||'No complete governed candidate level is available.';
+    const candidate=human(e.candidate_instrument||'NONE');
+    const valueOrReason=(value,formatter=money)=>value==null
+      ?'<strong>Not available</strong><small>'+esc(unavailableReason)+'</small>'
+      :'<strong>'+formatter(value)+'</strong><small>Candidate level retained for diagnostic use only; this is not a live trade instruction.</small>';
+    const entry=(e.entry_low==null&&e.entry_high==null)
+      ?'<strong>Not available</strong><small>'+esc(unavailableReason)+'</small>'
+      :'<strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong><small>Candidate entry retained for diagnosis only; final action remains NO TRADE.</small>';
+    const gateHtml=failed.length
+      ?'<div class="stock-detail-grid execution-detail-grid">'+failed.map(g=>
+        '<div><span>'+esc(human(g.gate||'Gate'))+'</span><strong>FAIL</strong><small>Observed: '+esc(g.observed??'N/A')+' · Required: '+esc(g.threshold||'governed threshold')+(g.reason?' · '+esc(g.reason):'')+'</small></div>'
+      ).join('')+'</div>'
+      :'<div class="execution-support-grid"><div><span>Failed gates</span><strong>Not published</strong><small>The run is incomplete for Build 2.5 acceptance because exact rejection gates are required.</small></div></div>';
+    return '<section class="stock-section execution-section"><div class="stock-section-title"><div><span>Execution</span><h3>No executable trade</h3></div><span class="status-chip neutral">NO TRADE</span></div>'+
+      '<p class="stock-section-copy"><b>Dominant rejection reason:</b> '+esc(e.dominant_rejection_reason||'Not published')+'</p>'+key+
+      '<div class="stock-detail-grid execution-detail-grid">'+
+        '<div><span>Candidate setup</span><strong>'+esc(candidate)+'</strong><small>The pre-rejection setup, if one existed.</small></div>'+
+        '<div><span>Entry</span>'+entry+'</div>'+
+        '<div><span>Stop</span>'+valueOrReason(e.stop_price)+'</div>'+
+        '<div><span>Target 1</span>'+valueOrReason(e.target1)+'</div>'+
+        '<div><span>Target 2</span>'+valueOrReason(e.target2)+'</div>'+
+        '<div><span>R:R T1</span>'+valueOrReason(e.rr_t1,v=>num(v,2)+'R')+'</div>'+
+        '<div><span>Invalidation</span><strong>'+esc(e.invalidation||'Not available')+'</strong><small>'+esc(e.invalidation?'Candidate thesis invalidation retained.':unavailableReason)+'</small></div>'+
+        '<div><span>Time exit</span><strong>'+esc(e.time_exit||'Frozen forecast horizon')+'</strong><small>The forecast remains valid only for its governed time window unless invalidated earlier.</small></div>'+
+      '</div>'+
+      '<div class="stock-section-title"><div><span>Rejection gates</span><h3>Why the setup did not become a trade</h3></div></div>'+gateHtml+
+      '</section>';
+  }
   return '<section class="stock-section execution-section"><div class="stock-section-title"><div><span>Execution</span><h3>Trade plan</h3></div><span class="status-chip positive">'+esc(human(e.instrument))+'</span></div><p class="stock-section-copy">This setup has passed the governed execution checks. Entry, stop, targets and time exit define the trade—not the directional forecast alone.</p>'+key+
     '<div class="stock-detail-grid execution-detail-grid">'+
       '<div><span>Entry</span><strong>'+money(e.entry_low)+' – '+money(e.entry_high)+'</strong><small>Preferred price area for initiating the governed setup.</small></div>'+
