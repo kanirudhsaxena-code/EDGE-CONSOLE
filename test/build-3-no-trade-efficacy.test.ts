@@ -155,4 +155,7 @@ test('NO TRADE summary reconciles forensic and quality-hint populations',()=>{
   assert.equal(s.protected_hint,1);
   assert.equal(s.missed_hint,1);
   assert.equal(s.inconclusive_hint,1);
+  assert.equal(s.rejecting_gate_breakdown.MARKET_TRUST.observations,3);
+  assert.equal(s.rejecting_gate_breakdown.MARKET_TRUST.good_avoid,1);
+  assert.equal(s.rejecting_gate_breakdown.MARKET_TRUST.missed_opportunity,1);
 });
