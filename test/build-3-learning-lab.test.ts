@@ -85,10 +85,13 @@ test('Learning Lab output keeps production mutation disabled and states next evi
 });
 
 test('same-population 3% zone comparison can create a challenger only with sufficient sample',async()=>{
-  const cohort=Array.from({length:30},(_,i)=>truthRow({
-    source_id:'t'+i,target_session:'2026-10-'+String((i%20)+1).padStart(2,'0'),
-    issued_at:new Date(Date.UTC(2026,9,1+i,3)).toISOString(),
-  }));
+  const cohort=Array.from({length:30},(_,i)=>{
+    const date=new Date(Date.UTC(2026,9,1+i));
+    return truthRow({
+      source_id:'t'+i,target_session:date.toISOString().slice(0,10),
+      issued_at:new Date(date.getTime()-24*60*60*1000+3*60*60*1000).toISOString(),
+    });
+  });
   const truth=cohort.map(({regime:_r,evidence_quality:_e,event_state:_s,...row})=>row as Build3TruthMetricRow);
   const cohorts=summarizeBuild3Cohorts(cohort);
   const noTrade=summarizeBuild3NoTradeOutcomes([]);
