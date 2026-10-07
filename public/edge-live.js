@@ -362,18 +362,22 @@ export function renderEdgeV13(report){
   '</section>';
 
   const drillCards=drill.length?drill.map(row=>{
-    const verified=String(row.verification_status||'NOT_VERIFIED')==='VERIFIED';
+    const verification=String(row.verification_status||'NOT_VERIFIED').toUpperCase();
+    const verified=verification==='VERIFIED';
+    const eligibility=String(row.score_eligibility||'EXCLUDED').toUpperCase();
+    const included=eligibility==='INCLUDED';
     const outcome=scoreText(row.score_or_level);
     const finding=drillFinding(row);
     const meaning=componentMeaning(row.component);
     const weight=row.normalized_weight??row.original_weight;
     const contribution=row.weighted_contribution;
+    const exclusion=included?'':'<div class="edge-explanation-block"><span>SCORE ELIGIBILITY</span><p>Excluded from score — '+esc(row.score_exclusion_reason||'This factor is not eligible for frozen scoring in this run.')+'</p></div>';
     return '<div class="edge-drill-card"><div class="edge-drill-head"><strong>'+esc(componentDisplayName(row.component||'—'))+'</strong><span class="score-pill '+scoreTone(row.score_or_level)+'">'+esc(outcome)+'</span></div>'+
       '<div class="edge-drill-metrics"><span>Raw score <b>'+esc(row.score_or_level??'N/A')+'</b></span><span>Original weight <b>'+esc(row.original_weight==null?'—':num(row.original_weight,1)+'%')+'</b></span><span>Used weight <b>'+esc(weight==null?'—':num(weight,1)+'%')+'</b></span><span>Contribution <b>'+esc(contribution==null?'—':num(contribution,2))+'</b></span></div>'+
       '<div class="edge-explanation-block"><span>WHAT WE SAW</span><p>'+esc(finding)+'</p></div>'+
       '<div class="edge-explanation-block"><span>WHAT IT MEANS</span><p>'+esc(drillInterpretation(row))+'</p></div>'+
-      '<div class="edge-explanation-block"><span>WHY IT MATTERS NOW</span><p>'+esc(meaning)+'</p></div>'+
-      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">'+esc(verified?'Verified · '+human(row.evidence_quality||'—'):'Evidence limited')+'</span>'+(row.conflict_flag?'<span class="evidence-chip limited">Material conflict</span>':'')+'</div></div>';
+      '<div class="edge-explanation-block"><span>WHY IT MATTERS NOW</span><p>'+esc(meaning)+'</p></div>'+exclusion+
+      '<div class="edge-drill-foot"><span class="evidence-chip '+(verified?'verified':'limited')+'">Evidence: '+esc(human(verification))+(verified?' · '+esc(human(row.evidence_quality||'—')):'')+'</span><span class="evidence-chip '+(included?'verified':'limited')+'">Score: '+esc(included?'Included':'Excluded from score')+'</span>'+(row.conflict_flag?'<span class="evidence-chip limited">Material conflict</span>':'')+'</div></div>';
   }).join(''):'<div class="generic-empty">No drill-down evidence was published for this run.</div>';
   const section3='<section class="edge-user-section" data-edge-section="drilldown"><div class="edge-user-head"><div><span>4 — DRILL-DOWN</span><h3>Why EDGE reached this view</h3></div><p>Each card shows whether a factor is helping, hurting or not materially affecting the five-day view.</p></div><div class="edge-drill-grid">'+drillCards+'</div></section>';
 
