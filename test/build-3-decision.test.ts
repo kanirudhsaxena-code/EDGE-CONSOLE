@@ -129,3 +129,21 @@ test('stock actionable execution levels are frozen as a complete decision snapsh
   assert.equal(decision.execution_snapshot.entry_activation_rule,'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE');
   assert.equal(decision.execution_snapshot.lifecycle_end_at,'2026-10-12T10:00:00.000Z');
 });
+
+
+test('NIFTY execution snapshot freezes provider instrument identity when supplied',()=>{
+  const decision=buildNiftyBuild3Decision(forecast('5DR'),{
+    definitive_forecast:'BULLISH',recommendation:'BUY_CE',tradeable:true,
+    market_trust:75,des5:55,execution_edge:80,expected_rr:2.4,
+    tradeability_blockers:[],event_shock:{kill_switch:false},
+    engine_diagnostics:{data_adequate:true},
+    execution_snapshot:{
+      contract_symbol:'NIFTY 08 OCT 25000 CE',
+      instrument_key:'NSE_FO|123456',
+      entry:100,stop:80,target1:140,target2:180,expiry:'2026-10-08'
+    }
+  });
+  assert.equal(decision.execution_snapshot.provider_instrument_key,'NSE_FO|123456');
+  assert.equal(decision.execution_snapshot.instrument_expression,'NIFTY 08 OCT 25000 CE');
+  assert.equal(decision.execution_snapshot.exact_contract_verified,true);
+});
