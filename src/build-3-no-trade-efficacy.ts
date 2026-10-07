@@ -4,6 +4,7 @@ import { build3MaturedThroughDate } from './build-3-outcome-evaluator';
 import type { Build3DecisionRecord } from './build-3-decision';
 
 export const BUILD3_NO_TRADE_OUTCOME_VERSION='MDOS_BUILD_3_NO_TRADE_OUTCOME_V1' as const;
+export const BUILD3_NO_TRADE_OBSERVATION_ATTEMPT_VERSION='MDOS_BUILD_3_NO_TRADE_OBSERVATION_ATTEMPT_V1' as const;
 
 export type Build3NoTradeClassification=
   |'GOOD_AVOID'
@@ -243,10 +244,31 @@ export type Build3NoTradeEvaluationResult={
   engine:'5DR'|'EDGE_STOCKS';
   instrument:string;
   source_id:string;
-  status:'SCORED'|'PENDING_SOURCE'|'NOT_SCORABLE';
+  status:'SCORED'|'PENDING_SOURCE'|'NOT_SCORABLE'|'RETRYABLE_ERROR';
   classification?:Build3NoTradeClassification;
   reason:string|null;
 };
+
+async function recordBuild3NoTradeObservationAttempt(
+  databaseUrl:string,
+  row:Build3NoTradeEvaluationResult,
+  evidence:Record<string,unknown>,
+):Promise<void>{
+  const sql=neon(databaseUrl);
+  const attemptedAt=new Date().toISOString();
+  const payload={
+    attempt_version:BUILD3_NO_TRADE_OBSERVATION_ATTEMPT_VERSION,
+    ...row,attempted_at:attemptedAt,evidence,
+  };
+  await sql`
+    insert into build3_no_trade_observation_attempts(
+      attempt_version,engine,instrument,source_id,attempted_at,attempt_state,reason,evidence,payload
+    ) values(
+      ${BUILD3_NO_TRADE_OBSERVATION_ATTEMPT_VERSION},${row.engine},${row.instrument},${row.source_id},
+      ${attemptedAt},${row.status},${row.reason},${JSON.stringify(evidence)}::jsonb,${JSON.stringify(payload)}::jsonb
+    )
+  `;
+}
 
 export async function evaluateMaturedBuild3NoTrades(
   databaseUrl:string|undefined,
@@ -271,6 +293,7 @@ export async function evaluateMaturedBuild3NoTrades(
   const results:Build3NoTradeEvaluationResult[]=[];
   for(const raw of candidates){
     const decision=raw.payload as Build3DecisionRecord;
+    try{
     const rows=await sql`
       select f.horizon,f.horizon_index,f.target_session,
              o.direction_result,o.scorability_state,o.scorability_reason
@@ -286,19 +309,23 @@ export async function evaluateMaturedBuild3NoTrades(
         decision,truth:[],evaluated_at:now.toISOString(),
       });
       const persisted=await persistBuild3NoTradeOutcome(databaseUrl,scored);
-      results.push({
+      const result:Build3NoTradeEvaluationResult={
         engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
         status:'NOT_SCORABLE',classification:persisted.outcome_classification,reason:persisted.reason,
-      });
+      };
+      await recordBuild3NoTradeObservationAttempt(databaseUrl,result,{outcome:persisted});
+      results.push(result);
       continue;
     }
     const lastTarget=new Date(String(rows[rows.length-1].target_session)).toISOString().slice(0,10);
     if(lastTarget>maturedThrough)continue;
     if(rows.some(row=>row.direction_result===null||row.scorability_state===null)){
-      results.push({
+      const result:Build3NoTradeEvaluationResult={
         engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
         status:'PENDING_SOURCE',reason:'MATURED_HORIZON_TRUTH_NOT_YET_PERSISTED',
-      });
+      };
+      await recordBuild3NoTradeObservationAttempt(databaseUrl,result,{truth_rows:rows.length});
+      results.push(result);
       continue;
     }
     const truth=rows.map(row=>({
@@ -312,11 +339,23 @@ export async function evaluateMaturedBuild3NoTrades(
       decision,truth,evaluated_at:now.toISOString(),
     });
     const persisted=await persistBuild3NoTradeOutcome(databaseUrl,scored);
-    results.push({
+    const result:Build3NoTradeEvaluationResult={
       engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
       status:persisted.scorability_state==='SCORABLE'?'SCORED':'NOT_SCORABLE',
       classification:persisted.outcome_classification,reason:persisted.reason,
-    });
+    };
+    await recordBuild3NoTradeObservationAttempt(databaseUrl,result,{outcome:persisted});
+    results.push(result);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      const result:Build3NoTradeEvaluationResult={
+        engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+        status:'RETRYABLE_ERROR',reason:detail,
+      };
+      await recordBuild3NoTradeObservationAttempt(databaseUrl,result,{error:detail});
+      results.push(result);
+      continue;
+    }
   }
   return results;
 }
