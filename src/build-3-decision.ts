@@ -41,6 +41,7 @@ export type Build3ExecutionSnapshot={
   efficacy_target_label:'T1'|null;
   entry_activation_rule:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE'|null;
   lifecycle_end:string|null;
+  lifecycle_end_at:string|null;
   exact_contract_verified:boolean;
   reason:string|null;
 };
@@ -96,7 +97,7 @@ function emptyExecution(reason:string):Build3ExecutionSnapshot{
   return {
     applicable:false,availability:'NOT_AVAILABLE',action:'NONE',instrument_expression:null,
     entry_low:null,entry_high:null,stop:null,target1:null,target2:null,time_exit:null,
-    efficacy_target:null,efficacy_target_label:null,entry_activation_rule:null,lifecycle_end:null,
+    efficacy_target:null,efficacy_target_label:null,entry_activation_rule:null,lifecycle_end:null,lifecycle_end_at:null,
     exact_contract_verified:false,reason,
   };
 }
@@ -133,7 +134,7 @@ function niftyExecutionSnapshot(
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
     efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
     entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
-    lifecycle_end:timeExit,
+    lifecycle_end:timeExit,lifecycle_end_at:null,
     exact_contract_verified:availability==='COMPLETE'&&!!instrument,
     reason:availability==='COMPLETE'?null:'EXACT_ISSUED_EXECUTION_PACKET_NOT_BOUND',
   };
@@ -159,10 +160,30 @@ function stockExecutionSnapshot(
     entry_low:entryLow,entry_high:entryHigh,stop,target1,target2,time_exit:timeExit,
     efficacy_target:target1,efficacy_target_label:target1===null?null:'T1',
     entry_activation_rule:availability==='NOT_AVAILABLE'?null:'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE',
-    lifecycle_end:timeExit,
+    lifecycle_end:timeExit,lifecycle_end_at:null,
     exact_contract_verified:availability==='COMPLETE'&&['EQUITY','EQUITY_EXIT'].includes(String(instrument??'').toUpperCase()),
     reason:availability==='COMPLETE'?null:'ISSUED_EXECUTION_LEVELS_INCOMPLETE',
   };
+}
+
+
+function forecastLifecycleEndAt(forecast:Build3Forecast):string{
+  const last=forecast.horizons[forecast.horizons.length-1];
+  if(!last||!/^\d{4}-\d{2}-\d{2}$/.test(last.target_session))throw new Error('BUILD3_DECISION_LIFECYCLE_END_INVALID');
+  return last.target_session+'T10:00:00.000Z';
+}
+
+function explicitLifecycleEndAt(value:string|null):string|null{
+  if(!value)return null;
+  const dateOnly=value.match(/^(\d{4}-\d{2}-\d{2})$/);
+  if(dateOnly)return dateOnly[1]+'T10:00:00.000Z';
+  const parsed=Date.parse(value);
+  return Number.isNaN(parsed)?null:new Date(parsed).toISOString();
+}
+
+function bindLifecycleEnd(snapshot:Build3ExecutionSnapshot,forecast:Build3Forecast):Build3ExecutionSnapshot{
+  if(!snapshot.applicable)return snapshot;
+  return {...snapshot,lifecycle_end_at:explicitLifecycleEndAt(snapshot.lifecycle_end)??forecastLifecycleEndAt(forecast)};
 }
 
 export function buildNiftyBuild3Decision(
@@ -239,7 +260,7 @@ export function buildNiftyBuild3Decision(
     gate_results:gates,
     rejecting_gates:rejecting,
     counterfactual,
-    execution_snapshot:niftyExecutionSnapshot(recommendation,result),
+    execution_snapshot:bindLifecycleEnd(niftyExecutionSnapshot(recommendation,result),forecast),
   };
 }
 
@@ -330,7 +351,7 @@ export function buildStockBuild3Decision(
     gate_results:gates,
     rejecting_gates:rejecting,
     counterfactual,
-    execution_snapshot:stockExecutionSnapshot(recommendation,execution),
+    execution_snapshot:bindLifecycleEnd(stockExecutionSnapshot(recommendation,execution),forecast),
   };
 }
 
