@@ -21,7 +21,8 @@ test('Build 3.0 schema status covers every governed persistence surface through 
     'build3_forecast_horizons','build3_precision_issuance','build3_precision_outcomes',
     'build3_decisions','build3_session_ohlc_sources','build3_outcome_attempts','build3_decision_outcomes',
     'build3_recommendation_efficacy','build3_recommendation_observation_attempts','build3_recommendation_intraday_sources','build3_recommendation_intraday_dispatch_attempts',
-    'build3_learning_lab_snapshots','build3_challengers','build3_challenger_events'
+    'build3_learning_lab_snapshots','build3_challengers','build3_challenger_events',
+    'build3_no_trade_observation_attempts'
   ]);
   assert.ok(BUILD3_SCHEMA_REQUIRED_COLUMNS.some(([table,column])=>table==='build3_decisions'&&column==='execution_snapshot'));
   assert.ok(BUILD3_SCHEMA_REQUIRED_COLUMNS.some(([table,column])=>table==='build3_precision_outcomes'&&column==='brier_score'));
