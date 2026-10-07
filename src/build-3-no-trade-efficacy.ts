@@ -45,6 +45,15 @@ export type Build3NoTradeOutcomeRecord={
   truth:Build3NoTradeTruthRow[];
 };
 
+export type Build3NoTradeGateBreakdown={
+  observations:number;
+  good_avoid:number;
+  missed_opportunity:number;
+  ambiguous:number;
+  evidence_conflict:number;
+  execution_rejection:number;
+};
+
 export type Build3NoTradeOutcomeSummary={
   total:number;
   scorable:number;
@@ -58,6 +67,7 @@ export type Build3NoTradeOutcomeSummary={
   protected_hint:number;
   missed_hint:number;
   inconclusive_hint:number;
+  rejecting_gate_breakdown:Record<string,Build3NoTradeGateBreakdown>;
 };
 
 const EXPECTED_HORIZONS=['D','D+1','D+2','D+3','D+4'] as const;
@@ -315,6 +325,23 @@ export function summarizeBuild3NoTradeOutcomes(
   rows:Build3NoTradeOutcomeRecord[],
 ):Build3NoTradeOutcomeSummary{
   const count=(c:Build3NoTradeClassification)=>rows.filter(row=>row.outcome_classification===c).length;
+  const gateMap=new Map<string,Build3NoTradeGateBreakdown>();
+  for(const row of rows){
+    for(const rawGate of row.failed_gate_names){
+      const gate=rawGate.trim().toUpperCase();
+      if(!gate)continue;
+      const current=gateMap.get(gate)??{
+        observations:0,good_avoid:0,missed_opportunity:0,ambiguous:0,evidence_conflict:0,execution_rejection:0,
+      };
+      current.observations++;
+      if(row.outcome_classification==='GOOD_AVOID')current.good_avoid++;
+      if(row.outcome_classification==='MISSED_OPPORTUNITY')current.missed_opportunity++;
+      if(row.outcome_classification==='AMBIGUOUS')current.ambiguous++;
+      if(row.outcome_classification==='EVIDENCE_CONFLICT')current.evidence_conflict++;
+      if(row.outcome_classification==='EXECUTION_REJECTION')current.execution_rejection++;
+      gateMap.set(gate,current);
+    }
+  }
   return {
     total:rows.length,
     scorable:rows.filter(row=>row.scorability_state==='SCORABLE').length,
@@ -328,6 +355,9 @@ export function summarizeBuild3NoTradeOutcomes(
     protected_hint:rows.filter(row=>row.quality_hint==='PROTECTED').length,
     missed_hint:rows.filter(row=>row.quality_hint==='MISSED').length,
     inconclusive_hint:rows.filter(row=>row.quality_hint==='INCONCLUSIVE').length,
+    rejecting_gate_breakdown:Object.fromEntries(
+      [...gateMap.entries()].sort((a,b)=>b[1].observations-a[1].observations||a[0].localeCompare(b[0]))
+    ),
   };
 }
 
