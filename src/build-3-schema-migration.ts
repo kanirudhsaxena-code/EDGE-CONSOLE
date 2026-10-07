@@ -112,23 +112,9 @@ export function splitBuild3MigrationStatements(source:string):string[]{
 export async function readBuild3SchemaStatus(databaseUrl:string|undefined):Promise<Build3SchemaStatus>{
   if(!databaseUrl?.trim())throw new Error('BUILD3_SCHEMA_DATABASE_NOT_CONFIGURED');
   const sql=neon(databaseUrl);
-  const tablePlaceholders=BUILD3_SCHEMA_TABLES.map((_,index)=>'
-
-export async function applyBuild3Schema(databaseUrl:string|undefined){
-  const before=await readBuild3SchemaStatus(databaseUrl);
-  if(before.ready)return {status:'ALREADY_READY' as const,before,after:before,statements_executed:0};
-  if(!databaseUrl?.trim())throw new Error('BUILD3_SCHEMA_DATABASE_NOT_CONFIGURED');
-  const sql=neon(databaseUrl);
-  const statements=BUILD3_SCHEMA_MIGRATIONS.flatMap(migration=>splitBuild3MigrationStatements(migration.sql));
-  const queries=statements.map(statement=>sql`${sql.unsafe(statement)}`);
-  await sql.transaction(queries);
-  const after=await readBuild3SchemaStatus(databaseUrl);
-  if(!after.ready)throw new Error('BUILD3_SCHEMA_APPLY_INCOMPLETE:'+JSON.stringify(after));
-  return {status:'APPLIED' as const,before,after,statements_executed:statements.length};
-}
-+(index+1)).join(',');
+  const tablePlaceholders=BUILD3_SCHEMA_TABLES.map((_,index)=>'$'+(index+1)).join(',');
   const tableRows=await sql.query(
-    `select name,to_regclass('public.'||name) as relation from unnest(array[${tablePlaceholders}]::text[]) as name`,
+    "select name,to_regclass('public.'||name) as relation from unnest(array["+tablePlaceholders+"]::text[]) as name",
     [...BUILD3_SCHEMA_TABLES],
   );
   const presentTables=new Set(tableRows.filter((row:any)=>row.relation!==null).map((row:any)=>String(row.name)));
@@ -156,14 +142,10 @@ export async function applyBuild3Schema(databaseUrl:string|undefined){
   if(before.ready)return {status:'ALREADY_READY' as const,before,after:before,statements_executed:0};
   if(!databaseUrl?.trim())throw new Error('BUILD3_SCHEMA_DATABASE_NOT_CONFIGURED');
   const sql=neon(databaseUrl);
-  let statements=0;
-  for(const migration of BUILD3_SCHEMA_MIGRATIONS){
-    for(const statement of splitBuild3MigrationStatements(migration.sql)){
-      await sql.query(statement,[]);
-      statements++;
-    }
-  }
+  const statements=BUILD3_SCHEMA_MIGRATIONS.flatMap(migration=>splitBuild3MigrationStatements(migration.sql));
+  const queries=statements.map(statement=>sql`${sql.unsafe(statement)}`);
+  await sql.transaction(queries);
   const after=await readBuild3SchemaStatus(databaseUrl);
   if(!after.ready)throw new Error('BUILD3_SCHEMA_APPLY_INCOMPLETE:'+JSON.stringify(after));
-  return {status:'APPLIED' as const,before,after,statements_executed:statements};
+  return {status:'APPLIED' as const,before,after,statements_executed:statements.length};
 }
