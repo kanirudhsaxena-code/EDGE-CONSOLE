@@ -112,26 +112,42 @@ export function splitBuild3MigrationStatements(source:string):string[]{
 export async function readBuild3SchemaStatus(databaseUrl:string|undefined):Promise<Build3SchemaStatus>{
   if(!databaseUrl?.trim())throw new Error('BUILD3_SCHEMA_DATABASE_NOT_CONFIGURED');
   const sql=neon(databaseUrl);
-  const missingTables:string[]=[];
-  for(const table of BUILD3_SCHEMA_TABLES){
-    const rows=await sql`select to_regclass(${'public.'+table}) as relation`;
-    if(!rows.length||rows[0].relation===null)missingTables.push(table);
-  }
-  const missingColumns:string[]=[];
-  for(const [table,column] of BUILD3_SCHEMA_REQUIRED_COLUMNS){
-    const rows=await sql`
-      select 1
-        from information_schema.columns
-       where table_schema='public' and table_name=${table} and column_name=${column}
-       limit 1
-    `;
-    if(!rows.length)missingColumns.push(table+'.'+column);
-  }
+  const tablePlaceholders=BUILD3_SCHEMA_TABLES.map((_,index)=>'
+
+export async function applyBuild3Schema(databaseUrl:string|undefined){
+  const before=await readBuild3SchemaStatus(databaseUrl);
+  if(before.ready)return {status:'ALREADY_READY' as const,before,after:before,statements_executed:0};
+  if(!databaseUrl?.trim())throw new Error('BUILD3_SCHEMA_DATABASE_NOT_CONFIGURED');
+  const sql=neon(databaseUrl);
+  const statements=BUILD3_SCHEMA_MIGRATIONS.flatMap(migration=>splitBuild3MigrationStatements(migration.sql));
+  const queries=statements.map(statement=>sql`${sql.unsafe(statement)}`);
+  await sql.transaction(queries);
+  const after=await readBuild3SchemaStatus(databaseUrl);
+  if(!after.ready)throw new Error('BUILD3_SCHEMA_APPLY_INCOMPLETE:'+JSON.stringify(after));
+  return {status:'APPLIED' as const,before,after,statements_executed:statements.length};
+}
++(index+1)).join(',');
+  const tableRows=await sql.query(
+    `select name,to_regclass('public.'||name) as relation from unnest(array[${tablePlaceholders}]::text[]) as name`,
+    [...BUILD3_SCHEMA_TABLES],
+  );
+  const presentTables=new Set(tableRows.filter((row:any)=>row.relation!==null).map((row:any)=>String(row.name)));
+  const missingTables=BUILD3_SCHEMA_TABLES.filter(table=>!presentTables.has(table));
+
+  const requiredPairs=BUILD3_SCHEMA_REQUIRED_COLUMNS.map(([table,column])=>table+'.'+column);
+  const columnRows=await sql`
+    select table_name,column_name
+      from information_schema.columns
+     where table_schema='public'
+       and table_name in ('build3_decisions','build3_precision_outcomes')
+  `;
+  const presentColumns=new Set(columnRows.map((row:any)=>String(row.table_name)+'.'+String(row.column_name)));
+  const missingColumns=requiredPairs.filter(pair=>!presentColumns.has(pair));
   return {
     version:BUILD3_SCHEMA_VERSION,
     ready:missingTables.length===0&&missingColumns.length===0,
-    missing_tables:missingTables,
-    missing_columns:missingColumns,
+    missing_tables:[...missingTables],
+    missing_columns:[...missingColumns],
   };
 }
 
