@@ -1,5 +1,6 @@
 import type { Build3ForecastHorizon } from './build-3-forecast-contract';
 import type { Build3PrecisionIssuance } from './build-3-precision';
+import { BUILD3_EFFICACY_SCORING_VERSION, scoreBuild3ZoneEfficacy } from './build-3-efficacy-contract';
 import {
   BUILD3_OUTCOME_VERSION,
   BUILD3_PROBABILITY_RULE_VERSION,
@@ -68,6 +69,14 @@ export function scoreBuild3HorizonOutcome(x:{
   const coreTouch=touch(s.actual_low,s.actual_high,row.core_zone.low,row.core_zone.high);
   const coreClose=inside(s.actual_close,row.core_zone.low,row.core_zone.high);
   const centreError=Math.abs(s.actual_close-row.expected_centre);
+  const outerEfficacy=scoreBuild3ZoneEfficacy({
+    zone_low:row.outer_zone.low,zone_high:row.outer_zone.high,
+    actual_high:s.actual_high,actual_low:s.actual_low,actual_close:s.actual_close,
+  });
+  const coreEfficacy=scoreBuild3ZoneEfficacy({
+    zone_low:row.core_zone.low,zone_high:row.core_zone.high,
+    actual_high:s.actual_high,actual_low:s.actual_low,actual_close:s.actual_close,
+  });
   const prob=probability(row,p,p0,s.actual_close);
   const caOk=engine==='5DR'
     ?s.corporate_action_state==='NOT_APPLICABLE'
@@ -88,6 +97,9 @@ export function scoreBuild3HorizonOutcome(x:{
     centre_error:centreError,normalized_centre_error:centreError/p0*100,
     miss_distance:dist(s.actual_close,row.core_zone.low,row.core_zone.high),
     edge_proximity:Math.min(Math.abs(s.actual_close-row.core_zone.low),Math.abs(s.actual_close-row.core_zone.high)),
+    zone_efficacy_version:BUILD3_EFFICACY_SCORING_VERSION,
+    outer_efficacy:outerEfficacy,
+    core_efficacy:coreEfficacy,
     probability_state:caOk?prob.state:'NOT_SCORABLE',
     realized_probability_class:caOk?prob.actual:null,
     brier_score:caOk?prob.brier:null,
