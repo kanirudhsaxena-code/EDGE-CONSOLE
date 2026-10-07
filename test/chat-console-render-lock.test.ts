@@ -106,3 +106,10 @@ test('Build 2.75 explanation cards do not call scored structured evidence absent
   assert.match(app,/Governed PVPO component/);
   assert.match(app,/PVPO may contribute to DES5 from the governed normalized evidence/);
 });
+
+
+test('Build 2.75 live Chat workflow fails on NIFTY semantic contradictions',()=>{
+  assert.match(workflow,/forbidden_nifty_presentation/);
+  assert.match(workflow,/contradictory_zone_efficacy_pairs/);
+  assert.match(workflow,/actual expected R:R 0\.00 · hard gate FAIL/);
+});
