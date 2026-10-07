@@ -215,15 +215,16 @@ jobs:
               import re
               required=['EDGE NIFTY','TABLE 1 · 5DR ASSESSMENT & EFFICACY','TABLE 2 · CURRENT 5DR RUN','Today’s Market View','5-day forecast','WHAT WE SAW','WHAT IT MEANS','WHY IT MATTERS NOW','What could change the view?','Future performance scorecard','Advanced details','Expected NIFTY zone · D+4','R:R quality subscore']
               forbidden=['Expected NIFTY zone · D+5','D+1 to D+5 outcomes are available']
-              present_forbidden=[x for x in forbidden if x in text]; assert not present_forbidden, {'forbidden_nifty_presentation':present_forbidden}
+              present_forbidden=[x for x in forbidden if x.lower() in text.lower()]; assert not present_forbidden, {'forbidden_nifty_presentation':present_forbidden}
               zone_pairs=re.findall(r'(\\d+)\\s*/\\s*(\\d+)\\s+zone hits',text,re.I)
               assert len(set(zone_pairs))<=1, {'contradictory_zone_efficacy_pairs':zone_pairs}
-              if 'Current 0.00' in text:
-                  assert 'actual expected R:R 0.00 · hard gate FAIL' in text, {'rr_semantic_mismatch':'zero R:R must be explicitly tied to failed hard gate'}
+              if 'current 0.00' in text.lower():
+                  assert 'actual expected r:r 0.00 · hard gate fail' in text.lower(), {'rr_semantic_mismatch':'zero R:R must be explicitly tied to failed hard gate'}
           else:
               required=['EDGE STOCKS','1 — EDGE MASTER ASSESSMENT','2 — ACTIVE CALLS','3 — CURRENT STOCK OUTCOME','4 — DRILL-DOWN',
                         'CANONICAL FORECAST PATH','Five governed sessions · D through D+4','EXACTLY 5','Regime:','Evidence:']
-          missing=[x for x in required if x not in text]; assert not missing, {'missing_console_sections':missing}
+          lower=text.lower()
+          missing=[x for x in required if x.lower() not in lower]; assert not missing, {'missing_console_sections':missing}
           if module=='EDGE_STOCKS':
               rendered_path='/tmp/chat-five-session-rendered.json'
               source_path='/tmp/chat-five-session-source.json'
