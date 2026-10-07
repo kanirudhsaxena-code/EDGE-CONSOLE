@@ -162,7 +162,7 @@ async function read5drReplay(env:ReplayEnv,asOf:Date){
       maturedHorizons++;
       const low=num(row.zone_low),high=num(row.zone_high),p0=num(row.spot_price);
       if(low===null||high===null||!(high>low)){bump(exclusions,'FROZEN_OUTER_ZONE_INVALID');pushSample(exclusion_samples,forecastId+':'+horizon);continue}
-      let actualHigh:number|null=null,actualLow:number|null=null,actualClose:numReturn=null as any;
+      let actualHigh:number|null=null,actualLow:number|null=null,actualClose:number|null=null;
       try{
         const source=await readBuild3OutcomeSource(env,{engine:'5DR',instrument:'NIFTY',source_id:forecastId,target_session:session});
         if(source){
@@ -254,7 +254,6 @@ async function read5drReplay(env:ReplayEnv,asOf:Date){
   };
 }
 
-type numReturn=number|null;
 
 async function readEdgeReplay(env:ReplayEnv,asOf:Date){
   if(!env.EDGE_DATABASE_URL?.trim())throw new Error('BUILD3_REPLAY_EDGE_DATABASE_NOT_CONFIGURED');
