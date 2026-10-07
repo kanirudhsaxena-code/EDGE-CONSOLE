@@ -1,5 +1,6 @@
 import type { Build3DecisionRecord } from './build-3-decision';
 import type { Build3SessionOhlcSource } from './build-3-outcome-types';
+import type { Build3RecommendationIntradaySource } from './build-3-recommendation-intraday-source';
 
 export const BUILD3_RECOMMENDATION_OBSERVATION_VERSION='MDOS_BUILD_3_RECOMMENDATION_OBSERVATION_V1' as const;
 
@@ -13,6 +14,7 @@ export type Build3RecommendationObservation={
   evaluated_at:string;
   state:Build3RecommendationObservationState;
   reason:string|null;
+  evidence_mode:'DAILY_SESSION'|'ONE_MINUTE';
   lifecycle_complete:boolean;
   entry_triggered:boolean;
   entry_triggered_session:string|null;
@@ -25,10 +27,11 @@ export type Build3RecommendationObservation={
     session_date:string;
     source_ref:string;
     provider_hash:string;
-    actual_open:number;
-    actual_high:number;
-    actual_low:number;
-    actual_close:number;
+    actual_open?:number;
+    actual_high?:number;
+    actual_low?:number;
+    actual_close?:number;
+    candle_count?:number;
   }>;
 };
 
@@ -58,7 +61,7 @@ function result(
   return {
     observation_version:BUILD3_RECOMMENDATION_OBSERVATION_VERSION,
     engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
-    evaluated_at:evaluatedAt,state,reason,lifecycle_complete:lifecycleComplete,
+    evaluated_at:evaluatedAt,state,reason,evidence_mode:'DAILY_SESSION',lifecycle_complete:lifecycleComplete,
     entry_triggered:false,entry_triggered_session:null,entry_triggered_basis:null,
     target_hit:null,sl_hit:null,
     expected_sessions:expectedSessions,
@@ -187,5 +190,139 @@ export function observeBuild3RecommendationFromDailySessions(input:{
     entry_triggered_basis:entryBasis,
     target_hit:entryTriggered?targetHit:false,
     sl_hit:entryTriggered?slHit:false,
+  });
+}
+
+
+function minuteResult(
+  decision:Build3DecisionRecord,
+  evaluatedAt:string,
+  lifecycleComplete:boolean,
+  state:Build3RecommendationObservationState,
+  reason:string|null,
+  expectedSessions:string[],
+  sources:Build3RecommendationIntradaySource[],
+  partial:Partial<Build3RecommendationObservation>={},
+):Build3RecommendationObservation{
+  return {
+    observation_version:BUILD3_RECOMMENDATION_OBSERVATION_VERSION,
+    engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+    evaluated_at:evaluatedAt,state,reason,evidence_mode:'ONE_MINUTE',lifecycle_complete:lifecycleComplete,
+    entry_triggered:false,entry_triggered_session:null,entry_triggered_basis:null,
+    target_hit:null,sl_hit:null,
+    expected_sessions:expectedSessions,
+    observed_sessions:sources.map(row=>row.session_date),
+    evidence:sources.map(row=>({
+      session_date:row.session_date,source_ref:row.source_ref,provider_hash:row.provider_hash,
+      candle_count:row.candles.length,
+    })),
+    ...partial,
+  };
+}
+
+export function observeBuild3RecommendationFromMinuteSources(input:{
+  decision:Build3DecisionRecord;
+  expected_sessions:string[];
+  sources:Build3RecommendationIntradaySource[];
+  now?:Date;
+}):Build3RecommendationObservation{
+  const {decision}=input;
+  const now=input.now??new Date();
+  if(Number.isNaN(now.getTime()))throw new Error('BUILD3_RECOMMENDATION_MINUTE_NOW_INVALID');
+  const evaluatedAt=now.toISOString();
+  const expectedSessions=[...new Set(input.expected_sessions)].sort();
+  if(expectedSessions.some(value=>!validDate(value)))throw new Error('BUILD3_RECOMMENDATION_EXPECTED_SESSION_INVALID');
+  if(decision.decision_state!=='ACTIONABLE'){
+    return minuteResult(decision,evaluatedAt,false,'NOT_SCORABLE','ACTIONABLE_RECOMMENDATION_REQUIRED',expectedSessions,[]);
+  }
+  const x=decision.execution_snapshot;
+  const lifecycleEndMs=Date.parse(String(x.lifecycle_end_at??''));
+  if(Number.isNaN(lifecycleEndMs)){
+    return minuteResult(decision,evaluatedAt,false,'NOT_SCORABLE','LIFECYCLE_END_NOT_FROZEN',expectedSessions,[]);
+  }
+  const lifecycleComplete=now.getTime()>=lifecycleEndMs;
+  if(!lifecycleComplete){
+    return minuteResult(decision,evaluatedAt,false,'PENDING','LIFECYCLE_OPEN',expectedSessions,[]);
+  }
+  if(
+    !x.applicable||x.availability!=='COMPLETE'||!x.exact_contract_verified||
+    !finite(x.entry_low)||!finite(x.entry_high)||!finite(x.stop)||!finite(x.efficacy_target)||
+    x.entry_low>x.entry_high
+  ){
+    return minuteResult(decision,evaluatedAt,true,'NOT_SCORABLE','FROZEN_EXECUTION_CONTRACT_INCOMPLETE',expectedSessions,[]);
+  }
+  const frozenKey=String(x.provider_instrument_key??'').trim();
+  if(!frozenKey){
+    return minuteResult(decision,evaluatedAt,true,'NOT_SCORABLE','FROZEN_PROVIDER_INSTRUMENT_KEY_MISSING',expectedSessions,[]);
+  }
+  const lifecycleEndDate=new Date(lifecycleEndMs+330*60_000).toISOString().slice(0,10);
+  const required=expectedSessions.filter(date=>date<=lifecycleEndDate);
+  const byDate=new Map<string,Build3RecommendationIntradaySource>();
+  for(const source of input.sources){
+    if(
+      source.engine!==decision.engine||
+      source.instrument!==decision.instrument||
+      source.source_id!==decision.source_id||
+      source.provider_instrument_key!==frozenKey||
+      source.candle_interval_minutes!==1||
+      !required.includes(source.session_date)
+    ){
+      return minuteResult(decision,evaluatedAt,true,'NOT_SCORABLE','INTRADAY_SOURCE_IDENTITY_MISMATCH',required,[]);
+    }
+    if(byDate.has(source.session_date)){
+      return minuteResult(decision,evaluatedAt,true,'NOT_SCORABLE','INTRADAY_SOURCE_DUPLICATE_SESSION',required,[]);
+    }
+    byDate.set(source.session_date,source);
+  }
+  const missing=required.filter(date=>!byDate.has(date));
+  const sources=required.map(date=>byDate.get(date)).filter((row):row is Build3RecommendationIntradaySource=>!!row);
+  if(missing.length){
+    return minuteResult(decision,evaluatedAt,true,'PENDING','INTRADAY_SOURCE_MISSING:'+missing.join(','),required,sources);
+  }
+
+  const issuedMs=Date.parse(decision.issued_at);
+  if(Number.isNaN(issuedMs))throw new Error('BUILD3_RECOMMENDATION_ISSUED_AT_INVALID');
+  let entryTriggered=false;
+  let entrySession:string|null=null;
+  let entryBasis:'OPEN_IN_BAND'|'RANGE_ENTERED_BAND'|null=null;
+  let targetHit=false;
+  let slHit=false;
+
+  const candles=sources.flatMap(source=>source.candles.map(candle=>({source,candle})))
+    .filter(({candle})=>{
+      const ts=Date.parse(candle.timestamp);
+      return Number.isFinite(ts)&&ts>=issuedMs&&ts<=lifecycleEndMs;
+    })
+    .sort((a,b)=>a.candle.timestamp.localeCompare(b.candle.timestamp));
+
+  for(const {source,candle} of candles){
+    if(!entryTriggered){
+      if(inRange(candle.open,x.entry_low,x.entry_high)){
+        entryTriggered=true;entrySession=source.session_date;entryBasis='OPEN_IN_BAND';
+        targetHit=rangeTouches(candle.low,candle.high,x.efficacy_target);
+        slHit=rangeTouches(candle.low,candle.high,x.stop);
+        continue;
+      }
+      if(bandTouches(candle.low,candle.high,x.entry_low,x.entry_high)){
+        entryTriggered=true;entrySession=source.session_date;entryBasis='RANGE_ENTERED_BAND';
+        const targetSameMinute=rangeTouches(candle.low,candle.high,x.efficacy_target);
+        const slSameMinute=rangeTouches(candle.low,candle.high,x.stop);
+        if(targetSameMinute||slSameMinute){
+          return minuteResult(
+            decision,evaluatedAt,true,'NOT_SCORABLE','ENTRY_MINUTE_TARGET_SL_SEQUENCE_AMBIGUOUS',
+            required,sources,{entry_triggered:true,entry_triggered_session:entrySession,entry_triggered_basis:entryBasis}
+          );
+        }
+        continue;
+      }
+      continue;
+    }
+    if(rangeTouches(candle.low,candle.high,x.efficacy_target))targetHit=true;
+    if(rangeTouches(candle.low,candle.high,x.stop))slHit=true;
+  }
+
+  return minuteResult(decision,evaluatedAt,true,'SCORABLE',null,required,sources,{
+    entry_triggered:entryTriggered,entry_triggered_session:entrySession,entry_triggered_basis:entryBasis,
+    target_hit:entryTriggered?targetHit:false,sl_hit:entryTriggered?slHit:false,
   });
 }
