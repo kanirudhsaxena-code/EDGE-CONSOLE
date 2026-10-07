@@ -30,7 +30,7 @@ jobs:
         run: |
           set -euo pipefail
           AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
-          for attempt in $(seq 1 36); do
+          for attempt in $(seq 1 3); do
             code="$(curl --location --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/api/build3/historical-replay?probe=${{ github.sha }}" -o /tmp/replay.json -w '%{http_code}')"
             if [ "$code" = "200" ] && python - <<'PY'
           import json
@@ -41,7 +41,9 @@ jobs:
               break
             fi
             echo "historical replay preview not ready: http=$code attempt=$attempt"
-            sleep 10
+            cat /tmp/replay.json || true
+            echo
+            sleep 5
           done
 
       - name: Validate complete historical acceptance population
