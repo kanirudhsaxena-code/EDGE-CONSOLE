@@ -271,6 +271,32 @@ export function buildBuild3ModelFeedback(input:{
       comparison_state:'OBSERVED_BASELINE',
     });
   }
+  for(const [gate,stats] of Object.entries(no_trade.rejecting_gate_breakdown)){
+    if(stats.observations<10)continue;
+    const missedRate=stats.missed_opportunity/stats.observations;
+    const protectRate=stats.good_avoid/stats.observations;
+    if(missedRate>=0.3&&stats.missed_opportunity>=3){
+      feedback.push({
+        action:'INVESTIGATE',topic:'NO_TRADE_GATE:'+gate,
+        evidence_strength:strength(stats.observations),sample_size:stats.observations,
+        evidence:{...stats,missed_opportunity_rate_pct:Number((missedRate*100).toFixed(4))},
+        expected_benefit:'Determine whether this specific frozen rejection gate is systematically over-restrictive.',
+        risk:'Gate relaxation may remove genuine capital protection in other regimes.',
+        affected_cohort:'NO_TRADE_GATE:'+gate,next_observations_needed:Math.max(0,30-stats.observations),
+        comparison_state:'OBSERVED_BASELINE',
+      });
+    }else if(protectRate>=0.6&&stats.good_avoid>=6){
+      feedback.push({
+        action:'KEEP',topic:'NO_TRADE_GATE:'+gate,
+        evidence_strength:strength(stats.observations),sample_size:stats.observations,
+        evidence:{...stats,good_avoid_rate_pct:Number((protectRate*100).toFixed(4))},
+        expected_benefit:'Preserve a gate with repeated observed capital-protection value.',
+        risk:'Continue monitoring for cohort-specific missed opportunities.',
+        affected_cohort:'NO_TRADE_GATE:'+gate,next_observations_needed:Math.max(0,30-stats.observations),
+        comparison_state:'OBSERVED_BASELINE',
+      });
+    }
+  }
   return feedback;
 }
 
