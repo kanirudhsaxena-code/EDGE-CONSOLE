@@ -141,6 +141,17 @@ export function validateEdgeStocksResult(body: unknown, options: { requireForeca
         }
         if (!Array.isArray(execution.gate_results) || execution.gate_results.length===0) {
           errors.push('current_stock_outcome.execution.gate_results must explain non-executable decisions');
+        } else {
+          execution.gate_results.forEach((gate,index)=>{
+            if(!isObject(gate)){
+              errors.push(`current_stock_outcome.execution.gate_results[${index}] must be an object`);
+              return;
+            }
+            if(!isNonEmptyString(gate.gate))errors.push(`current_stock_outcome.execution.gate_results[${index}].gate is mandatory`);
+            if(!['PASS','FAIL','N/A'].includes(String(gate.status)))errors.push(`current_stock_outcome.execution.gate_results[${index}].status is invalid`);
+            if(!isNonEmptyString(gate.threshold))errors.push(`current_stock_outcome.execution.gate_results[${index}].threshold is mandatory`);
+            if(String(gate.status)==='FAIL'&&!isNonEmptyString(gate.reason))errors.push(`current_stock_outcome.execution.gate_results[${index}].reason is mandatory for failed gates`);
+          });
         }
       }
     }
