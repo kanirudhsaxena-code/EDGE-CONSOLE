@@ -1,0 +1,60 @@
+name: G5.1 User Output Capture Trigger
+
+on:
+  push:
+    branches:
+      - capture-user-output-20261004
+    paths:
+      - '.github/workflows/g51-user-output-capture-trigger.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  capture:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      CONSOLE_URL: https://edge-console.k-anirudhsaxena.workers.dev
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+      EXPECTED_NIFTY: 5drrun_bed398ae-a158-4b2b-aed3-ae9ab76e468a
+      EXPECTED_LTF: EDGE-LTF-20261004-140227-AUTO
+      EXPECTED_CUPID: EDGE-CUPID-20261004-140319-AUTO
+      EXPECTED_RELIANCE: EDGE-RELIANCE-20261004-140410-AUTO
+
+    steps:
+      - uses: actions/checkout@v4
+      - name: Capture exact governed outputs
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/g51-user-output
+          h=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET" -H "Accept: application/json")
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/5dr/latest" -o /tmp/g51-user-output/nifty_latest.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/5dr/run-request?run_id=$EXPECTED_NIFTY" -o /tmp/g51-user-output/nifty_request.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/5dr/outcome-assessment?run_id=$EXPECTED_NIFTY" -o /tmp/g51-user-output/nifty_outcome_assessment.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/assessment-summary?engine=5DR" -o /tmp/g51-user-output/nifty_assessment_summary.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/edge-stocks/report?ticker=LTF" -o /tmp/g51-user-output/ltf.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/edge-stocks/report?ticker=CUPID" -o /tmp/g51-user-output/cupid.json
+          curl --fail --location --silent --show-error "${h[@]}" "$CONSOLE_URL/api/edge-stocks/report?ticker=RELIANCE" -o /tmp/g51-user-output/reliance.json
+      - name: Validate exact identities
+        run: |
+          python - <<'PY'
+          import json,os
+          root='/tmp/g51-user-output'
+          n=json.load(open(root+'/nifty_latest.json'))
+          assert (n.get('run') or {}).get('run_id')==os.environ['EXPECTED_NIFTY'], n
+          for file,key,envk in [('ltf.json','LTF','EXPECTED_LTF'),('cupid.json','CUPID','EXPECTED_CUPID'),('reliance.json','RELIANCE','EXPECTED_RELIANCE')]:
+            d=json.load(open(root+'/'+file)); r=d.get('report') or {}
+            assert r.get('ticker')==key, r
+            assert r.get('run_id')==os.environ[envk], (key,r.get('run_id'),os.environ[envk])
+            assert r.get('contract_version')=='EDGE_STOCKS_V1_3', r
+            assert r.get('presentation_contract')=='EFFICACY_V2', r
+          print('EXACT_FINAL_USER_OUTPUT_IDENTITIES=PASS')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: g51-final-user-output
+          path: /tmp/g51-user-output
+          retention-days: 3
+          if-no-files-found: error
