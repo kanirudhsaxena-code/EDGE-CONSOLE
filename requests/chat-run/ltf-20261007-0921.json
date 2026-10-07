@@ -1,0 +1,119 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE LTF",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-ltf-20261007-035000z",
+    "ticker": "LTF",
+    "command": "EDGE LTF",
+    "created_at": "2026-10-07T03:50:00Z",
+    "research_fresh_at": "2026-10-07T03:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "LTF_OFFICIAL_INVESTORS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/investors",
+        "title": "L&T Finance investor relations",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "LTF_OFFICIAL_NEWSROOM",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.ltfinance.com/news-room",
+        "title": "L&T Finance official newsroom",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "LTF_SCREENER",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/LTF/",
+        "title": "L&T Finance financial and shareholding snapshot",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "LTF_UNIVEST_20261001",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://univest.in/blogs/why-l-and-t-finance-ltd-share-price-rise-today-2026",
+        "title": "L&T Finance market move and valuation snapshot",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-10-01T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "ltf-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "L&T Finance's official investor materials provide FY27 financial reporting and show AAA/STABLE long-term ratings, supporting a stable funding and credit-quality profile in the bounded source set.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "LTF_OFFICIAL_INVESTORS"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 shareholding shows promoters at about 65.96%, FIIs at 7.71% versus 7.64% in March, and DIIs near 14.90%; this is historical ownership evidence rather than proof of current-session institutional flow.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "LTF_SCREENER"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-catalysts",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "The official newsroom records recent operating and digital-distribution initiatives, including the September 2026 Pine Labs partnership for Agentic Commerce and payments on the PLANET app; the bounded market source did not establish a separate company-specific reason for the October 1 price move.",
+        "materiality": "MODERATE",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "LTF_OFFICIAL_NEWSROOM",
+          "LTF_UNIVEST_20261001"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "A recent market snapshot reported L&T Finance around 20.9x earnings and about 2.3x book value, providing a moderate valuation context rather than a stand-alone trading signal.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "LTF_UNIVEST_20261001"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "ltf-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No material adverse corporate shock was identified in the bounded recent official and market source set; the latest verified company updates were operational, community-development and partnership items.",
+        "materiality": "MODERATE",
+        "direction": "NEUTRAL",
+        "source_ids": [
+          "LTF_OFFICIAL_NEWSROOM",
+          "LTF_UNIVEST_20261001"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Shareholding data is historical and must not be interpreted as current-session institutional order flow.",
+      "Fresh market microstructure and price data are delegated to the governed EDGE market-data acquisition stage."
+    ]
+  }
+}
