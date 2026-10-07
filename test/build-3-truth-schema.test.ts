@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs';
 const migration=readFileSync(new URL('../database/0010_build3_truth_outcomes.sql',import.meta.url),'utf8');
 const efficacy=readFileSync(new URL('../database/0011_build3_efficacy_scoring_contract.sql',import.meta.url),'utf8');
 const recommendationTruth=readFileSync(new URL('../database/0012_build3_recommendation_truth.sql',import.meta.url),'utf8');
+const intradayTruth=readFileSync(new URL('../database/0013_build3_recommendation_intraday_sources.sql',import.meta.url),'utf8');
 
 test('Wave 3 Truth migration defines immutable full-OHLC source evidence',()=>{
   assert.match(migration,/create table if not exists build3_session_ohlc_sources/i);
@@ -51,4 +52,12 @@ test('recommendation Truth attempts are append-only and retryable',()=>{
   assert.match(recommendationTruth,/PENDING_SOURCE/);
   assert.match(recommendationTruth,/NOT_SCORABLE/);
   assert.match(recommendationTruth,/prevent_build3_recommendation_observation_attempt_mutation/i);
+});
+
+
+test('one-minute recommendation truth sources are immutable and provider-key bound',()=>{
+  assert.match(intradayTruth,/create table if not exists build3_recommendation_intraday_sources/i);
+  assert.match(intradayTruth,/provider_instrument_key text not null/i);
+  assert.match(intradayTruth,/candle_interval_minutes integer not null check \(candle_interval_minutes=1\)/i);
+  assert.match(intradayTruth,/prevent_build3_recommendation_intraday_source_mutation/i);
 });
