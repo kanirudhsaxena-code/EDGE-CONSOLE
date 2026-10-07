@@ -72,6 +72,8 @@ test('renders exactly the locked two-table NIFTY user output from the exact run'
   const m=JSON.parse(fs.readFileSync(manifest,'utf8'));
   assert.equal(m.request_id,'5drreq_test');
   assert.equal(m.run_id,'5drrun_test');
+  assert.equal(m.envelope_contract_version,'5DR_V2_1_2');
+  assert.equal(m.output_contract_version,'5DR_V2_1_2');
   assert.deepEqual(m.display_horizons,['D','D+1','D+2','D+3','D+4']);
   assert.equal(m.sections.length,2);
   assert.match(m.output_sha256,/^[0-9a-f]{64}$/);
