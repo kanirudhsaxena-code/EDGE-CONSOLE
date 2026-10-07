@@ -73,6 +73,33 @@ test('stock Core calibration is ATR/factor-driven and never reuses NIFTY width v
   assert.equal(plan.issuance[0].calibration_inputs.empirical_validation_state,'2C-02_OPEN');
 });
 
+
+
+test('stock calibration consumes native verified G5 lineage fields without a second data source',()=>{
+  const rows=stockRows(false).map(row=>({
+    ...row,
+    regime_context:'stock=BULLISH;sector=NEUTRAL;liquidity=CAUTION;event=MODERATE',
+    lineage:{
+      p0:100,
+      atr14:2.4,
+      stock_regime:'BULLISH',
+      sector_regime:'NEUTRAL',
+      liquidity_state:'CAUTION',
+      event_gap_risk_state:'MODERATE',
+      methodology_version:'G5_STOCK_DD4_V1.0',
+    }
+  }));
+  const factors=stockCoreCalibrationFactors(rows[0]);
+  assert.deepEqual(factors.missing,[]);
+  assert.equal(factors.factors?.atr_points,2.4);
+  assert.equal(factors.factors?.liquidity_state,'CAUTION');
+  assert.equal(factors.factors?.gap_event_risk,'MODERATE');
+  const plan=buildStockPrecisionPlan(forecast('EDGE_STOCKS'),rows);
+  assert.equal(plan.issuance.every(row=>row.calibration_state==='UNVALIDATED_SHADOW'),true);
+  assert.equal(plan.forecast.horizons.every(row=>row.core_zone_kind==='CALIBRATED'),true);
+  assert.equal(plan.issuance[0].calibration_inputs.empirical_validation_state,'2C-02_OPEN');
+});
+
 test('stock calibration fails closed to centre-only when attributable ATR/volatility is missing',()=>{
   const rows=stockRows(false);
   const plan=buildStockPrecisionPlan(forecast('EDGE_STOCKS'),rows);
