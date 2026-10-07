@@ -45,3 +45,17 @@ For future autonomous engine-to-console publication, use a dedicated machine/ser
 ## Next adapter step
 
 Connect the 5DR execution/output process to this ingestion boundary. Manual screenshot evidence remains an optional input path. The engine must emit the normalized payload; the Console remains stable even if the internal 5DR implementation evolves.
+
+
+## Chat user-output boundary
+
+The standard ChatGPT surface for EDGE NIFTY is an exact-run presentation boundary, not a free-form summary layer.
+
+For each fresh user invocation the orchestration layer must consume the exact published run and that run's frozen assessment snapshot, validate request/run identity, and render exactly two user tables:
+
+1. `TABLE 1 — 5DR ASSESSMENT & EFFICACY`
+2. `TABLE 2 — CURRENT 5DR RUN`
+
+The deterministic renderer must fail closed if any D:D+4 user-facing forecast slot, probability vector, expected zone, forecast assessment, recommendation assessment, or tradeability field is missing. The Console may expose richer diagnostic analysis, but that diagnostic DOM does not redefine the standard ChatGPT output contract.
+
+The workflow persists a hashed user payload plus manifest. ChatGPT returns that validated payload verbatim for the invocation. This is a presentation/orchestration control only; no 5DR analytical methodology is changed.
