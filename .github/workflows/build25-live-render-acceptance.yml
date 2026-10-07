@@ -103,7 +103,8 @@ jobs:
           if(verifiedCount>0) assert.ok(html.includes('Evidence: Verified'),'verified evidence not rendered as VERIFIED');
           if(excludedCount>0) assert.ok(html.includes('Score: Excluded from score'),'score exclusion not rendered separately');
 
-          const execution=report.current_stock_outcome?.execution||{};\n          console.log('EXECUTION_PAYLOAD='+JSON.stringify(execution));
+          const execution=report.current_stock_outcome?.execution||{};
+          console.log('EXECUTION_PAYLOAD='+JSON.stringify(execution));
           const instrument=String(execution.instrument||'NONE').toUpperCase();
           if(instrument==='NONE'){
             const dominant=String(execution.dominant_rejection_reason||'').trim();
