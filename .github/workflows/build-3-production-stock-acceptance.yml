@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-3-production-stock-acceptance.yml'
+      - 'src/build-3-stock-materializer.ts'
+      - 'src/build-3-stock-forecast.ts'
+      - 'src/build-3-precision.ts'
 
 permissions:
   contents: read
