@@ -23,7 +23,7 @@ test('NIFTY completion materializes independent Core calibration and decision af
   assert.match(materializer,/buildNiftyPrecisionPlan\(forecast\)/);
   assert.match(materializer,/persistBuild3Forecast\(databaseUrl,forecast\)/);
   assert.match(materializer,/persistBuild3PrecisionIssuance\(databaseUrl,precision\.issuance\)/);
-  assert.match(materializer,/buildNiftyBuild3Decision\(forecast,row\.result/);
+  assert.match(materializer,/buildNiftyBuild3Decision\(forecast,resultWithFrozenInstrument/);
   assert.match(materializer,/persistBuild3Decision\(databaseUrl,decision\)/);
 });
 
