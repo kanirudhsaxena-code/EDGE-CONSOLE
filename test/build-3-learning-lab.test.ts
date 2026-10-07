@@ -117,3 +117,22 @@ test('same-population 3% zone comparison can create a challenger only with suffi
   assert.equal(proposal.production_mutation_allowed,false);
   assert.equal(proposal.status,'PROPOSED');
 });
+
+
+test('dual-touch concentration is INVESTIGATE until exact entry/SL geometry is frozen',()=>{
+  const cohort=[truthRow()];
+  const truth=cohort.map(({regime:_r,evidence_quality:_e,event_state:_s,...row})=>row as Build3TruthMetricRow);
+  const cohorts=summarizeBuild3Cohorts(cohort);
+  const recRows=Array.from({length:20},(_,i)=>scoreBuild3RecommendationEfficacy({
+    entry_triggered:true,target_hit:i<4?true:true,sl_hit:i<4?false:i<8?true:false,lifecycle_complete:true,
+  }));
+  const recommendation=summarizeBuild3RecommendationEfficacy(recRows);
+  const noTrade=summarizeBuild3NoTradeOutcomes([]);
+  const scorecard=buildBuild3Scorecard({truth:summarizeBuild3Truth(truth),recommendation,no_trade:noTrade,cohorts});
+  const attribution=summarizeBuild3Attribution(Array.from({length:20},(_,i)=>attributionRow(i)));
+  const feedback=buildBuild3ModelFeedback({scorecard,attribution,no_trade:noTrade});
+  const entry=feedback.find(x=>x.topic==='ENTRY_SL_GEOMETRY');
+  assert.equal(entry?.action,'INVESTIGATE');
+  assert.equal(entry?.evidence.challenger_not_created_reason,'EXACT_ENTRY_SL_GEOMETRY_NOT_YET_DEFINED');
+  assert.equal(feedback.some(x=>x.action==='CHALLENGER'&&x.topic==='ENTRY_SL_GEOMETRY'),false);
+});
