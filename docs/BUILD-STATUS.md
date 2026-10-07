@@ -107,3 +107,26 @@ All release gates passed on 21 September 2026:
 6. `APP_ENV=production` is active.
 
 Production remains fail-closed. Trading execution remains disabled. Future methodology, scoring, recommendation-semantics or Learning Lab changes require explicit governance rather than being folded into production maintenance.
+
+
+## Build 2.75 corrective status — 7 October 2026
+
+Status: **RELEASE BLOCKED UNTIL USER-OUTPUT ACCEPTANCE PASSES**
+
+Closed corrective controls:
+- fresh NIFTY research is required before market acquisition/scoring;
+- research transport success is distinct from FACT_READY evidence;
+- current RBI policy/rate evidence and latest Fed policy evidence are factual gates;
+- unresolved policy facts fail closed rather than silently becoming neutral/zero;
+- exact NIFTY request/run identity is preserved through publication.
+
+New release-blocking user-output controls:
+- every standard NIFTY chat run must generate `chat-user-output.md` from the exact published run and its frozen assessment snapshot;
+- the file must contain exactly two tables: 5DR Assessment & Efficacy, then Current 5DR Run;
+- user-facing horizons are exactly D through D+4;
+- diagnostic Console narrative is excluded from the standard response unless drill-down is requested;
+- `chat-user-output-manifest.json` binds request_id, run_id, horizon contract and SHA-256 output hash;
+- Console render success is parity evidence only and cannot be reported as end-to-end user success;
+- ChatGPT must return the validated `chat-user-output.md` content for the invocation without reconstruction.
+
+Build 2.75 cannot be marked CLOSED until CI passes and at least one fresh governed NIFTY invocation produces and returns the exact validated two-table payload to the user.

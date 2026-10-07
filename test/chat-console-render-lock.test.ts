@@ -8,11 +8,13 @@ const html=fs.readFileSync('public/index.html','utf8');
 const app=fs.readFileSync('public/app.js','utf8');
 const stocks=fs.readFileSync('public/edge-live.js','utf8');
 
-test('Chat presentation is captured from live Console DOM, not rebuilt from engine JSON',()=>{
+test('Console capture remains a parity surface while NIFTY user output is exact-run deterministic',()=>{
   assert.match(capture,/querySelector\('#assessmentSummary'\)\?\.innerText/);
   assert.match(capture,/querySelector\('#fiveDrSummary'\)\?\.innerText/);
   assert.match(capture,/querySelector\('#stocksSummary'\)\?\.innerText/);
-  assert.doesNotMatch(capture,/probabilities\.|directional_label|master_assessment|current_stock_outcome/);
+  assert.match(workflow,/render-nifty-chat-output\.mjs/);
+  assert.match(workflow,/chat-user-output\.md/);
+  assert.match(workflow,/chat-user-output-manifest\.json/);
 });
 
 test('capture selectors are owned by the current Console',()=>{
@@ -48,17 +50,14 @@ test('EDGE NIFTY runner advances then reads canonical persisted state',()=>{
 });
 
 
-test('EDGE NIFTY Chat capture expands full analysis before reading Console text',()=>{
+test('EDGE NIFTY Console diagnostics may expand, but standard chat output rejects diagnostic narrative',()=>{
   assert.match(capture,/querySelector\('\[data-analysis-detail\]'\)/);
   assert.match(capture,/detail\.hidden=false/);
   assert.match(capture,/querySelectorAll\('details'\)\.forEach/);
   assert.match(capture,/node\.open=true/);
-  assert.match(workflow,/5-day forecast/);
-  assert.match(workflow,/WHAT WE SAW/);
-  assert.match(workflow,/WHAT IT MEANS/);
-  assert.match(workflow,/WHY IT MATTERS NOW/);
-  assert.match(workflow,/What could change the view\?/);
-  assert.match(workflow,/Future performance scorecard/);
+  assert.match(workflow,/user_forbidden=\['WHAT WE SAW','WHAT IT MEANS','WHY IT MATTERS NOW','Advanced details','Future performance scorecard'\]/);
+  assert.match(workflow,/diagnostic_narrative_leaked_to_chat_user_output/);
+  assert.match(workflow,/chat_user_output_table_count/);
 });
 
 test('Chat stock UAT preflights independently verified Event-Shock research before dispatch',()=>{
@@ -108,9 +107,12 @@ test('Build 2.75 explanation cards do not call scored structured evidence absent
 });
 
 
-test('Build 2.75 live Chat workflow fails on NIFTY semantic contradictions',()=>{
-  assert.match(workflow,/forbidden_nifty_presentation/);
-  assert.match(workflow,/contradictory_zone_efficacy_pairs/);
-  assert.match(workflow,/actual expected r:r 0\.00 · hard gate fail/);
-  assert.match(workflow,/lower=text\.lower\(\)/);
+test('Build 2.75 live Chat workflow fails on NIFTY user-output identity, shape or integrity contradictions',()=>{
+  assert.match(workflow,/forbidden_nifty_console_presentation/);
+  assert.match(workflow,/missing_chat_user_output_fields/);
+  assert.match(workflow,/chat_user_output_request_mismatch/);
+  assert.match(workflow,/chat_user_output_run_mismatch/);
+  assert.match(workflow,/chat_user_output_hash_mismatch/);
+  assert.match(workflow,/TABLE_1_5DR_ASSESSMENT_EFFICACY/);
+  assert.match(workflow,/TABLE_2_CURRENT_5DR_RUN/);
 });
