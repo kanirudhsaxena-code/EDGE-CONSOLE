@@ -13,6 +13,7 @@ import { buildBuild3RunRegistryRecord, classifyBuild3MarketPhase, persistBuild3R
 import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build-3-evidence-snapshot';
 import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materializer';
+import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-output-read';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -96,7 +97,12 @@ async function exact5drRequest(request:Request,env:Env,requestId:string):Promise
   if(isAccessIdentityEnforced(env)&&actor.role!=='OWNER'&&!actorCanAccessStored(actor,metadata.actor,env))return json({error:'This run belongs to a different Console user'},403);
   const runId=rows[0].run_id?String(rows[0].run_id):null;
   const runRows=runId?await sql`select run_id,contract_version,framework_version,status,provenance_mode,sources,freshness_at,generated_at,result,warnings,published,learning_eligible from analysis_runs where engine='5DR' and run_id=${runId} limit 1`:[];
-  return json({request:rows[0],run:runRows[0]??null});
+  let run:Record<string,unknown>|null=runRows.length?runRows[0] as Record<string,unknown>:null;
+  if(run){
+    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',requestId);
+    run={...run,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
+  }
+  return json({request:rows[0],run});
 }
 
 async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
@@ -125,8 +131,13 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
   }
 
   if(url.pathname==='/api/5dr/latest'&&request.method==='GET'){
-    const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
-    return json({run:rows[0]??null,sandbox:true,note:rows.length?undefined:'No sandbox 5DR run yet'});
+    const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published,req.request_id as build3_source_id from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
+    if(!rows.length)return json({run:null,sandbox:true,note:'No sandbox 5DR run yet'});
+    const sourceId=String(rows[0].build3_source_id);
+    const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',sourceId);
+    const run={...(rows[0] as Record<string,unknown>),build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
+    delete run.build3_source_id;
+    return json({run,sandbox:true});
   }
 
   if(url.pathname==='/api/5dr/outcome-assessment'&&request.method==='GET'){
