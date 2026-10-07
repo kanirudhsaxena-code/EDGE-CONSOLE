@@ -59,8 +59,8 @@ jobs:
           grep -q 'styles.css?v=edge-ui-v19-20260922' /tmp/index.html
           grep -q 'EDGE NIFTY' /tmp/index.html
           grep -q 'Run EDGE NIFTY' /tmp/index.html
-          grep -q 'app.js?v=edge-ui-v19-20260922' /tmp/index.html
-          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/app.js?v=edge-ui-v19-20260922" -o /tmp/app.js
+          grep -q 'app.js?v=build3-core-zone-20261007' /tmp/index.html
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache' "$BASE/app.js?v=build3-core-zone-20261007" -o /tmp/app.js
           grep -Fq 'body:JSON.stringify({command,force_new:true})' /tmp/app.js
           grep -Fq 'force_new:true,client_invocation_id:crypto.randomUUID()' /tmp/app.js
           grep -Fq 'ACTIVE_NIFTY_REQUEST_KEY' /tmp/app.js
