@@ -68,12 +68,20 @@ const report = {
       verification_state:'VERIFIED'
     })),
     risk_override:{status:'CLEAR',code:null},primary_action:'NO TRADE; NO OPTION TRADE.',
-    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B',subscores:{forecast_edge:55,market_trust:92,structure_pattern_quality:60,pv_pvpo_confirmation:55,catalyst_asymmetry:50,execution_quality:60},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},execution:{instrument:'NONE',option_suitability_status:'NO OPTION TRADE',execution_quality_score:60},current_price:3100
+    decision_ladder:'INVESTIGATION',bot:{score:65,grade:'B',subscores:{forecast_edge:55,market_trust:92,structure_pattern_quality:60,pv_pvpo_confirmation:55,catalyst_asymmetry:50,execution_quality:0},weights:{forecast_edge:25,market_trust:20,structure_pattern_quality:20,pv_pvpo_confirmation:15,catalyst_asymmetry:10,execution_quality:10}},execution:{
+      instrument:'NONE',candidate_instrument:null,option_suitability_status:'NO OPTION TRADE',
+      execution_quality_score:0,execution_quality_level:'NOT_EXECUTABLE',
+      dominant_rejection_reason:'base/range has no directional edge',
+      gate_results:[
+        {gate:'DIRECTIONAL_EDGE',status:'FAIL',observed:'BASE_RANGE',threshold:'BULLISH or BEARISH',reason:'base/range has no directional edge'},
+        {gate:'STRUCTURE',status:'FAIL',observed:'NONE',threshold:'verified candidate entry/invalidation/target structure',reason:'verified candidate execution structure is unavailable'}
+      ]
+    },current_price:3100
   },
   drilldown:[
-    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,original_weight:10,normalized_weight:11.1,weighted_contribution:5.55,evidence_quality:'HIGH',conflict_flag:false,finding:'Verified fundamentals evidence was positive.',verification_status:'VERIFIED',key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
+    {component:'BUSINESS_FUNDAMENTALS',score_or_level:1,original_weight:10,normalized_weight:11.1,weighted_contribution:5.55,evidence_quality:'HIGH',conflict_flag:false,finding:'Verified fundamentals evidence was positive.',verification_status:'VERIFIED',score_eligibility:'INCLUDED',score_exclusion_reason:null,key_outcome:'POSITIVE',narrative_source:'LEGACY_SCORE_RECONSTRUCTION',interpretation:'Legacy active run: the original narrative field was not persisted. The immutable verified component score is 1 (positive); Business fundamentals are therefore acting as a medium-term support or drag within the five-day framework.'},
     {component:'PV_PVPO',score_or_level:-1,original_weight:18,normalized_weight:20,weighted_contribution:-10,evidence_quality:'HIGH',conflict_flag:true,finding:'Price and participation weakened.',verification_status:'VERIFIED',key_outcome:'NEGATIVE',narrative_source:'PERSISTED_EVIDENCE_NARRATIVE',interpretation:'Price weakened while participation and available derivatives confirmation did not support a bullish continuation.'},
-    {component:'VALUATION',score_or_level:'N/A',original_weight:7,normalized_weight:null,weighted_contribution:null,evidence_quality:'NOT_VERIFIED',conflict_flag:false,finding:'Verified valuation evidence was unavailable.',verification_status:'NOT_VERIFIED',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
+    {component:'VALUATION',score_or_level:'N/A',original_weight:7,normalized_weight:null,weighted_contribution:null,evidence_quality:'NOT_VERIFIED',conflict_flag:false,finding:'Verified valuation evidence was unavailable.',verification_status:'NOT_VERIFIED',score_eligibility:'EXCLUDED',score_exclusion_reason:'Independent valuation evidence did not meet the gate.',key_outcome:'NOT VERIFIED',interpretation:'Required structured evidence was unavailable or insufficient; no interpretation inferred.'}
   ]
 };
 
@@ -132,6 +140,8 @@ test('unverified institutional behaviour explains the missing evidence plainly',
     component:'INSTITUTIONAL_BEHAVIOUR',
     score_or_level:'N/A',
     verification_status:'NOT_VERIFIED',
+    score_eligibility:'EXCLUDED',
+    score_exclusion_reason:'Fresh independent verification was unavailable.',
     key_outcome:'NOT VERIFIED',
     interpretation:'Supporting provider evidence was excluded because fresh independent ChatGPT web validation was unavailable.'
   });
@@ -278,4 +288,28 @@ test('current G5 user presentation uses D:D+4 five-session terminology without D
   assert.ok(html.includes('5-session zone'));
   assert.ok(html.includes('five governed target sessions'));
   assert.ok(!html.includes('D+5'));
+});
+
+
+test('Build 2.5 renderer separates evidence verification from score eligibility',()=>{
+  const current=structuredClone(report);
+  current.drilldown[0].score_or_level='N/A';
+  current.drilldown[0].score_eligibility='EXCLUDED';
+  current.drilldown[0].score_exclusion_reason='Provider component score unavailable under frozen methodology.';
+  const html=renderEdgeV13(current);
+  assert.ok(html.includes('Evidence: Verified'));
+  assert.ok(html.includes('Score: Excluded from score'));
+  assert.ok(html.includes('Provider component score unavailable under frozen methodology.'));
+});
+
+test('Build 2.5 no-trade card exposes dominant reason, candidate levels state and failed gates',()=>{
+  const html=renderEdgeV13(report);
+  assert.ok(html.includes('Dominant rejection reason:'));
+  assert.ok(html.includes('base/range has no directional edge'));
+  assert.ok(html.includes('Candidate setup'));
+  assert.ok(html.includes('Not available'));
+  assert.ok(html.includes('Why the setup did not become a trade'));
+  assert.ok(html.includes('Directional Edge'));
+  assert.ok(html.includes('FAIL'));
+  assert.ok(html.includes('Not executable'));
 });
