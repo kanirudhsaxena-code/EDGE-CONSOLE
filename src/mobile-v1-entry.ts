@@ -14,6 +14,7 @@ import { build3EvidenceSnapshotRef, freezeBuild3EvidenceSnapshot } from './build
 import { assessBuild3FiveDrDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materializer';
 import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-output-read';
+import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -1036,8 +1037,31 @@ async function preopenStatus(request:Request,env:Env):Promise<Response>{
 }
 
 
+async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
+  const url=new URL(request.url);
+  if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
+    return json({error:'Not found'},404);
+  }
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  if(request.method==='GET'){
+    try{return json(await readBuild3SchemaStatus(env.DATABASE_URL));}
+    catch(error){return json({error:error instanceof Error?error.message:String(error)},503);}
+  }
+  if(request.method==='POST'){
+    if(request.headers.get('X-Build3-Schema-Action')!=='APPLY_ADDITIVE_BUILD3_V1'){
+      return json({error:'Explicit additive Build 3.0 schema action header is required'},403);
+    }
+    try{return json(await applyBuild3Schema(env.DATABASE_URL));}
+    catch(error){return json({error:'Build 3.0 schema migration failed',detail:error instanceof Error?error.message:String(error)},500);}
+  }
+  return json({error:'Method not allowed'},405);
+}
+
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
+  if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
   const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
