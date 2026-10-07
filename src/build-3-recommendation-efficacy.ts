@@ -1,5 +1,8 @@
 import { neon } from '@neondatabase/serverless';
 import { canonicalBuild3EvidenceJson } from './build-3-evidence-snapshot';
+import type { Build3DecisionRecord } from './build-3-decision';
+import type { Build3SessionOhlcSource } from './build-3-outcome-types';
+import { observeBuild3RecommendationFromDailySessions } from './build-3-recommendation-observation';
 import {
   BUILD3_EFFICACY_SCORING_VERSION,
   scoreBuild3RecommendationEfficacy,
@@ -86,4 +89,128 @@ export async function readBuild3RecommendationEfficacySummary(
     ?await sql`select payload from build3_recommendation_efficacy where engine=${engine} order by evaluated_at,source_id`
     :await sql`select payload from build3_recommendation_efficacy order by engine,evaluated_at,source_id`;
   return summarizeBuild3RecommendationEfficacy(rows.map(row=>row.payload as Build3RecommendationEfficacy));
+}
+
+
+export const BUILD3_RECOMMENDATION_OBSERVATION_ATTEMPT_VERSION='MDOS_BUILD_3_RECOMMENDATION_OBSERVATION_ATTEMPT_V1' as const;
+
+export type Build3RecommendationEvaluationResult={
+  engine:'5DR'|'EDGE_STOCKS';
+  instrument:string;
+  source_id:string;
+  status:'SCORED'|'PENDING_SOURCE'|'NOT_SCORABLE';
+  reason:string|null;
+  classification?:Build3RecommendationEfficacy['classification'];
+};
+
+async function recordBuild3RecommendationObservationAttempt(
+  databaseUrl:string,
+  row:Build3RecommendationEvaluationResult,
+  evidence:Record<string,unknown>,
+):Promise<void>{
+  const sql=neon(databaseUrl);
+  const attemptedAt=new Date().toISOString();
+  const payload={
+    attempt_version:BUILD3_RECOMMENDATION_OBSERVATION_ATTEMPT_VERSION,
+    ...row,attempted_at:attemptedAt,evidence,
+  };
+  await sql`
+    insert into build3_recommendation_observation_attempts(
+      attempt_version,engine,instrument,source_id,attempted_at,attempt_state,reason,evidence,payload
+    ) values(
+      ${BUILD3_RECOMMENDATION_OBSERVATION_ATTEMPT_VERSION},${row.engine},${row.instrument},
+      ${row.source_id},${attemptedAt},${row.status},${row.reason},
+      ${JSON.stringify(evidence)}::jsonb,${JSON.stringify(payload)}::jsonb
+    )
+  `;
+}
+
+function restoredSessionSource(row:any,engine:'5DR'|'EDGE_STOCKS',instrument:string):Build3SessionOhlcSource|null{
+  if(!row.outcome_source||!row.source_captured_at||!row.provider_hash||!row.corporate_action_state||!row.adjustment_basis)return null;
+  const values=[row.actual_open,row.actual_high,row.actual_low,row.actual_close].map(Number);
+  if(values.some(value=>!Number.isFinite(value)||value<=0))return null;
+  return {
+    source_version:'BUILD3_SESSION_OHLC_FROM_PERSISTED_OUTCOME_V1',
+    engine,instrument,session_date:new Date(String(row.target_session)).toISOString().slice(0,10),
+    captured_at:new Date(String(row.source_captured_at)).toISOString(),
+    source_ref:String(row.outcome_source),provider_hash:String(row.provider_hash),
+    actual_open:values[0],actual_high:values[1],actual_low:values[2],actual_close:values[3],
+    corporate_action_state:String(row.corporate_action_state) as Build3SessionOhlcSource['corporate_action_state'],
+    adjustment_basis:String(row.adjustment_basis),
+  };
+}
+
+export async function evaluateMaturedBuild3Recommendations(
+  databaseUrl:string|undefined,
+  options:{now?:Date;limit?:number}={},
+):Promise<Build3RecommendationEvaluationResult[]>{
+  if(!databaseUrl?.trim())throw new Error('BUILD3_RECOMMENDATION_EFFICACY_DATABASE_NOT_CONFIGURED');
+  const now=options.now??new Date();
+  if(Number.isNaN(now.getTime()))throw new Error('BUILD3_RECOMMENDATION_EFFICACY_NOW_INVALID');
+  const sql=neon(databaseUrl);
+  const limit=Math.max(1,Math.min(100,Math.floor(options.limit??25)));
+  const candidates=await sql`
+    select d.engine,d.instrument,d.source_id,d.payload
+      from build3_decisions d
+      left join build3_recommendation_efficacy e
+        on e.engine=d.engine and e.source_id=d.source_id
+     where d.decision_state='ACTIONABLE'
+       and e.id is null
+     order by d.issued_at asc,d.id asc
+     limit ${limit}
+  `;
+  const results:Build3RecommendationEvaluationResult[]=[];
+  for(const raw of candidates){
+    const decision=raw.payload as Build3DecisionRecord;
+    const lifecycleAt=Date.parse(String(decision.execution_snapshot?.lifecycle_end_at??''));
+    if(Number.isNaN(lifecycleAt)||now.getTime()<lifecycleAt)continue;
+
+    const truth=await sql`
+      select f.horizon_index,f.target_session,
+             o.outcome_source,o.source_captured_at,o.provider_hash,o.corporate_action_state,o.adjustment_basis,
+             o.actual_open,o.actual_high,o.actual_low,o.actual_close
+        from build3_forecast_horizons f
+        left join build3_precision_outcomes o
+          on o.engine=f.engine and o.source_id=f.source_id and o.horizon=f.horizon
+       where f.engine=${decision.engine}
+         and f.source_id=${decision.source_id}
+       order by f.horizon_index asc
+    `;
+    const expectedSessions=truth.map(row=>new Date(String(row.target_session)).toISOString().slice(0,10));
+    const sessions=truth
+      .map(row=>restoredSessionSource(row,decision.engine,decision.instrument))
+      .filter((row):row is Build3SessionOhlcSource=>!!row);
+    const observation=observeBuild3RecommendationFromDailySessions({
+      decision,expected_sessions:expectedSessions,sessions,now,
+    });
+
+    if(observation.state!=='SCORABLE'){
+      const result:Build3RecommendationEvaluationResult={
+        engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+        status:observation.state==='PENDING'?'PENDING_SOURCE':'NOT_SCORABLE',
+        reason:observation.reason,
+      };
+      await recordBuild3RecommendationObservationAttempt(databaseUrl,result,{observation});
+      results.push(result);
+      continue;
+    }
+    if(observation.target_hit===null||observation.sl_hit===null){
+      throw new Error('BUILD3_RECOMMENDATION_SCORABLE_PRIMITIVES_MISSING');
+    }
+    const efficacy=buildBuild3RecommendationEfficacyRecord({
+      engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+      evaluated_at:observation.evaluated_at,
+      entry_triggered:observation.entry_triggered,target_hit:observation.target_hit,
+      sl_hit:observation.sl_hit,lifecycle_complete:observation.lifecycle_complete,
+      primary_target_label:'T1',evidence:{observation},
+    });
+    const persisted=await persistBuild3RecommendationEfficacy(databaseUrl,efficacy);
+    const result:Build3RecommendationEvaluationResult={
+      engine:decision.engine,instrument:decision.instrument,source_id:decision.source_id,
+      status:'SCORED',reason:null,classification:persisted.classification,
+    };
+    await recordBuild3RecommendationObservationAttempt(databaseUrl,result,{observation,efficacy:persisted});
+    results.push(result);
+  }
+  return results;
 }
