@@ -343,20 +343,14 @@ async function readEdgeReplay(env:ReplayEnv,asOf:Date){
       maturedHorizons++;
       const low=num(row.outer_expected_zone_low),high=num(row.outer_expected_zone_high);
       if(low===null||high===null||!(high>low)){bump(exclusions,'FROZEN_OUTER_ZONE_INVALID');continue}
-      let actualHigh:number|null=null,actualLow:number|null=null,actualClose:number|null=null;
-      const lifecycleId=String(row.lifecycle_id??'').trim();
-      if(lifecycleId){
-        try{
-          const source=await readBuild3OutcomeSource(env,{engine:'EDGE_STOCKS',instrument:String(row.ticker),source_id:lifecycleId,target_session:session});
-          if(source&&['CLEAR','ADJUSTED'].includes(source.corporate_action_state)){
-            actualHigh=source.actual_high;actualLow=source.actual_low;actualClose=source.actual_close;authenticatedOhlc++;
-          }
-        }catch{bump(exclusions,'AUTHENTICATED_OHLC_SOURCE_ERROR')}
-      }
-      if(actualClose===null){
-        actualClose=num(row.checkpoint_close);actualHigh=num(row.checkpoint_high);actualLow=num(row.checkpoint_low);
-        if(actualClose!==null)checkpointTruth++;
-      }
+      // Historical acceptance intentionally uses the persisted EDGE checkpoint
+      // population in one bounded read. Per-horizon market-cache re-reads would
+      // exceed the Cloudflare Worker subrequest ceiling and are not required to
+      // prove scoring against already-captured historical truth.
+      let actualClose=num(row.checkpoint_close);
+      let actualHigh=num(row.checkpoint_high);
+      let actualLow=num(row.checkpoint_low);
+      if(actualClose!==null)checkpointTruth++;
       if(actualClose===null){bump(exclusions,'TRUTH_NOT_AVAILABLE');pushSample(exclusion_samples,recommendationId+':'+horizon);continue}
       addZone(outer,{low,high,actualHigh,actualLow,actualClose});
       const lineage=object(row.lineage);
@@ -420,6 +414,7 @@ async function readEdgeReplay(env:ReplayEnv,asOf:Date){
       matured_horizons:maturedHorizons,
       not_due_horizons:futureHorizons,
       authenticated_ohlc_horizons:authenticatedOhlc,
+      historical_truth_mode:'PERSISTED_EDGE_OUTCOME_CHECKPOINTS',
       legacy_checkpoint_truth_horizons:checkpointTruth,
       core_shadow_eligible_horizons:coreShadowEligible,
     },
