@@ -127,4 +127,5 @@ test('stock actionable execution levels are frozen as a complete decision snapsh
   assert.equal(decision.execution_snapshot.efficacy_target,111);
   assert.equal(decision.execution_snapshot.efficacy_target_label,'T1');
   assert.equal(decision.execution_snapshot.entry_activation_rule,'FIRST_ELIGIBLE_TRADE_IN_ENTRY_BAND_AFTER_ISSUANCE');
+  assert.equal(decision.execution_snapshot.lifecycle_end_at,'2026-10-12T10:00:00.000Z');
 });
