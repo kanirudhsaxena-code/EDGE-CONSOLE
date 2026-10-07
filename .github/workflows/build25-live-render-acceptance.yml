@@ -1,0 +1,161 @@
+name: Build 2.5 Live Render Acceptance
+
+on:
+  push:
+    branches:
+      - 'build25-live-acceptance-*'
+    paths:
+      - 'acceptance-requests/*.json'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-live-render:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CLOUDFLARE_ACCESS_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Resolve Build 2.5 acceptance request
+        shell: bash
+        run: |
+          set -euo pipefail
+          FILE="$(git diff-tree --no-commit-id --name-only -r "$GITHUB_SHA" | grep -E '^acceptance-requests/[^/]+\.json$' | head -1 || true)"
+          test -n "$FILE"
+          test -f "$FILE"
+          python - "$FILE" <<'PY'
+          import json, os, re, sys
+          data=json.load(open(sys.argv[1],encoding='utf-8'))
+          ticker=str(data.get('ticker') or '').strip().upper()
+          expected=str(data.get('expected_run_id') or '').strip()
+          assert re.fullmatch(r'[A-Z0-9._&-]{1,20}',ticker), ticker
+          assert expected.startswith(f'EDGE-{ticker}-'), (ticker,expected)
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as out:
+              out.write(f'EDGE_TICKER={ticker}\n')
+              out.write(f'EXPECTED_RUN_ID={expected}\n')
+          print(json.dumps({'ticker':ticker,'expected_run_id':expected,'acceptance':'BUILD_2_5_LIVE_RENDER'}))
+          PY
+
+      - name: Fetch exact live production report and deployed renderer
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE='https://edge-console.k-anirudhsaxena.workers.dev'
+          AUTH=(-H "CF-Access-Client-Id: $CF_ACCESS_CLIENT_ID" -H "CF-Access-Client-Secret: $CF_ACCESS_CLIENT_SECRET")
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache'             "$BASE/api/edge-stocks/report?ticker=$EDGE_TICKER" -o /tmp/report.json
+          curl --location --fail --silent --show-error "${AUTH[@]}" -H 'Cache-Control: no-cache'             "$BASE/edge-live.js?v=build25-live-${GITHUB_SHA}" -o /tmp/edge-live.mjs
+
+      - name: Validate Build 2.5 criteria A-E against rendered live output
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+
+          const payload=JSON.parse(fs.readFileSync('/tmp/report.json','utf8'));
+          const report=payload.report;
+          assert.ok(report && typeof report==='object',payload);
+          assert.equal(report.ticker,process.env.EDGE_TICKER,report);
+          assert.equal(report.run_id,process.env.EXPECTED_RUN_ID,report);
+          assert.equal(report.contract_version,'EDGE_STOCKS_V1_3',report);
+          assert.equal(report.presentation_contract,'EFFICACY_V2',report);
+
+          const live=await import('file:///tmp/edge-live.mjs?build25='+Date.now());
+          assert.equal(typeof live.renderEdgeV13,'function');
+          const html=live.renderEdgeV13(report);
+          assert.ok(typeof html==='string' && html.length>1000,'rendered HTML missing');
+          fs.writeFileSync('build25-rendered.html',html);
+
+          const esc=(v)=>String(v??'')
+            .replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;')
+            .replaceAll('"','&quot;').replaceAll("'","&#39;");
+
+          const drill=Array.isArray(report.drilldown)?report.drilldown:[];
+          assert.ok(drill.length>0,'drilldown missing');
+          let verifiedCount=0, excludedCount=0;
+          const navOnly=/^(?:home|menu|login|log in|sign in|register|contact|contact us|about|about us|privacy|privacy policy|terms|terms of use|careers|products|services|search)(?:\s*[|•·,\/\-]\s*(?:home|menu|login|log in|sign in|register|contact|contact us|about|about us|privacy|privacy policy|terms|terms of use|careers|products|services|search))*[.!]?$/i;
+
+          for(const row of drill){
+            const verification=String(row.verification_status||'').toUpperCase();
+            const eligibility=String(row.score_eligibility||'').toUpperCase();
+            assert.ok(['INCLUDED','EXCLUDED'].includes(eligibility),row);
+            if(verification==='VERIFIED'){
+              verifiedCount++;
+              const texts=[row.finding,row.interpretation].map(v=>String(v??'').trim()).filter(Boolean);
+              assert.ok(texts.length>0,row);
+              assert.ok(texts.some(t=>!navOnly.test(t)),'navigation/boilerplate-only verified evidence: '+JSON.stringify(row));
+            }
+            if(eligibility==='EXCLUDED'){
+              excludedCount++;
+              const reason=String(row.score_exclusion_reason||'').trim();
+              assert.ok(reason,row);
+              assert.ok(html.includes(esc(reason)),'rendered exclusion reason missing: '+reason);
+            }
+          }
+
+          if(verifiedCount>0) assert.ok(html.includes('Evidence: Verified'),'verified evidence not rendered as VERIFIED');
+          if(excludedCount>0) assert.ok(html.includes('Score: Excluded from score'),'score exclusion not rendered separately');
+
+          const execution=report.current_stock_outcome?.execution||{};
+          const instrument=String(execution.instrument||'NONE').toUpperCase();
+          if(instrument==='NONE'){
+            const dominant=String(execution.dominant_rejection_reason||'').trim();
+            const gates=Array.isArray(execution.gate_results)?execution.gate_results:[];
+            assert.ok(dominant,'dominant rejection reason missing');
+            assert.ok(gates.length>0,'execution gates missing');
+            assert.equal(String(execution.execution_quality_level||'').toUpperCase(),'NOT_EXECUTABLE',execution);
+            const failed=gates.filter(g=>String(g?.status||'').toUpperCase()==='FAIL');
+            assert.ok(failed.length>0,'NO TRADE has no failed gate');
+            assert.ok(html.includes('Dominant rejection reason:'),'dominant reason label missing in render');
+            assert.ok(html.includes(esc(dominant)),'dominant reason value missing in render');
+            assert.ok(html.includes('Candidate setup'),'candidate setup missing in render');
+            assert.ok(html.includes('Why the setup did not become a trade'),'rejection gate section missing in render');
+            assert.ok(html.includes('Not executable'),'execution quality did not render NOT EXECUTABLE');
+            for(const gate of failed){
+              const reason=String(gate.reason||'').trim();
+              assert.ok(reason,gate);
+              assert.ok(html.includes(esc(reason)),'failed gate reason missing in render: '+reason);
+            }
+            const levelKeys=['entry_low','entry_high','stop_price','target1','target2','rr_t1'];
+            if(levelKeys.some(k=>execution[k]==null)) assert.ok(html.includes('Not available'),'unavailable candidate level reason not rendered');
+          }
+
+          assert.ok(html.includes('4 — DRILL-DOWN'),'drill-down section missing');
+          assert.ok(html.includes('3 — CURRENT STOCK OUTCOME'),'current outcome section missing');
+
+          const summary={
+            status:'PASS',
+            acceptance:'BUILD_2_5_LIVE_RENDER',
+            ticker:report.ticker,
+            run_id:report.run_id,
+            criteria:{A:true,B:true,C:true,D:true,E:true},
+            verified_rows:verifiedCount,
+            excluded_rows:excludedCount,
+            recommendation:report.current_stock_outcome?.primary_action??null,
+            instrument
+          };
+          fs.writeFileSync('build25-acceptance-summary.json',JSON.stringify(summary,null,2));
+          console.log(JSON.stringify(summary));
+          NODE
+          cp /tmp/report.json build25-live-report.json
+          cp /tmp/edge-live.mjs build25-deployed-renderer.mjs
+
+      - name: Upload Build 2.5 live acceptance evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build25-live-render-${{ env.EDGE_TICKER }}
+          path: |
+            build25-live-report.json
+            build25-rendered.html
+            build25-acceptance-summary.json
+            build25-deployed-renderer.mjs
+          if-no-files-found: warn
+          retention-days: 30
