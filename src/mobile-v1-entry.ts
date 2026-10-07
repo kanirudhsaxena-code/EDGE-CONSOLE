@@ -16,6 +16,7 @@ import { materializePersistedNiftyBuild3Forecast } from './build-3-nifty-materia
 import { build3PrecisionOutput, readBuild3OutputPrecision } from './build-3-output-read';
 import { applyBuild3Schema, readBuild3SchemaStatus } from './build-3-schema-migration';
 import { isBuild3RuntimeEnabled } from './build-3-isolation';
+import { readBuild3Scorecard } from './build-3-scorecard';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
@@ -1052,6 +1053,32 @@ async function preopenStatus(request:Request,env:Env):Promise<Response>{
 }
 
 
+async function build3ScorecardApi(request:Request,env:Env):Promise<Response>{
+  if(!isBuild3RuntimeEnabled(env))return json({error:'Not found'},404);
+  if(!env.DATABASE_URL)return json({error:'Database is not configured'},503);
+  const actor=await resolveAccessActor(request,env);
+  if(!actor.authenticated||actor.role!=='OWNER'){
+    return json({error:'Owner authentication is required for Build 3 scorecard'},403);
+  }
+  const url=new URL(request.url);
+  const scope=String(url.searchParams.get('engine')??'ALL').toUpperCase();
+  if(!['ALL','5DR','EDGE_STOCKS'].includes(scope)){
+    return json({error:'engine must be ALL, 5DR or EDGE_STOCKS'},422);
+  }
+  try{
+    const scorecard=await readBuild3Scorecard(
+      env.DATABASE_URL,
+      scope==='ALL'?undefined:scope as '5DR'|'EDGE_STOCKS',
+    );
+    return json({scorecard,trading_enabled:false,build3_runtime:true});
+  }catch(error){
+    return json({
+      error:'Build 3 scorecard unavailable',
+      detail:error instanceof Error?error.message:String(error),
+    },503);
+  }
+}
+
 async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
@@ -1077,6 +1104,7 @@ async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Respons
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
+  if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
   if(url.pathname==='/api/session'&&request.method==='GET')return sessionInfo(request,env);
   if(url.pathname==='/api/5dr/dispatch-health'&&request.method==='GET'){const health=await check5drWorkflowAccess(env,fetch);return json({...health,trading_enabled:false},health.ok?200:503)}
   const exactRequest=url.pathname.match(/^\/api\/5dr\/run-requests\/([^/]+)$/);
