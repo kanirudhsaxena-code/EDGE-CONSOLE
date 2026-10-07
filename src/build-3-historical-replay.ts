@@ -449,7 +449,15 @@ async function readEdgeReplay(env:ReplayEnv,asOf:Date){
 export async function readBuild3HistoricalReplay(env:ReplayEnv,input:{as_of?:string}={}){
   const asOf=input.as_of?new Date(input.as_of):new Date();
   if(Number.isNaN(asOf.getTime()))throw new Error('BUILD3_HISTORICAL_REPLAY_AS_OF_INVALID');
-  const [fiveDr,edge]=await Promise.all([read5drReplay(env,asOf),readEdgeReplay(env,asOf)]);
+  const fiveDr=env.FIVEDR_DATABASE_URL?.trim()
+    ?await read5drReplay(env,asOf)
+    :{
+      status:'EXTERNAL_AUTHORITATIVE_REPLAY_REQUIRED' as const,
+      authority:'5DR-V2/DATABASE_URL',
+      reason:'FIVEDR_DATABASE_URL_NOT_AVAILABLE_IN_CONSOLE_RUNTIME',
+      expected_artifact:'build3-5dr-historical-replay',
+    };
+  const edge=await readEdgeReplay(env,asOf);
   const integrity={
     historical_records_mutated:false,
     writes_performed:0,
@@ -470,8 +478,9 @@ export async function readBuild3HistoricalReplay(env:ReplayEnv,input:{as_of?:str
     edge_stocks:edge,
     acceptance:{
       source_population_accounted:
-        fiveDr.accounted_forecasts===fiveDr.source_population.valid_forecasts&&
-        edge.accounted_recommendations===edge.source_population.recommendations,
+        edge.accounted_recommendations===edge.source_population.recommendations&&
+        ('status' in fiveDr||fiveDr.accounted_forecasts===fiveDr.source_population.valid_forecasts),
+      five_dr_external_authority_required:'status' in fiveDr,
       official_vs_shadow_separated:true,
       not_scorable_is_explicit:true,
       historical_replay_can_close_engineering_population_gates:true,
