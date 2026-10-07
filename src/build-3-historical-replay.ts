@@ -215,7 +215,7 @@ async function read5drReplay(env:ReplayEnv,asOf:Date){
   for(const [id,group] of recGroups){
     const types=new Set(group.map(x=>String(x.event_type??'')));
     if(types.has('NOT_SCORABLE')||types.has('ENTRY_NOT_VERIFIABLE')){bump(recommendationExclusions,'EXPLICIT_NOT_SCORABLE_OR_ENTRY_NOT_VERIFIABLE');continue}
-    const entry=types.has('ENTRY_REFERENCE_SET')||types.has('ENTRY_TRIGGERED');
+    const entry=types.has('MARK')||types.has('ENTRY_REFERENCE_SET')||types.has('ENTRY_TRIGGERED');
     if(!entry){bump(recommendationExclusions,'ENTRY_TRIGGER_NOT_FROZEN');continue}
     const target=types.has('T1_HIT');
     const sl=types.has('SL_HIT');
