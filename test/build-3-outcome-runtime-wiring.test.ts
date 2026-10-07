@@ -18,5 +18,7 @@ test('production entry routes the Truth cron before unrelated scheduled work',()
   assert.match(scheduler,/evaluateMaturedBuild3Recommendations\(env\.DATABASE_URL/);
   assert.match(scheduler,/readBuild3TruthMetrics\(env\.DATABASE_URL\)/);
   assert.match(scheduler,/recommendation_results:recommendationResults/);
+  assert.match(scheduler,/evaluateMaturedBuild3NoTrades\(env\.DATABASE_URL/);
+  assert.match(scheduler,/no_trade_results:noTradeResults/);
   assert.match(scheduler,/truth_metrics:truthMetrics/);
 });
