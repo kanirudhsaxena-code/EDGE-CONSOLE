@@ -60,7 +60,7 @@ const STOCK_HORIZON_ATR_MULTIPLIER:Record<Build3Horizon,number>={
   'D+4':0.60,
 };
 const LIQUIDITY_FACTOR:Record<string,number>={
-  DEEP:0.90,HIGH:0.90,NORMAL:1.00,ADEQUATE:1.00,THIN:1.15,WEAK:1.25,LOW:1.25,
+  DEEP:0.90,HIGH:0.90,NORMAL:1.00,ADEQUATE:1.00,CAUTION:1.10,THIN:1.15,WEAK:1.25,LOW:1.25,
 };
 const EVENT_FACTOR:Record<string,number>={
   NONE:1.00,LOW:1.00,NO_MATERIAL_RISK:1.00,MODERATE:1.10,HIGH:1.25,HIGH_RISK:1.25,EXTREME:1.40,
@@ -196,9 +196,9 @@ export function stockCoreCalibrationFactors(row:Build3StockPathRow):{
 }{
   const lineage=lineageObject(row);
   const context=contextFields(row.regime_context);
-  const atr=firstPositive(lineage,['atr_points','atr','median_true_range','realized_range_points']);
+  const atr=firstPositive(lineage,['atr_points','atr','atr14','median_true_range','realized_range_points']);
   const liquidity=firstString(lineage,['liquidity_state','liquidity'])??context.get('LIQUIDITY')??null;
-  const event=firstString(lineage,['gap_event_risk','event_risk'])??context.get('EVENT')??null;
+  const event=firstString(lineage,['gap_event_risk','event_risk','event_gap_risk_state'])??context.get('EVENT')??null;
   const stock=firstString(lineage,['stock_regime'])??context.get('STOCK')??null;
   const sector=firstString(lineage,['sector_regime'])??context.get('SECTOR')??null;
   const missing:string[]=[];
