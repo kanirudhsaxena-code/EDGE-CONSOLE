@@ -21,7 +21,7 @@ export type Build3OutcomeEvaluationResult={
   source_id:string;
   horizon:string;
   target_session:string;
-  status:'SCORED'|'BLOCKED_CORPORATE_ACTION'|'SOURCE_NOT_AVAILABLE'|'SOURCE_INVALID';
+  status:'SCORED'|'BLOCKED_CORPORATE_ACTION'|'SOURCE_NOT_AVAILABLE'|'SOURCE_INVALID'|'RETRYABLE_ERROR';
   detail?:string;
 };
 
@@ -41,7 +41,7 @@ async function recordAttempt(
   row:{
     engine:'5DR'|'EDGE_STOCKS';instrument:string;source_id:string;horizon:string;target_session:string;
   },
-  state:'SOURCE_NOT_AVAILABLE'|'SOURCE_INVALID'|'BLOCKED_CORPORATE_ACTION'|'SCORED'|'ALREADY_SCORED',
+  state:'SOURCE_NOT_AVAILABLE'|'SOURCE_INVALID'|'BLOCKED_CORPORATE_ACTION'|'SCORED'|'ALREADY_SCORED'|'RETRYABLE_ERROR',
   sourceRef:string|null,
   detail:string|null,
 ):Promise<void>{
@@ -125,21 +125,29 @@ export async function evaluateMaturedBuild3Outcomes(
       results.push({...identity,status:'BLOCKED_CORPORATE_ACTION',detail});
       continue;
     }
-    const persistedSource=await persistBuild3SessionOhlcSource(databaseUrl,source);
-    const forecastRow=raw.forecast_payload as Build3ForecastHorizon;
-    const precision=raw.precision_payload as Build3PrecisionIssuance;
-    const outcome=scoreBuild3HorizonOutcome({
-      engine:identity.engine,
-      instrument:identity.instrument,
-      source_id:identity.source_id,
-      reference_price_p0:Number(raw.reference_price_p0),
-      row:forecastRow,
-      precision,
-      source:persistedSource,
-    });
-    await persistBuild3HorizonOutcome(databaseUrl,outcome);
-    await recordAttempt(databaseUrl,identity,'SCORED',persistedSource.source_ref,null);
-    results.push({...identity,status:'SCORED'});
+    try{
+      const persistedSource=await persistBuild3SessionOhlcSource(databaseUrl,source);
+      const forecastRow=raw.forecast_payload as Build3ForecastHorizon;
+      const precision=raw.precision_payload as Build3PrecisionIssuance;
+      const outcome=scoreBuild3HorizonOutcome({
+        engine:identity.engine,
+        instrument:identity.instrument,
+        source_id:identity.source_id,
+        reference_price_p0:Number(raw.reference_price_p0),
+        row:forecastRow,
+        precision,
+        source:persistedSource,
+      });
+      await persistBuild3HorizonOutcome(databaseUrl,outcome);
+      await recordAttempt(databaseUrl,identity,'SCORED',persistedSource.source_ref,null);
+      results.push({...identity,status:'SCORED'});
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      if(isConfigurationError(detail))throw error;
+      await recordAttempt(databaseUrl,identity,'RETRYABLE_ERROR',source.source_ref,detail);
+      results.push({...identity,status:'RETRYABLE_ERROR',detail});
+      continue;
+    }
   }
   return results;
 }
