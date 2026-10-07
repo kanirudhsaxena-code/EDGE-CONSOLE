@@ -1,6 +1,7 @@
 import type { Build3PrecisionIssuance } from './build-3-precision';
+import type { Build3ZoneEfficacy } from './build-3-efficacy-contract';
 
-export const BUILD3_OUTCOME_VERSION='MDOS_BUILD_3_OUTCOME_V1' as const;
+export const BUILD3_OUTCOME_VERSION='MDOS_BUILD_3_OUTCOME_V2' as const;
 export const BUILD3_PROBABILITY_RULE_VERSION='FROZEN_CORE_WIDTH_REBASED_TO_P0_V1' as const;
 
 export type Build3SessionOhlcSource={
@@ -51,6 +52,9 @@ export type Build3HorizonOutcome={
   normalized_centre_error:number;
   miss_distance:number;
   edge_proximity:number;
+  zone_efficacy_version:string;
+  outer_efficacy:Build3ZoneEfficacy;
+  core_efficacy:Build3ZoneEfficacy;
   probability_state:'SCORABLE'|'NOT_SCORABLE';
   realized_probability_class:'BULL'|'RANGE'|'BEAR'|null;
   brier_score:number|null;
