@@ -73,8 +73,8 @@ async function responseJson(response:Response):Promise<JsonRecord>{
 async function prep(env:PreopenEnv,now:Date):Promise<void>{
   const clock=istClock(now);
 
-  // NIFTY uses its existing governed pre-open acquisition -> system-research
-  // path. The 09:05 stage below performs a separate fresh delta-research pass.
+  // NIFTY createAutomatedRun now enforces fresh system research before governed
+  // market acquisition. The 09:05 stage below remains a separate fresh delta-research pass.
   const assessment=await dispatch5drAssessmentRefresh(
     env,
     `preopen-prep-${clock.date}`,
@@ -268,7 +268,7 @@ async function research(env:PreopenEnv,now:Date):Promise<void>{
       missing_dimensions:niftyDeltaBody.missing_dimensions??[]
     },
     stocks,
-    invariant:'DATA_THEN_RESEARCH',
+    invariant:'RESEARCH_FIRST_THEN_DATA_THEN_RECONCILIATION',
     canonical_created:false,
     trading_enabled:false
   }));
