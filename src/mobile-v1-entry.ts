@@ -133,10 +133,11 @@ async function scoped5drRead(request:Request,env:Env):Promise<Response|null>{
   if(url.pathname==='/api/5dr/latest'&&request.method==='GET'){
     const rows=await sql`select ar.run_id,ar.contract_version,ar.framework_version,ar.status,ar.provenance_mode,ar.sources,ar.freshness_at,ar.generated_at,ar.result,ar.warnings,ar.published,req.request_id as build3_source_id from analysis_runs ar join analysis_requests req on req.run_id=ar.run_id where ar.engine='5DR' and req.metadata->'actor'->>'id'=${actor.id} order by ar.generated_at desc limit 1`;
     if(!rows.length)return json({run:null,sandbox:true,note:'No sandbox 5DR run yet'});
-    const sourceId=String(rows[0].build3_source_id);
+    const raw=rows[0] as Record<string,unknown>;
+    const sourceId=String(raw.build3_source_id);
     const precisionRows=await readBuild3OutputPrecision(env.DATABASE_URL,'5DR',sourceId);
-    const run={...(rows[0] as Record<string,unknown>),build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
-    delete run.build3_source_id;
+    const {build3_source_id:_build3SourceId,...visible}=raw;
+    const run={...visible,build3_precision:precisionRows.length?build3PrecisionOutput(precisionRows):null};
     return json({run,sandbox:true});
   }
 
