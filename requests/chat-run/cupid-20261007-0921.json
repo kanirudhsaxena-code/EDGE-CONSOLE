@@ -1,0 +1,131 @@
+{
+  "module": "EDGE_STOCKS",
+  "command": "EDGE CUPID",
+  "research_bundle": {
+    "contract_version": "EDGE_RESEARCH_BUNDLE_V1",
+    "bundle_id": "chat-cupid-20261007-035000z",
+    "ticker": "CUPID",
+    "command": "EDGE CUPID",
+    "created_at": "2026-10-07T03:50:00Z",
+    "research_fresh_at": "2026-10-07T03:50:00Z",
+    "research_authority": "CHATGPT",
+    "retrieval_providers": [
+      "CHATGPT_WEB"
+    ],
+    "sources": [
+      {
+        "source_id": "CUPID_OFFICIAL_NOTICES",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/shareholders-notice/shareholders-notice-2026-2027/",
+        "title": "Cupid Limited shareholder notices 2026-27",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "CUPID_OFFICIAL_FINANCIALS",
+        "provider": "CHATGPT_WEB",
+        "authority": "COMPANY",
+        "url": "https://www.cupidlimited.com/financial-reports/",
+        "title": "Cupid Limited financial reports",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "CUPID_BS_20260930",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.business-standard.com/markets/news/cupid-shares-surge-17-in-2-days-to-record-high-what-s-behind-sharp-rise-126093000347_1.html",
+        "title": "Cupid shares surge 17% in two days to record high",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-09-30T00:00:00Z"
+      },
+      {
+        "source_id": "CUPID_SCREENER",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.screener.in/company/CUPID/consolidated/",
+        "title": "Cupid consolidated financial and shareholding snapshot",
+        "retrieved_at": "2026-10-07T03:50:00Z"
+      },
+      {
+        "source_id": "CUPID_BS_JV_20260828",
+        "provider": "CHATGPT_WEB",
+        "authority": "REPUTABLE_SECONDARY",
+        "url": "https://www.business-standard.com/markets/capital-market-news/board-of-cupid-accords-in-principle-approval-for-establishing-manufacturing-jv-in-south-africa-126082801158_1.html",
+        "title": "Cupid board accords in-principle approval for South Africa manufacturing JV",
+        "retrieved_at": "2026-10-07T03:50:00Z",
+        "publication_date": "2026-08-28T00:00:00Z"
+      }
+    ],
+    "claims": [
+      {
+        "claim_id": "cupid-business",
+        "evidence_category": "BUSINESS_FUNDAMENTALS",
+        "statement": "Cupid's June-quarter FY27 performance showed strong growth, with reported net profit and sales materially higher year on year, while management raised medium-term revenue and profit guidance in the bounded source set.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "CUPID_BS_20260930",
+          "CUPID_OFFICIAL_FINANCIALS"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-institutional",
+        "evidence_category": "INSTITUTIONAL_BEHAVIOUR",
+        "statement": "June 2026 ownership data show FII holding rising to about 4.17% from 1.01% in March and DII holding to about 0.34% from 0.17%; Nifty Smallcap 250 inclusion was also estimated to create passive inflow demand, though this is not proof of current-session flow.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "CUPID_SCREENER",
+          "CUPID_BS_20260930"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-catalysts",
+        "evidence_category": "NEWS_EVENTS_CATALYSTS",
+        "statement": "Recent catalysts include the September 30 Q2 FY27 business update, Nifty Smallcap 250 inclusion and an in-principle South Africa manufacturing joint venture announced in late August.",
+        "materiality": "HIGH",
+        "direction": "POSITIVE",
+        "source_ids": [
+          "CUPID_OFFICIAL_NOTICES",
+          "CUPID_BS_20260930",
+          "CUPID_BS_JV_20260828"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-valuation",
+        "evidence_category": "VALUATION",
+        "statement": "Recent market snapshots place Cupid at a price-to-earnings multiple above 300x, indicating that substantial future growth expectations are already embedded in the valuation.",
+        "materiality": "HIGH",
+        "direction": "NEGATIVE",
+        "source_ids": [
+          "CUPID_SCREENER"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      },
+      {
+        "claim_id": "cupid-event",
+        "evidence_category": "EVENT_SHOCK",
+        "statement": "No adverse corporate shock was identified in the bounded sources, but a roughly 17% two-day rise to a record high alongside a greater-than-300x earnings multiple makes the stock highly sensitive to catalyst confirmation or disappointment.",
+        "materiality": "HIGH",
+        "direction": "BINARY_UNCERTAIN",
+        "source_ids": [
+          "CUPID_BS_20260930",
+          "CUPID_SCREENER"
+        ],
+        "verification_status": "VERIFIED",
+        "independent_validation": true
+      }
+    ],
+    "limitations": [
+      "Rapid price appreciation and elevated valuation can make point-in-time conclusions unstable; current market structure is delegated to EDGE live data acquisition.",
+      "Institutional shareholding is historical ownership evidence, not current-session flow."
+    ]
+  }
+}
