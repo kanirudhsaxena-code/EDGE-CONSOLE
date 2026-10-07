@@ -20,9 +20,10 @@ import { readBuild3Scorecard } from './build-3-scorecard';
 import { readBuild3LearningLab } from './build-3-learning-lab';
 import { prepareBuild3ChallengerEvent, persistBuild3ChallengerEvent } from './build-3-challenger-governance';
 import { persistBuild3RecommendationIntradaySource, type Build3RecommendationIntradaySourceInput } from './build-3-recommendation-intraday-source';
+import { readBuild3HistoricalReplay } from './build-3-historical-replay';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
-type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
+type Env=EngineDispatchEnv&AccessIdentityEnv&{ASSETS:Fetcher;EVIDENCE_BUCKET:R2Bucket;DATABASE_URL?:string;FIVEDR_DATABASE_URL?:string;EDGE_DATABASE_URL?:string;EDGE_GITHUB_TOKEN?:string;MDOS_BUILD3_ENABLED?:string;APP_ENV:string;OUTPUT_CONTRACT_VERSION:string;AI:AiBinding};
 const json=(data:unknown,status=200)=>new Response(JSON.stringify(data,null,2),{status,headers:{'content-type':'application/json; charset=utf-8','cache-control':'private, no-store'}});
 const allowed=new Set<ScreenshotCategory>(['PRICE_TECHNICALS','DERIVATIVES_OI']);
 const REQUIRED_FAMILIES=['PRICE_TECHNICALS','DERIVATIVES_OI','MARKET_TRUST','EVENT_SHOCK','EXECUTION_RISK'] as const;
@@ -1186,6 +1187,20 @@ async function build3ChallengerEventApi(request:Request,env:Env,challengerId:str
   }
 }
 
+async function build3HistoricalReplayApi(request:Request,env:Env):Promise<Response>{
+  const accessProof=request.headers.get('Cf-Access-Jwt-Assertion')
+    ||(request.headers.get('CF-Access-Client-Id')&&request.headers.get('CF-Access-Client-Secret')?'SERVICE_TOKEN':null);
+  if(!accessProof)return json({error:'Cloudflare Access proof is required'},403);
+  const url=new URL(request.url);
+  const asOf=url.searchParams.get('as_of')??undefined;
+  try{
+    const replay=await readBuild3HistoricalReplay(env,{as_of:asOf});
+    return json(replay);
+  }catch(error){
+    return json({error:'Build 3 historical replay failed',detail:error instanceof Error?error.message:String(error)},500);
+  }
+}
+
 async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.hostname!=='build-3-0-accuracy-loop-20261006-edge-console.k-anirudhsaxena.workers.dev'){
@@ -1211,6 +1226,7 @@ async function build3PreviewSchemaAdmin(request:Request,env:Env):Promise<Respons
 export default {async fetch(request:Request,env:Env):Promise<Response>{
   const url=new URL(request.url);
   if(url.pathname==='/api/build3/preview-schema'&&(request.method==='GET'||request.method==='POST'))return build3PreviewSchemaAdmin(request,env);
+  if(url.pathname==='/api/build3/historical-replay'&&request.method==='GET')return build3HistoricalReplayApi(request,env);
   if(url.pathname==='/api/build3/recommendation-intraday-source'&&request.method==='POST')return build3RecommendationIntradaySourceApi(request,env);
   if(url.pathname==='/api/build3/scorecard'&&request.method==='GET')return build3ScorecardApi(request,env);
   if(url.pathname==='/api/build3/learning-lab'&&request.method==='POST')return build3LearningLabApi(request,env);
