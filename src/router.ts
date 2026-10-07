@@ -22,6 +22,7 @@ import { build3EvidenceSnapshotRef, freezeBuild3StockEvidence } from './build-3-
 import { assessBuild3StockDataQuality, build3DataQualityRef, persistBuild3DataQuality } from './build-3-data-quality';
 import { materializePersistedStockBuild3Forecast } from './build-3-stock-materializer';
 import { build3PrecisionOutput, readBuild3NiftyPrecisionByRunId, readBuild3OutputPrecision } from './build-3-output-read';
+import { isBuild3RuntimeEnabled } from './build-3-isolation';
 
 type AiBinding={run:(model:string,input:Record<string,unknown>)=>Promise<unknown>};
 type Env = AccessIdentityEnv & {
@@ -31,6 +32,7 @@ type Env = AccessIdentityEnv & {
   DATABASE_URL?: string;
   EDGE_DATABASE_URL?: string;
   EDGE_GITHUB_TOKEN?: string;
+  MDOS_BUILD3_ENABLED?: string;
   APP_ENV: string;
   OUTPUT_CONTRACT_VERSION: string;
 };
@@ -593,17 +595,18 @@ async function beginNormalStockLifecycle(env:Env,ticker:string):Promise<{
     trigger_type:'USER',
     target_session:currentIstDate(),
   });
-  const build3RunTimestamp=new Date();
-  const build3Run=buildBuild3RunRegistryRecord({
-    engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
-    run_timestamp:build3RunTimestamp,trigger_type:'MANUAL',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
-  });
-  try{
-    await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
-  }catch(error){
-    const detail=error instanceof Error?error.message:String(error);
-    await markStockDataBlocked(env,lifecycleId,`Build 3.0 run registry blocked: ${detail}`);
-    return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',error:detail};
+  if(isBuild3RuntimeEnabled(env)){
+    const build3RunTimestamp=new Date();
+    const build3Run=buildBuild3RunRegistryRecord({
+      engine:'EDGE_STOCKS',instrument:ticker,source_id:lifecycleId,model_version:'EDGE_V1',
+      run_timestamp:build3RunTimestamp,trigger_type:'MANUAL',market_phase:classifyBuild3MarketPhase(build3RunTimestamp)
+    });
+    try{
+      await persistBuild3RunRegistryRecord(env.DATABASE_URL,build3Run);
+    }catch(error){
+      const detail=error instanceof Error?error.message:String(error);
+      return {ok:false,lifecycle_id:lifecycleId,status:'DATA_BLOCKED',error:`Build 3.0 isolated sidecar blocked: ${detail}`};
+    }
   }
   const dispatched=await dispatchEdgeDataWorkflow(env.EDGE_GITHUB_TOKEN??'',{
     ticker,lifecycle_id:lifecycleId,trigger_type:'USER',target_session:currentIstDate()
@@ -667,9 +670,10 @@ export async function progressNormalStockLifecycle(
     if(!lifecycle.market_snapshot_id||!lifecycle.research_bundle_id){
       return {status:'BLOCKED',lifecycle_stage:lifecycle.stage,lifecycle_id:lifecycleId,detail:'RESEARCH_READY lineage is incomplete'};
     }
-    let evidenceSnapshot;
-    try{
-      evidenceSnapshot=await freezeBuild3StockEvidence(env,{
+    if(isBuild3RuntimeEnabled(env)){
+      let evidenceSnapshot;
+      try{
+        evidenceSnapshot=await freezeBuild3StockEvidence(env,{
         ticker,
         lifecycle_id:lifecycleId,
         market_snapshot_id:lifecycle.market_snapshot_id,
@@ -689,15 +693,16 @@ export async function progressNormalStockLifecycle(
       env.DATABASE_URL,
       assessBuild3StockDataQuality(evidenceSnapshot)
     );
-    if(!dataQuality.valid_for_forecast){
-      return {
-        status:'BLOCKED',
-        lifecycle_stage:lifecycle.stage,
-        lifecycle_id:lifecycleId,
-        market_snapshot_id:lifecycle.market_snapshot_id,
-        research_bundle_id:lifecycle.research_bundle_id,
-        detail:`Build 3.0 data-quality gate blocked: ${dataQuality.blockers.join(', ')}`
-      };
+      if(!dataQuality.valid_for_forecast){
+        return {
+          status:'BLOCKED',
+          lifecycle_stage:lifecycle.stage,
+          lifecycle_id:lifecycleId,
+          market_snapshot_id:lifecycle.market_snapshot_id,
+          research_bundle_id:lifecycle.research_bundle_id,
+          detail:`Build 3.0 data-quality gate blocked: ${dataQuality.blockers.join(', ')}`
+        };
+      }
     }
     const dispatch=await dispatchEdgeWorkflow(
       env.EDGE_GITHUB_TOKEN??'',ticker,'UNKNOWN',lifecycle.research_bundle_id,
@@ -710,6 +715,17 @@ export async function progressNormalStockLifecycle(
   }
 
   if(['PERSISTED','PRESENTED'].includes(lifecycle.stage)){
+    if(!isBuild3RuntimeEnabled(env)){
+      return {
+        status:'COMPLETE',
+        lifecycle_stage:lifecycle.stage,
+        lifecycle_id:lifecycleId,
+        run_id:lifecycle.recommendation_id??null,
+        market_snapshot_id:lifecycle.market_snapshot_id,
+        research_bundle_id:lifecycle.research_bundle_id,
+        auction_snapshot_id:lifecycle.auction_snapshot_id,
+      };
+    }
     let build3Forecast;
     try{
       build3Forecast=await materializePersistedStockBuild3Forecast(env,lifecycleId);
@@ -1023,7 +1039,7 @@ async function invokeEdgeStocks(request: Request, env: Env): Promise<Response> {
     : undefined;
 
   let evidenceSnapshotRef:Record<string,string>|null=null;
-  if(lifecycleId&&marketSnapshotId&&researchBundleId){
+  if(isBuild3RuntimeEnabled(env)&&lifecycleId&&marketSnapshotId&&researchBundleId){
     try{
       const evidenceSnapshot=await freezeBuild3StockEvidence(env,{
         ticker,
@@ -1590,7 +1606,7 @@ async function edgeStocksReport(env: Env, ticker: string): Promise<Response> {
   }
 
   let build3Precision: ReturnType<typeof build3PrecisionOutput> = null;
-  if (env.DATABASE_URL && forecastSessions) {
+  if (isBuild3RuntimeEnabled(env) && env.DATABASE_URL && forecastSessions) {
     try {
       const lifecycleRows = await sql`
         select lifecycle_id
@@ -1992,6 +2008,7 @@ export default { async fetch(request: Request, env: Env): Promise<Response> {
     `;
     if(!rows.length)return json({run:null,note:'No published 5DR run yet'});
     const run=rows[0] as Record<string,unknown>;
+    if(!isBuild3RuntimeEnabled(env))return json({run,note:undefined});
     const precision=await readBuild3NiftyPrecisionByRunId(env.DATABASE_URL,String(run.run_id));
     return json({
       run:{...run,build3_precision:precision?build3PrecisionOutput(precision.rows):null},
