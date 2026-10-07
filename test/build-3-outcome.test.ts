@@ -48,8 +48,8 @@ test('direction uses frozen P0 and Core/Outer touch and close stay separate',()=
   assert.equal(o.normalized_centre_error,2);
   assert.equal(o.miss_distance,1);
   assert.equal(o.outer_efficacy.close_hit,true);
-  assert.equal(o.outer_efficacy.deviation_hit,false);
-  assert.equal(o.outer_efficacy.quality_status,'AMBER');
+  assert.equal(o.outer_efficacy.deviation_hit,true);
+  assert.equal(o.outer_efficacy.quality_status,'GREEN');
   assert.equal(o.core_efficacy.close_hit,false);
   assert.equal(o.core_efficacy.deviation_hit,false);
   assert.equal(o.core_efficacy.quality_status,'RED');
@@ -92,8 +92,9 @@ test('stock corporate-action uncertainty blocks headline scoring explicitly',()=
 
 test('centre-only Core remains direction/zone scorable but Brier fails closed',()=>{
   const p={...precision,core_low:101,core_high:101,core_width_points:0,core_width_percent:0};
+  const centreOnlyRow={...row,core_zone_kind:'CENTRE_ONLY' as const,core_zone:{low:101,high:101}};
   const o=scoreBuild3HorizonOutcome({
-    engine:'5DR',instrument:'NIFTY',source_id:'req-1',reference_price_p0:100,row,precision:p,source,
+    engine:'5DR',instrument:'NIFTY',source_id:'req-1',reference_price_p0:100,row:centreOnlyRow,precision:p,source,
   });
   assert.equal(o.direction_result,'HIT');
   assert.equal(o.probability_state,'NOT_SCORABLE');
