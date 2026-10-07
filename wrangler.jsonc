@@ -28,6 +28,7 @@
   },
   "vars": {
     "APP_ENV": "production",
+    "MDOS_BUILD3_ENABLED": "true",
     "ACCESS_IDENTITY_MODE": "AUDIT",
     "OUTPUT_CONTRACT_VERSION": "1.0",
     "FIVEDR_REPOSITORY": "kanirudhsaxena-code/EDGE---V1",
