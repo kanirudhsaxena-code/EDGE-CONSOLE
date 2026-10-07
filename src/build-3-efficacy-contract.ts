@@ -137,6 +137,14 @@ export function scoreBuild3RecommendationEfficacy(input:{
       conservative_result:null,liberal_result:null,finalized_triggered:false,
     };
   }
+  if(!lifecycle_complete){
+    return {
+      scoring_version:BUILD3_EFFICACY_SCORING_VERSION,
+      entry_triggered,target_hit,sl_hit,lifecycle_complete,
+      classification:'OPEN',
+      conservative_result:null,liberal_result:null,finalized_triggered:false,
+    };
+  }
   if(target_hit&&sl_hit){
     return {
       scoring_version:BUILD3_EFFICACY_SCORING_VERSION,
@@ -159,14 +167,6 @@ export function scoreBuild3RecommendationEfficacy(input:{
       entry_triggered,target_hit:false,sl_hit,lifecycle_complete,
       classification:'SL_ONLY',
       conservative_result:'LOSS',liberal_result:'LOSS',finalized_triggered:true,
-    };
-  }
-  if(!lifecycle_complete){
-    return {
-      scoring_version:BUILD3_EFFICACY_SCORING_VERSION,
-      entry_triggered,target_hit:false,sl_hit:false,lifecycle_complete,
-      classification:'OPEN',
-      conservative_result:null,liberal_result:null,finalized_triggered:false,
     };
   }
   return {
