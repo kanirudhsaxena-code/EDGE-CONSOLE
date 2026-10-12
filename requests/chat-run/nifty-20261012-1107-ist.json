@@ -1,0 +1,12 @@
+{
+  "module": "EDGE_NIFTY",
+  "command": "Run EDGE NIFTY as per master specifications",
+  "client_invocation_id": "edge-nifty-20261012-1107-ist",
+  "assessment": {
+    "objective": "BOTH",
+    "risk_posture": "CONSERVATIVE",
+    "capital_priority": "CAPITAL_PROTECTION"
+  },
+  "capture_only": false,
+  "resume_existing": false
+}
