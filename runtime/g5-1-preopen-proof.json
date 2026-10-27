@@ -4,7 +4,7 @@
     "coverage_years": [
       2026
     ],
-    "previous_trading_session": "2026-10-23",
+    "previous_trading_session": "2026-10-26",
     "schema": "NSE_TRADING_CALENDAR_V1",
     "session_state": "TRADING_DAY"
   },
@@ -26,16 +26,16 @@
       "task": "RELIANCE"
     }
   ],
-  "generated_at": "2026-10-26T09:22:51.272023Z",
+  "generated_at": "2026-10-27T09:21:47.450260Z",
   "nifty": {},
   "point_12": {
     "acceptance": "genuine persisted NSE pre-open evidence; no backdating or timing inference",
-    "checked_at": "2026-10-26T09:22:51.272007Z",
+    "checked_at": "2026-10-27T09:21:47.450243Z",
     "session_state": "TRADING_DAY",
     "status": "FAIL",
     "verification_required": true
   },
   "schema": "MDOS_G5_1_PREOPEN_PROOF_V2",
   "stocks": {},
-  "target_date_ist": "2026-10-26"
+  "target_date_ist": "2026-10-27"
 }
